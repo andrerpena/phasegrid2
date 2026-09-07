@@ -12,6 +12,7 @@
 #include "render/OfflineRenderer.hpp"
 #include "render/PatchFile.hpp"
 #include "services/BlockSplitter.hpp"
+#include "services/Catalog.hpp"
 #include "services/MiniaudioBackend.hpp"
 
 static int usage() {
@@ -19,7 +20,8 @@ static int usage() {
       "phasegrid-engine\n"
       "  --version\n"
       "  --tone [seconds]      play a 440 Hz test tone on the default device\n"
-      "  --render <patch.json> --out <file.wav> [--seconds N] [--sr N] [--block N]");
+      "  --render <patch.json> --out <file.wav> [--seconds N] [--sr N] [--block N]\n"
+      "  --catalog             print the module catalog as JSON");
   return 2;
 }
 
@@ -84,9 +86,20 @@ static int runRender(int argc, char** argv) {
   return 0;
 }
 
+/// Every built-in module's ports, params and ranges, as JSON on stdout. The user interface reads this
+/// instead of carrying a hand-written copy of the module list, which is why adding a module needs no
+/// TypeScript change.
+static int runCatalog() {
+  pg::Registry reg;
+  pg::registerBuiltinModules(reg);
+  std::printf("%s\n", pg::catalogJson(reg).dump(2).c_str());
+  return 0;
+}
+
 int main(int argc, char** argv) {
   if (argc >= 2 && std::strcmp(argv[1], "--version") == 0) { std::printf("%s\n", pg::engineVersion()); return 0; }
   if (argc >= 2 && std::strcmp(argv[1], "--tone") == 0) return runTone(argc >= 3 ? std::atoi(argv[2]) : 3);
   if (argc >= 2 && std::strcmp(argv[1], "--render") == 0) return runRender(argc, argv);
+  if (argc >= 2 && std::strcmp(argv[1], "--catalog") == 0) return runCatalog();
   return usage();
 }

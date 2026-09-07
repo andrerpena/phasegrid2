@@ -1,0 +1,5730 @@
+{
+  "catalogHash": "8cc576888b6e1d73",
+  "conventions": {
+    "blockSize": 128,
+    "gateThreshold": 0,
+    "lanes": [
+      "v0.L",
+      "v0.R",
+      "v1.L",
+      "v1.R"
+    ],
+    "middleCHz": 261.6256,
+    "octavesPerUnit": 10.0
+  },
+  "modules": [
+    {
+      "category": "amp",
+      "doc": "Voltage-controlled amplifier: multiplies its input by the Gain knob plus the gain input, clamped at zero. Plug an envelope into gain and turn the knob down to shape a note.",
+      "flags": {
+        "needsTransport": false,
+        "terminal": false,
+        "writesTelemetry": false
+      },
+      "id": "amp.vca",
+      "inputs": [
+        {
+          "doc": "Signal to amplify",
+          "id": "in",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "In",
+          "role": "audio"
+        },
+        {
+          "doc": "Control signal, added to the Gain knob before the curve",
+          "id": "gain",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Gain",
+          "role": "cv"
+        },
+        {
+          "doc": "Gain with nothing plugged into the gain input; the input adds to it",
+          "id": "param:gain",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Gain",
+          "param": "gain",
+          "role": "cv"
+        }
+      ],
+      "name": "VCA",
+      "outputs": [
+        {
+          "doc": "in * curve(Gain knob + gain input)",
+          "id": "out",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Out",
+          "role": "audio"
+        }
+      ],
+      "params": [
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "Gain with nothing plugged into the gain input; the input adds to it",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "gain",
+          "max": 2.0,
+          "min": 0.0,
+          "name": "Gain",
+          "uiWidget": "slider",
+          "unit": "ratio"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Linear multiplies by the sum; Exponential squares it first, which tracks how loudness is heard",
+          "enumLabels": [
+            "Linear",
+            "Exponential"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "curve",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Curve",
+          "uiWidget": "select",
+          "unit": "none"
+        }
+      ]
+    },
+    {
+      "category": "mod",
+      "doc": "Delay/attack/hold/decay/sustain/release envelope. The gate holds it at the sustain level; a falling edge starts the release. Times are in seconds after the stage curve is applied.",
+      "flags": {
+        "needsTransport": false,
+        "terminal": false,
+        "writesTelemetry": false
+      },
+      "id": "env.dahdsr",
+      "inputs": [
+        {
+          "doc": "Gate: a rising edge starts the envelope, a falling edge starts the release",
+          "id": "gate",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Gate",
+          "role": "gate"
+        },
+        {
+          "doc": "Envelope 1 Attack",
+          "id": "param:attack",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Attack",
+          "param": "attack",
+          "role": "cv"
+        },
+        {
+          "doc": "Envelope 1 Decay",
+          "id": "param:decay",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Decay",
+          "param": "decay",
+          "role": "cv"
+        },
+        {
+          "doc": "Envelope 1 Delay",
+          "id": "param:delay",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Delay",
+          "param": "delay",
+          "role": "cv"
+        },
+        {
+          "doc": "Envelope 1 Hold",
+          "id": "param:hold",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Hold",
+          "param": "hold",
+          "role": "cv"
+        },
+        {
+          "doc": "Envelope 1 Release",
+          "id": "param:release",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Release",
+          "param": "release",
+          "role": "cv"
+        },
+        {
+          "doc": "Envelope 1 Sustain",
+          "id": "param:sustain",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Sustain",
+          "param": "sustain",
+          "role": "cv"
+        }
+      ],
+      "name": "Envelope",
+      "outputs": [
+        {
+          "doc": "Envelope level, 0..1",
+          "id": "out",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Out",
+          "role": "cv"
+        },
+        {
+          "doc": "Which stage the envelope is in, plus how far through it: 2.0 is the start of the attack, 2.5 halfway",
+          "id": "phase",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Phase",
+          "role": "phase"
+        }
+      ],
+      "params": [
+        {
+          "curve": "linear",
+          "default": 0.14949999749660492,
+          "doc": "Envelope 1 Attack",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "attack",
+          "max": 2.378420114517212,
+          "min": 0.0,
+          "name": "Attack",
+          "uiWidget": "slider",
+          "unit": "seconds"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Envelope 1 Attack Power",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": false,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "attack_power",
+          "max": 20.0,
+          "min": -20.0,
+          "name": "Attack Power",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "Envelope 1 Decay",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "decay",
+          "max": 2.378420114517212,
+          "min": 0.0,
+          "name": "Decay",
+          "uiWidget": "slider",
+          "unit": "seconds"
+        },
+        {
+          "curve": "linear",
+          "default": -2.0,
+          "doc": "Envelope 1 Decay Power",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": false,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "decay_power",
+          "max": 20.0,
+          "min": -20.0,
+          "name": "Decay Power",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Envelope 1 Delay",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "delay",
+          "max": 1.4142135381698608,
+          "min": 0.0,
+          "name": "Delay",
+          "uiWidget": "slider",
+          "unit": "seconds"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Envelope 1 Hold",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "hold",
+          "max": 1.4142135381698608,
+          "min": 0.0,
+          "name": "Hold",
+          "uiWidget": "slider",
+          "unit": "seconds"
+        },
+        {
+          "curve": "linear",
+          "default": 0.5475999712944031,
+          "doc": "Envelope 1 Release",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "release",
+          "max": 2.378420114517212,
+          "min": 0.0,
+          "name": "Release",
+          "uiWidget": "slider",
+          "unit": "seconds"
+        },
+        {
+          "curve": "linear",
+          "default": -2.0,
+          "doc": "Envelope 1 Release Power",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": false,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "release_power",
+          "max": 20.0,
+          "min": -20.0,
+          "name": "Release Power",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "Envelope 1 Sustain",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "sustain",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Sustain",
+          "uiWidget": "slider",
+          "unit": "none"
+        }
+      ]
+    },
+    {
+      "category": "filter",
+      "doc": "Multi-model filter: analog, dirty, ladder, digital, diode, formant, comb, phaser. Cutoff is a MIDI note number, so a semitone of modulation is a semitone of cutoff.",
+      "flags": {
+        "needsTransport": false,
+        "terminal": false,
+        "writesTelemetry": false
+      },
+      "id": "filter.multi",
+      "inputs": [
+        {
+          "doc": "Audio input",
+          "id": "in",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "In",
+          "role": "audio"
+        },
+        {
+          "doc": "Gate: a rising edge resets the filter state",
+          "id": "reset",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Reset",
+          "role": "gate"
+        },
+        {
+          "doc": "Pitch the comb model tunes to",
+          "id": "pitch",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Pitch",
+          "role": "pitch"
+        },
+        {
+          "doc": "Pitch for key tracking: semitones from middle C, scaled by the Key Track amount",
+          "id": "keytrack",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Key Track",
+          "role": "pitch"
+        },
+        {
+          "doc": "Filter 1 Blend",
+          "id": "param:blend",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Blend",
+          "param": "blend",
+          "role": "cv"
+        },
+        {
+          "doc": "Filter 1 Comb Blend Offset",
+          "id": "param:blend_transpose",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Comb Blend Offset",
+          "param": "blend_transpose",
+          "role": "cv"
+        },
+        {
+          "doc": "Filter 1 Cutoff",
+          "id": "param:cutoff",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Cutoff",
+          "param": "cutoff",
+          "role": "cv"
+        },
+        {
+          "doc": "Filter 1 Drive",
+          "id": "param:drive",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Drive",
+          "param": "drive",
+          "role": "cv"
+        },
+        {
+          "doc": "Filter 1 Formant Resonance",
+          "id": "param:formant_resonance",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Formant Resonance",
+          "param": "formant_resonance",
+          "role": "cv"
+        },
+        {
+          "doc": "Filter 1 Formant Spread",
+          "id": "param:formant_spread",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Formant Spread",
+          "param": "formant_spread",
+          "role": "cv"
+        },
+        {
+          "doc": "Filter 1 Formant Transpose",
+          "id": "param:formant_transpose",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Formant Transpose",
+          "param": "formant_transpose",
+          "role": "cv"
+        },
+        {
+          "doc": "Filter 1 Formant X",
+          "id": "param:formant_x",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Formant X",
+          "param": "formant_x",
+          "role": "cv"
+        },
+        {
+          "doc": "Filter 1 Formant Y",
+          "id": "param:formant_y",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Formant Y",
+          "param": "formant_y",
+          "role": "cv"
+        },
+        {
+          "doc": "Filter 1 Key Track",
+          "id": "param:keytrack",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Key Track",
+          "param": "keytrack",
+          "role": "cv"
+        },
+        {
+          "doc": "Filter 1 Mix",
+          "id": "param:mix",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Mix",
+          "param": "mix",
+          "role": "cv"
+        },
+        {
+          "doc": "Filter 1 Resonance",
+          "id": "param:resonance",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Resonance",
+          "param": "resonance",
+          "role": "cv"
+        }
+      ],
+      "name": "Filter",
+      "outputs": [
+        {
+          "doc": "Filtered audio",
+          "id": "out",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Out",
+          "role": "audio"
+        }
+      ],
+      "params": [
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Filter 1 Blend",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "blend",
+          "max": 2.0,
+          "min": 0.0,
+          "name": "Blend",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 42.0,
+          "doc": "Filter 1 Comb Blend Offset",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "blend_transpose",
+          "max": 84.0,
+          "min": 0.0,
+          "name": "Comb Blend Offset",
+          "uiWidget": "slider",
+          "unit": "semitones"
+        },
+        {
+          "curve": "linear",
+          "default": 60.0,
+          "doc": "Filter 1 Cutoff",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "cutoff",
+          "max": 136.0,
+          "min": 8.0,
+          "name": "Cutoff",
+          "uiWidget": "slider",
+          "unit": "semitones"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Filter 1 Drive",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "drive",
+          "max": 20.0,
+          "min": 0.0,
+          "name": "Drive",
+          "uiWidget": "slider",
+          "unit": "db"
+        },
+        {
+          "curve": "linear",
+          "default": 0.8500000238418579,
+          "doc": "Filter 1 Formant Resonance",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "formant_resonance",
+          "max": 1.0,
+          "min": 0.30000001192092896,
+          "name": "Formant Resonance",
+          "uiWidget": "slider",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Filter 1 Formant Spread",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "formant_spread",
+          "max": 1.0,
+          "min": -1.0,
+          "name": "Formant Spread",
+          "uiWidget": "slider",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Filter 1 Formant Transpose",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "formant_transpose",
+          "max": 12.0,
+          "min": -12.0,
+          "name": "Formant Transpose",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.5,
+          "doc": "Filter 1 Formant X",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "formant_x",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Formant X",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.5,
+          "doc": "Filter 1 Formant Y",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "formant_y",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Formant Y",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Filter 1 Key Track",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "keytrack",
+          "max": 1.0,
+          "min": -1.0,
+          "name": "Key Track",
+          "uiWidget": "slider",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "Filter 1 Mix",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "mix",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Mix",
+          "uiWidget": "slider",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Filter 1 Model",
+          "enumLabels": [
+            "Analog",
+            "Dirty",
+            "Ladder",
+            "Digital",
+            "Diode",
+            "Formant",
+            "Comb",
+            "Phaser"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "model",
+          "max": 7.0,
+          "min": 0.0,
+          "name": "Model",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.5,
+          "doc": "Filter 1 Resonance",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "resonance",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Resonance",
+          "uiWidget": "slider",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Filter style; the meaning depends on Model (0..4 name the analog and digital shapes: 12dB, 24dB, Notch Blend, Notch Spread, B/P/N)",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "style",
+          "max": 9.0,
+          "min": 0.0,
+          "name": "Style",
+          "uiWidget": "slider",
+          "unit": "none"
+        }
+      ]
+    },
+    {
+      "category": "fx",
+      "doc": "Chorus built from up to four modulated delay pairs sharing one rate. Frequency is a power of two in hertz; Delay 1 and Delay 2 set the range the pairs are spread across.",
+      "flags": {
+        "needsTransport": false,
+        "terminal": false,
+        "writesTelemetry": false
+      },
+      "id": "fx.chorus",
+      "inputs": [
+        {
+          "doc": "Audio input",
+          "id": "in",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "In",
+          "role": "audio"
+        },
+        {
+          "doc": "Chorus Filter Cutoff",
+          "id": "param:cutoff",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Chorus Filter Cutoff",
+          "param": "cutoff",
+          "role": "cv"
+        },
+        {
+          "doc": "Chorus Delay 1",
+          "id": "param:delay_1",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Chorus Delay 1",
+          "param": "delay_1",
+          "role": "cv"
+        },
+        {
+          "doc": "Chorus Delay 2",
+          "id": "param:delay_2",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Chorus Delay 2",
+          "param": "delay_2",
+          "role": "cv"
+        },
+        {
+          "doc": "Chorus Mix",
+          "id": "param:dry_wet",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Chorus Mix",
+          "param": "dry_wet",
+          "role": "cv"
+        },
+        {
+          "doc": "Chorus Feedback",
+          "id": "param:feedback",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Chorus Feedback",
+          "param": "feedback",
+          "role": "cv"
+        },
+        {
+          "doc": "Chorus Frequency",
+          "id": "param:frequency",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Chorus Frequency",
+          "param": "frequency",
+          "role": "cv"
+        },
+        {
+          "doc": "Chorus Mod Depth",
+          "id": "param:mod_depth",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Chorus Mod Depth",
+          "param": "mod_depth",
+          "role": "cv"
+        },
+        {
+          "doc": "Chorus Filter Spread",
+          "id": "param:spread",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Chorus Filter Spread",
+          "param": "spread",
+          "role": "cv"
+        }
+      ],
+      "name": "Chorus",
+      "outputs": [
+        {
+          "doc": "Dry/wet chorus output",
+          "id": "out",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Out",
+          "role": "audio"
+        }
+      ],
+      "params": [
+        {
+          "curve": "linear",
+          "default": 60.0,
+          "doc": "Chorus Filter Cutoff",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "cutoff",
+          "max": 136.0,
+          "min": 8.0,
+          "name": "Chorus Filter Cutoff",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": -9.0,
+          "doc": "Chorus Delay 1",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "delay_1",
+          "max": -5.64385986328125,
+          "min": -10.0,
+          "name": "Chorus Delay 1",
+          "uiWidget": "slider",
+          "unit": "seconds"
+        },
+        {
+          "curve": "linear",
+          "default": -7.0,
+          "doc": "Chorus Delay 2",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "delay_2",
+          "max": -5.64385986328125,
+          "min": -10.0,
+          "name": "Chorus Delay 2",
+          "uiWidget": "slider",
+          "unit": "seconds"
+        },
+        {
+          "curve": "linear",
+          "default": 0.5,
+          "doc": "Chorus Mix",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "dry_wet",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Chorus Mix",
+          "uiWidget": "slider",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 0.4000000059604645,
+          "doc": "Chorus Feedback",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "feedback",
+          "max": 0.949999988079071,
+          "min": -0.949999988079071,
+          "name": "Chorus Feedback",
+          "uiWidget": "slider",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": -3.0,
+          "doc": "Chorus Frequency",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "frequency",
+          "max": 3.0,
+          "min": -6.0,
+          "name": "Chorus Frequency",
+          "uiWidget": "slider",
+          "unit": "seconds"
+        },
+        {
+          "curve": "linear",
+          "default": 0.5,
+          "doc": "Chorus Mod Depth",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "mod_depth",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Chorus Mod Depth",
+          "uiWidget": "slider",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "Chorus Filter Spread",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "spread",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Chorus Filter Spread",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "Chorus Sync",
+          "enumLabels": [
+            "Seconds",
+            "Tempo",
+            "Tempo Dotted",
+            "Tempo Triplets"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "sync",
+          "max": 3.0,
+          "min": 0.0,
+          "name": "Chorus Sync",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 4.0,
+          "doc": "Chorus Tempo",
+          "enumLabels": [
+            "Freeze",
+            "32/1",
+            "16/1",
+            "8/1",
+            "4/1",
+            "2/1",
+            "1/1",
+            "1/2",
+            "1/4",
+            "1/8",
+            "1/16"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "tempo",
+          "max": 10.0,
+          "min": 0.0,
+          "name": "Chorus Tempo",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 4.0,
+          "doc": "Chorus Voices",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "voices",
+          "max": 4.0,
+          "min": 1.0,
+          "name": "Chorus Voices",
+          "uiWidget": "slider",
+          "unit": "none"
+        }
+      ]
+    },
+    {
+      "category": "fx",
+      "doc": "Multiband compressor. Each band has an upper threshold that compresses above it and a lower threshold that expands below it; Enabled Bands chooses how many bands run. Thresholds and gains are in decibels.",
+      "flags": {
+        "needsTransport": false,
+        "terminal": false,
+        "writesTelemetry": false
+      },
+      "id": "fx.compressor",
+      "inputs": [
+        {
+          "doc": "Audio input",
+          "id": "in",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "In",
+          "role": "audio"
+        },
+        {
+          "doc": "Compressor Attack",
+          "id": "param:attack",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Compressor Attack",
+          "param": "attack",
+          "role": "cv"
+        },
+        {
+          "doc": "Compressor Band Gain",
+          "id": "param:band_gain",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Compressor Band Gain",
+          "param": "band_gain",
+          "role": "cv"
+        },
+        {
+          "doc": "Compressor High Gain",
+          "id": "param:high_gain",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Compressor High Gain",
+          "param": "high_gain",
+          "role": "cv"
+        },
+        {
+          "doc": "Compressor Low Gain",
+          "id": "param:low_gain",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Compressor Low Gain",
+          "param": "low_gain",
+          "role": "cv"
+        },
+        {
+          "doc": "Compressor Mix",
+          "id": "param:mix",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Compressor Mix",
+          "param": "mix",
+          "role": "cv"
+        },
+        {
+          "doc": "Compressor Release",
+          "id": "param:release",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Compressor Release",
+          "param": "release",
+          "role": "cv"
+        }
+      ],
+      "name": "Compressor",
+      "outputs": [
+        {
+          "doc": "Dry/wet compressed output",
+          "id": "out",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Out",
+          "role": "audio"
+        },
+        {
+          "doc": "Low band input level, mean squared",
+          "id": "low_in",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Low In",
+          "role": "cv"
+        },
+        {
+          "doc": "Mid band input level, mean squared",
+          "id": "band_in",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Band In",
+          "role": "cv"
+        },
+        {
+          "doc": "High band input level, mean squared",
+          "id": "high_in",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "High In",
+          "role": "cv"
+        },
+        {
+          "doc": "Low band output level, mean squared",
+          "id": "low_out",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Low Out",
+          "role": "cv"
+        },
+        {
+          "doc": "Mid band output level, mean squared",
+          "id": "band_out",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Band Out",
+          "role": "cv"
+        },
+        {
+          "doc": "High band output level, mean squared",
+          "id": "high_out",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "High Out",
+          "role": "cv"
+        }
+      ],
+      "params": [
+        {
+          "curve": "linear",
+          "default": 0.5,
+          "doc": "Compressor Attack",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "attack",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Compressor Attack",
+          "uiWidget": "slider",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 11.699999809265137,
+          "doc": "Compressor Band Gain",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "band_gain",
+          "max": 30.0,
+          "min": -30.0,
+          "name": "Compressor Band Gain",
+          "uiWidget": "slider",
+          "unit": "db"
+        },
+        {
+          "curve": "linear",
+          "default": 0.800000011920929,
+          "doc": "Band Lower Ratio",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": false,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "band_lower_ratio",
+          "max": 1.0,
+          "min": -1.0,
+          "name": "Band Lower Ratio",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": -36.0,
+          "doc": "Band Lower Threshold",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": false,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "band_lower_threshold",
+          "max": 0.0,
+          "min": -80.0,
+          "name": "Band Lower Threshold",
+          "uiWidget": "slider",
+          "unit": "db"
+        },
+        {
+          "curve": "linear",
+          "default": 0.8569999933242798,
+          "doc": "Band Upper Ratio",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": false,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "band_upper_ratio",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Band Upper Ratio",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": -25.0,
+          "doc": "Band Upper Threshold",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": false,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "band_upper_threshold",
+          "max": 0.0,
+          "min": -80.0,
+          "name": "Band Upper Threshold",
+          "uiWidget": "slider",
+          "unit": "db"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Compressor Enabled Bands",
+          "enumLabels": [
+            "Multiband",
+            "Low Band",
+            "High Band",
+            "Single Band"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "enabled_bands",
+          "max": 3.0,
+          "min": 0.0,
+          "name": "Compressor Enabled Bands",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 16.299999237060547,
+          "doc": "Compressor High Gain",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "high_gain",
+          "max": 30.0,
+          "min": -30.0,
+          "name": "Compressor High Gain",
+          "uiWidget": "slider",
+          "unit": "db"
+        },
+        {
+          "curve": "linear",
+          "default": 0.800000011920929,
+          "doc": "High Lower Ratio",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": false,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "high_lower_ratio",
+          "max": 1.0,
+          "min": -1.0,
+          "name": "High Lower Ratio",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": -35.0,
+          "doc": "High Lower Threshold",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": false,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "high_lower_threshold",
+          "max": 0.0,
+          "min": -80.0,
+          "name": "High Lower Threshold",
+          "uiWidget": "slider",
+          "unit": "db"
+        },
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "High Upper Ratio",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": false,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "high_upper_ratio",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "High Upper Ratio",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": -30.0,
+          "doc": "High Upper Threshold",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": false,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "high_upper_threshold",
+          "max": 0.0,
+          "min": -80.0,
+          "name": "High Upper Threshold",
+          "uiWidget": "slider",
+          "unit": "db"
+        },
+        {
+          "curve": "linear",
+          "default": 16.299999237060547,
+          "doc": "Compressor Low Gain",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "low_gain",
+          "max": 30.0,
+          "min": -30.0,
+          "name": "Compressor Low Gain",
+          "uiWidget": "slider",
+          "unit": "db"
+        },
+        {
+          "curve": "linear",
+          "default": 0.800000011920929,
+          "doc": "Low Lower Ratio",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": false,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "low_lower_ratio",
+          "max": 1.0,
+          "min": -1.0,
+          "name": "Low Lower Ratio",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": -35.0,
+          "doc": "Low Lower Threshold",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": false,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "low_lower_threshold",
+          "max": 0.0,
+          "min": -80.0,
+          "name": "Low Lower Threshold",
+          "uiWidget": "slider",
+          "unit": "db"
+        },
+        {
+          "curve": "linear",
+          "default": 0.8999999761581421,
+          "doc": "Low Upper Ratio",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": false,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "low_upper_ratio",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Low Upper Ratio",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": -28.0,
+          "doc": "Low Upper Threshold",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": false,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "low_upper_threshold",
+          "max": 0.0,
+          "min": -80.0,
+          "name": "Low Upper Threshold",
+          "uiWidget": "slider",
+          "unit": "db"
+        },
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "Compressor Mix",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "mix",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Compressor Mix",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.5,
+          "doc": "Compressor Release",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "release",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Compressor Release",
+          "uiWidget": "slider",
+          "unit": "percent"
+        }
+      ]
+    },
+    {
+      "category": "fx",
+      "doc": "Stereo / ping-pong delay with a filtered feedback path. Frequency is a power of two in hertz and is the inverse of the delay time (3 = 8 Hz = 125 ms); Sync switches it to tempo divisions instead.",
+      "flags": {
+        "needsTransport": false,
+        "terminal": false,
+        "writesTelemetry": false
+      },
+      "id": "fx.delay",
+      "inputs": [
+        {
+          "doc": "Audio input",
+          "id": "in",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "In",
+          "role": "audio"
+        },
+        {
+          "doc": "Delay Frequency 2",
+          "id": "param:aux_frequency",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Delay Frequency 2",
+          "param": "aux_frequency",
+          "role": "cv"
+        },
+        {
+          "doc": "Delay Mix",
+          "id": "param:dry_wet",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Delay Mix",
+          "param": "dry_wet",
+          "role": "cv"
+        },
+        {
+          "doc": "Delay Feedback",
+          "id": "param:feedback",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Delay Feedback",
+          "param": "feedback",
+          "role": "cv"
+        },
+        {
+          "doc": "Delay Filter Cutoff",
+          "id": "param:filter_cutoff",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Delay Filter Cutoff",
+          "param": "filter_cutoff",
+          "role": "cv"
+        },
+        {
+          "doc": "Delay Filter Spread",
+          "id": "param:filter_spread",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Delay Filter Spread",
+          "param": "filter_spread",
+          "role": "cv"
+        },
+        {
+          "doc": "Delay Frequency",
+          "id": "param:frequency",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Delay Frequency",
+          "param": "frequency",
+          "role": "cv"
+        }
+      ],
+      "name": "Delay",
+      "outputs": [
+        {
+          "doc": "Dry/wet delay output",
+          "id": "out",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Out",
+          "role": "audio"
+        }
+      ],
+      "params": [
+        {
+          "curve": "linear",
+          "default": 2.0,
+          "doc": "Delay Frequency 2",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "aux_frequency",
+          "max": 9.0,
+          "min": -2.0,
+          "name": "Delay Frequency 2",
+          "uiWidget": "slider",
+          "unit": "seconds"
+        },
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "Delay Sync 2",
+          "enumLabels": [
+            "Seconds",
+            "Tempo",
+            "Tempo Dotted",
+            "Tempo Triplets"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "aux_sync",
+          "max": 3.0,
+          "min": 0.0,
+          "name": "Delay Sync 2",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 9.0,
+          "doc": "Delay Tempo 2",
+          "enumLabels": [
+            "4/1",
+            "2/1",
+            "1/1",
+            "1/2",
+            "1/4",
+            "1/8",
+            "1/16",
+            "1/32",
+            "1/64"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "aux_tempo",
+          "max": 12.0,
+          "min": 4.0,
+          "name": "Delay Tempo 2",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.33340001106262207,
+          "doc": "Delay Mix",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "dry_wet",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Delay Mix",
+          "uiWidget": "slider",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 0.5,
+          "doc": "Delay Feedback",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "feedback",
+          "max": 1.0,
+          "min": -1.0,
+          "name": "Delay Feedback",
+          "uiWidget": "slider",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 60.0,
+          "doc": "Delay Filter Cutoff",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "filter_cutoff",
+          "max": 136.0,
+          "min": 8.0,
+          "name": "Delay Filter Cutoff",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "Delay Filter Spread",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "filter_spread",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Delay Filter Spread",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 2.0,
+          "doc": "Delay Frequency",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "frequency",
+          "max": 9.0,
+          "min": -2.0,
+          "name": "Delay Frequency",
+          "uiWidget": "slider",
+          "unit": "seconds"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Delay Style",
+          "enumLabels": [
+            "Mono",
+            "Stereo",
+            "Ping Pong",
+            "Mid Ping Pong"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "style",
+          "max": 3.0,
+          "min": 0.0,
+          "name": "Delay Style",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "Delay Sync",
+          "enumLabels": [
+            "Seconds",
+            "Tempo",
+            "Tempo Dotted",
+            "Tempo Triplets"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "sync",
+          "max": 3.0,
+          "min": 0.0,
+          "name": "Delay Sync",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 9.0,
+          "doc": "Delay Tempo",
+          "enumLabels": [
+            "4/1",
+            "2/1",
+            "1/1",
+            "1/2",
+            "1/4",
+            "1/8",
+            "1/16",
+            "1/32",
+            "1/64"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "tempo",
+          "max": 12.0,
+          "min": 4.0,
+          "name": "Delay Tempo",
+          "uiWidget": "select",
+          "unit": "none"
+        }
+      ]
+    },
+    {
+      "category": "fx",
+      "doc": "Waveshaper -- soft clip, hard clip, folding, bit crush or downsampling -- with a filter that can run before it, after it, or not at all. Drive is in decibels, Filter Cutoff a MIDI note number.",
+      "flags": {
+        "needsTransport": false,
+        "terminal": false,
+        "writesTelemetry": false
+      },
+      "id": "fx.distortion",
+      "inputs": [
+        {
+          "doc": "Audio input",
+          "id": "in",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "In",
+          "role": "audio"
+        },
+        {
+          "doc": "Distortion Drive",
+          "id": "param:drive",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Distortion Drive",
+          "param": "drive",
+          "role": "cv"
+        },
+        {
+          "doc": "Distortion Filter Blend",
+          "id": "param:filter_blend",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Distortion Filter Blend",
+          "param": "filter_blend",
+          "role": "cv"
+        },
+        {
+          "doc": "Distortion Filter Cutoff",
+          "id": "param:filter_cutoff",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Distortion Filter Cutoff",
+          "param": "filter_cutoff",
+          "role": "cv"
+        },
+        {
+          "doc": "Distortion Filter Resonance",
+          "id": "param:filter_resonance",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Distortion Filter Resonance",
+          "param": "filter_resonance",
+          "role": "cv"
+        },
+        {
+          "doc": "Distortion Mix",
+          "id": "param:mix",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Distortion Mix",
+          "param": "mix",
+          "role": "cv"
+        }
+      ],
+      "name": "Distortion",
+      "outputs": [
+        {
+          "doc": "Dry/wet distorted output",
+          "id": "out",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Out",
+          "role": "audio"
+        }
+      ],
+      "params": [
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Distortion Drive",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "drive",
+          "max": 30.0,
+          "min": -30.0,
+          "name": "Distortion Drive",
+          "uiWidget": "slider",
+          "unit": "db"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Distortion Filter Blend",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "filter_blend",
+          "max": 2.0,
+          "min": 0.0,
+          "name": "Distortion Filter Blend",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 80.0,
+          "doc": "Distortion Filter Cutoff",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "filter_cutoff",
+          "max": 136.0,
+          "min": 8.0,
+          "name": "Distortion Filter Cutoff",
+          "uiWidget": "slider",
+          "unit": "semitones"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Distortion Filter Order",
+          "enumLabels": [
+            "None",
+            "Pre",
+            "Post"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "filter_order",
+          "max": 2.0,
+          "min": 0.0,
+          "name": "Distortion Filter Order",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.5,
+          "doc": "Distortion Filter Resonance",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "filter_resonance",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Distortion Filter Resonance",
+          "uiWidget": "slider",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "Distortion Mix",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "mix",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Distortion Mix",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Distortion Type",
+          "enumLabels": [
+            "Soft Clip",
+            "Hard Clip",
+            "Linear Fold",
+            "Sine Fold",
+            "Bit Crush",
+            "Down Sample"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "type",
+          "max": 5.0,
+          "min": 0.0,
+          "name": "Distortion Type",
+          "uiWidget": "select",
+          "unit": "none"
+        }
+      ]
+    },
+    {
+      "category": "fx",
+      "doc": "Three-band equaliser. Each band's Mode picks between a shelf and a cut (low: shelf or high-pass, band: shelf or notch, high: shelf or low-pass). Cutoffs are MIDI note numbers, gains are decibels.",
+      "flags": {
+        "needsTransport": false,
+        "terminal": false,
+        "writesTelemetry": false
+      },
+      "id": "fx.eq",
+      "inputs": [
+        {
+          "doc": "Audio input",
+          "id": "in",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "In",
+          "role": "audio"
+        },
+        {
+          "doc": "EQ Band Cutoff",
+          "id": "param:band_cutoff",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "EQ Band Cutoff",
+          "param": "band_cutoff",
+          "role": "cv"
+        },
+        {
+          "doc": "EQ Band Gain",
+          "id": "param:band_gain",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "EQ Band Gain",
+          "param": "band_gain",
+          "role": "cv"
+        },
+        {
+          "doc": "EQ Band Resonance",
+          "id": "param:band_resonance",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "EQ Band Resonance",
+          "param": "band_resonance",
+          "role": "cv"
+        },
+        {
+          "doc": "EQ High Cutoff",
+          "id": "param:high_cutoff",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "EQ High Cutoff",
+          "param": "high_cutoff",
+          "role": "cv"
+        },
+        {
+          "doc": "EQ High Gain",
+          "id": "param:high_gain",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "EQ High Gain",
+          "param": "high_gain",
+          "role": "cv"
+        },
+        {
+          "doc": "EQ High Resonance",
+          "id": "param:high_resonance",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "EQ High Resonance",
+          "param": "high_resonance",
+          "role": "cv"
+        },
+        {
+          "doc": "EQ Low Cutoff",
+          "id": "param:low_cutoff",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "EQ Low Cutoff",
+          "param": "low_cutoff",
+          "role": "cv"
+        },
+        {
+          "doc": "EQ Low Gain",
+          "id": "param:low_gain",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "EQ Low Gain",
+          "param": "low_gain",
+          "role": "cv"
+        },
+        {
+          "doc": "EQ Low Resonance",
+          "id": "param:low_resonance",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "EQ Low Resonance",
+          "param": "low_resonance",
+          "role": "cv"
+        }
+      ],
+      "name": "Equalizer",
+      "outputs": [
+        {
+          "doc": "Equalised audio",
+          "id": "out",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Out",
+          "role": "audio"
+        }
+      ],
+      "params": [
+        {
+          "curve": "linear",
+          "default": 80.0,
+          "doc": "EQ Band Cutoff",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "band_cutoff",
+          "max": 136.0,
+          "min": 8.0,
+          "name": "EQ Band Cutoff",
+          "uiWidget": "slider",
+          "unit": "semitones"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "EQ Band Gain",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "band_gain",
+          "max": 15.0,
+          "min": -15.0,
+          "name": "EQ Band Gain",
+          "uiWidget": "slider",
+          "unit": "db"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "EQ Band Mode",
+          "enumLabels": [
+            "Shelf",
+            "Notch"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "band_mode",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "EQ Band Mode",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.447299987077713,
+          "doc": "EQ Band Resonance",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "band_resonance",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "EQ Band Resonance",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 100.0,
+          "doc": "EQ High Cutoff",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "high_cutoff",
+          "max": 136.0,
+          "min": 8.0,
+          "name": "EQ High Cutoff",
+          "uiWidget": "slider",
+          "unit": "semitones"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "EQ High Gain",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "high_gain",
+          "max": 15.0,
+          "min": -15.0,
+          "name": "EQ High Gain",
+          "uiWidget": "slider",
+          "unit": "db"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "EQ High Mode",
+          "enumLabels": [
+            "Shelf",
+            "Low Pass"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "high_mode",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "EQ High Mode",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.31630000472068787,
+          "doc": "EQ High Resonance",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "high_resonance",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "EQ High Resonance",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 40.0,
+          "doc": "EQ Low Cutoff",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "low_cutoff",
+          "max": 136.0,
+          "min": 8.0,
+          "name": "EQ Low Cutoff",
+          "uiWidget": "slider",
+          "unit": "semitones"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "EQ Low Gain",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "low_gain",
+          "max": 15.0,
+          "min": -15.0,
+          "name": "EQ Low Gain",
+          "uiWidget": "slider",
+          "unit": "db"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "EQ Low Mode",
+          "enumLabels": [
+            "Shelf",
+            "High Pass"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "low_mode",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "EQ Low Mode",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.31630000472068787,
+          "doc": "EQ Low Resonance",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "low_resonance",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "EQ Low Resonance",
+          "uiWidget": "slider",
+          "unit": "percent"
+        }
+      ]
+    },
+    {
+      "category": "fx",
+      "doc": "Flanger: a short feedback delay swept by a triangle around Center. Center is a MIDI note number, Frequency a power of two in hertz.",
+      "flags": {
+        "needsTransport": false,
+        "terminal": false,
+        "writesTelemetry": false
+      },
+      "id": "fx.flanger",
+      "inputs": [
+        {
+          "doc": "Audio input",
+          "id": "in",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "In",
+          "role": "audio"
+        },
+        {
+          "doc": "Flanger Center",
+          "id": "param:center",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Flanger Center",
+          "param": "center",
+          "role": "cv"
+        },
+        {
+          "doc": "Flanger Mix",
+          "id": "param:dry_wet",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Flanger Mix",
+          "param": "dry_wet",
+          "role": "cv"
+        },
+        {
+          "doc": "Flanger Feedback",
+          "id": "param:feedback",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Flanger Feedback",
+          "param": "feedback",
+          "role": "cv"
+        },
+        {
+          "doc": "Flanger Frequency",
+          "id": "param:frequency",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Flanger Frequency",
+          "param": "frequency",
+          "role": "cv"
+        },
+        {
+          "doc": "Flanger Mod Depth",
+          "id": "param:mod_depth",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Flanger Mod Depth",
+          "param": "mod_depth",
+          "role": "cv"
+        },
+        {
+          "doc": "Flanger Phase Offset",
+          "id": "param:phase_offset",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Flanger Phase Offset",
+          "param": "phase_offset",
+          "role": "cv"
+        }
+      ],
+      "name": "Flanger",
+      "outputs": [
+        {
+          "doc": "Dry/wet flanger output",
+          "id": "out",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Out",
+          "role": "audio"
+        },
+        {
+          "doc": "The delay rate the sweep landed on this block, in hertz",
+          "id": "frequency",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Frequency",
+          "role": "cv"
+        }
+      ],
+      "params": [
+        {
+          "curve": "linear",
+          "default": 64.0,
+          "doc": "Flanger Center",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "center",
+          "max": 136.0,
+          "min": 8.0,
+          "name": "Flanger Center",
+          "uiWidget": "slider",
+          "unit": "semitones"
+        },
+        {
+          "curve": "linear",
+          "default": 0.5,
+          "doc": "Flanger Mix",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "dry_wet",
+          "max": 0.5,
+          "min": 0.0,
+          "name": "Flanger Mix",
+          "uiWidget": "slider",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 0.5,
+          "doc": "Flanger Feedback",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "feedback",
+          "max": 1.0,
+          "min": -1.0,
+          "name": "Flanger Feedback",
+          "uiWidget": "slider",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 2.0,
+          "doc": "Flanger Frequency",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "frequency",
+          "max": 2.0,
+          "min": -5.0,
+          "name": "Flanger Frequency",
+          "uiWidget": "slider",
+          "unit": "seconds"
+        },
+        {
+          "curve": "linear",
+          "default": 0.5,
+          "doc": "Flanger Mod Depth",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "mod_depth",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Flanger Mod Depth",
+          "uiWidget": "slider",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 0.3333333432674408,
+          "doc": "Flanger Phase Offset",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "phase_offset",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Flanger Phase Offset",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "Flanger Sync",
+          "enumLabels": [
+            "Seconds",
+            "Tempo",
+            "Tempo Dotted",
+            "Tempo Triplets"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "sync",
+          "max": 3.0,
+          "min": 0.0,
+          "name": "Flanger Sync",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 4.0,
+          "doc": "Flanger Tempo",
+          "enumLabels": [
+            "Freeze",
+            "32/1",
+            "16/1",
+            "8/1",
+            "4/1",
+            "2/1",
+            "1/1",
+            "1/2",
+            "1/4",
+            "1/8",
+            "1/16"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "tempo",
+          "max": 10.0,
+          "min": 0.0,
+          "name": "Flanger Tempo",
+          "uiWidget": "select",
+          "unit": "none"
+        }
+      ]
+    },
+    {
+      "category": "fx",
+      "doc": "Phaser: all-pass stages swept around Center by their own oscillator. Center and Mod Depth are in semitones, Frequency is a power of two in hertz.",
+      "flags": {
+        "needsTransport": false,
+        "terminal": false,
+        "writesTelemetry": false
+      },
+      "id": "fx.phaser",
+      "inputs": [
+        {
+          "doc": "Audio input",
+          "id": "in",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "In",
+          "role": "audio"
+        },
+        {
+          "doc": "Phaser Blend",
+          "id": "param:blend",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Phaser Blend",
+          "param": "blend",
+          "role": "cv"
+        },
+        {
+          "doc": "Phaser Center",
+          "id": "param:center",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Phaser Center",
+          "param": "center",
+          "role": "cv"
+        },
+        {
+          "doc": "Phaser Mix",
+          "id": "param:dry_wet",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Phaser Mix",
+          "param": "dry_wet",
+          "role": "cv"
+        },
+        {
+          "doc": "Phaser Feedback",
+          "id": "param:feedback",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Phaser Feedback",
+          "param": "feedback",
+          "role": "cv"
+        },
+        {
+          "doc": "Phaser Frequency",
+          "id": "param:frequency",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Phaser Frequency",
+          "param": "frequency",
+          "role": "cv"
+        },
+        {
+          "doc": "Phaser Mod Depth",
+          "id": "param:mod_depth",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Phaser Mod Depth",
+          "param": "mod_depth",
+          "role": "cv"
+        },
+        {
+          "doc": "Phaser Phase Offset",
+          "id": "param:phase_offset",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Phaser Phase Offset",
+          "param": "phase_offset",
+          "role": "cv"
+        }
+      ],
+      "name": "Phaser",
+      "outputs": [
+        {
+          "doc": "Dry/wet phaser output",
+          "id": "out",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Out",
+          "role": "audio"
+        },
+        {
+          "doc": "Where the sweep left the all-pass cutoff at the end of the block, as a MIDI note",
+          "id": "cutoff",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Cutoff",
+          "role": "cv"
+        }
+      ],
+      "params": [
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "Phaser Blend",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "blend",
+          "max": 2.0,
+          "min": 0.0,
+          "name": "Phaser Blend",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 80.0,
+          "doc": "Phaser Center",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "center",
+          "max": 136.0,
+          "min": 8.0,
+          "name": "Phaser Center",
+          "uiWidget": "slider",
+          "unit": "semitones"
+        },
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "Phaser Mix",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "dry_wet",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Phaser Mix",
+          "uiWidget": "slider",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 0.5,
+          "doc": "Phaser Feedback",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "feedback",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Phaser Feedback",
+          "uiWidget": "slider",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": -3.0,
+          "doc": "Phaser Frequency",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "frequency",
+          "max": 2.0,
+          "min": -5.0,
+          "name": "Phaser Frequency",
+          "uiWidget": "slider",
+          "unit": "seconds"
+        },
+        {
+          "curve": "linear",
+          "default": 24.0,
+          "doc": "Phaser Mod Depth",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "mod_depth",
+          "max": 48.0,
+          "min": 0.0,
+          "name": "Phaser Mod Depth",
+          "uiWidget": "slider",
+          "unit": "semitones"
+        },
+        {
+          "curve": "linear",
+          "default": 0.3333333432674408,
+          "doc": "Phaser Phase Offset",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "phase_offset",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Phaser Phase Offset",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "Phaser Sync",
+          "enumLabels": [
+            "Seconds",
+            "Tempo",
+            "Tempo Dotted",
+            "Tempo Triplets"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "sync",
+          "max": 3.0,
+          "min": 0.0,
+          "name": "Phaser Sync",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 3.0,
+          "doc": "Phaser Tempo",
+          "enumLabels": [
+            "Freeze",
+            "32/1",
+            "16/1",
+            "8/1",
+            "4/1",
+            "2/1",
+            "1/1",
+            "1/2",
+            "1/4",
+            "1/8",
+            "1/16"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "tempo",
+          "max": 10.0,
+          "min": 0.0,
+          "name": "Phaser Tempo",
+          "uiWidget": "select",
+          "unit": "none"
+        }
+      ]
+    },
+    {
+      "category": "fx",
+      "doc": "Reverb with pre-filtering, low/high shelving and a chorused tail. Decay Time is a power of two in seconds; the cutoffs are MIDI note numbers.",
+      "flags": {
+        "needsTransport": false,
+        "terminal": false,
+        "writesTelemetry": false
+      },
+      "id": "fx.reverb",
+      "inputs": [
+        {
+          "doc": "Audio input",
+          "id": "in",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "In",
+          "role": "audio"
+        },
+        {
+          "doc": "Reverb Chorus Amount",
+          "id": "param:chorus_amount",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Reverb Chorus Amount",
+          "param": "chorus_amount",
+          "role": "cv"
+        },
+        {
+          "doc": "Reverb Chorus Frequency",
+          "id": "param:chorus_frequency",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Reverb Chorus Frequency",
+          "param": "chorus_frequency",
+          "role": "cv"
+        },
+        {
+          "doc": "Reverb Decay Time",
+          "id": "param:decay_time",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Reverb Decay Time",
+          "param": "decay_time",
+          "role": "cv"
+        },
+        {
+          "doc": "Reverb Delay",
+          "id": "param:delay",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Reverb Delay",
+          "param": "delay",
+          "role": "cv"
+        },
+        {
+          "doc": "Reverb Mix",
+          "id": "param:dry_wet",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Reverb Mix",
+          "param": "dry_wet",
+          "role": "cv"
+        },
+        {
+          "doc": "Reverb High Cutoff",
+          "id": "param:high_shelf_cutoff",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Reverb High Cutoff",
+          "param": "high_shelf_cutoff",
+          "role": "cv"
+        },
+        {
+          "doc": "Reverb High Gain",
+          "id": "param:high_shelf_gain",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Reverb High Gain",
+          "param": "high_shelf_gain",
+          "role": "cv"
+        },
+        {
+          "doc": "Reverb Low Cutoff",
+          "id": "param:low_shelf_cutoff",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Reverb Low Cutoff",
+          "param": "low_shelf_cutoff",
+          "role": "cv"
+        },
+        {
+          "doc": "Reverb Low Gain",
+          "id": "param:low_shelf_gain",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Reverb Low Gain",
+          "param": "low_shelf_gain",
+          "role": "cv"
+        },
+        {
+          "doc": "Reverb Pre High Cutoff",
+          "id": "param:pre_high_cutoff",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Reverb Pre High Cutoff",
+          "param": "pre_high_cutoff",
+          "role": "cv"
+        },
+        {
+          "doc": "Reverb Pre Low Cutoff",
+          "id": "param:pre_low_cutoff",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Reverb Pre Low Cutoff",
+          "param": "pre_low_cutoff",
+          "role": "cv"
+        },
+        {
+          "doc": "Reverb Size",
+          "id": "param:size",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Reverb Size",
+          "param": "size",
+          "role": "cv"
+        }
+      ],
+      "name": "Reverb",
+      "outputs": [
+        {
+          "doc": "Dry/wet reverb output",
+          "id": "out",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Out",
+          "role": "audio"
+        }
+      ],
+      "params": [
+        {
+          "curve": "linear",
+          "default": 0.22360700368881226,
+          "doc": "Reverb Chorus Amount",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "chorus_amount",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Reverb Chorus Amount",
+          "uiWidget": "slider",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": -2.0,
+          "doc": "Reverb Chorus Frequency",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "chorus_frequency",
+          "max": 3.0,
+          "min": -8.0,
+          "name": "Reverb Chorus Frequency",
+          "uiWidget": "slider",
+          "unit": "hz"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Reverb Decay Time",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "decay_time",
+          "max": 6.0,
+          "min": -6.0,
+          "name": "Reverb Decay Time",
+          "uiWidget": "slider",
+          "unit": "seconds"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Reverb Delay",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "delay",
+          "max": 0.30000001192092896,
+          "min": 0.0,
+          "name": "Reverb Delay",
+          "uiWidget": "slider",
+          "unit": "seconds"
+        },
+        {
+          "curve": "linear",
+          "default": 0.25,
+          "doc": "Reverb Mix",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "dry_wet",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Reverb Mix",
+          "uiWidget": "slider",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 90.0,
+          "doc": "Reverb High Cutoff",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "high_shelf_cutoff",
+          "max": 128.0,
+          "min": 0.0,
+          "name": "Reverb High Cutoff",
+          "uiWidget": "slider",
+          "unit": "semitones"
+        },
+        {
+          "curve": "linear",
+          "default": -1.0,
+          "doc": "Reverb High Gain",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "high_shelf_gain",
+          "max": 0.0,
+          "min": -6.0,
+          "name": "Reverb High Gain",
+          "uiWidget": "slider",
+          "unit": "db"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Reverb Low Cutoff",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "low_shelf_cutoff",
+          "max": 128.0,
+          "min": 0.0,
+          "name": "Reverb Low Cutoff",
+          "uiWidget": "slider",
+          "unit": "semitones"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Reverb Low Gain",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "low_shelf_gain",
+          "max": 0.0,
+          "min": -6.0,
+          "name": "Reverb Low Gain",
+          "uiWidget": "slider",
+          "unit": "db"
+        },
+        {
+          "curve": "linear",
+          "default": 110.0,
+          "doc": "Reverb Pre High Cutoff",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "pre_high_cutoff",
+          "max": 128.0,
+          "min": 0.0,
+          "name": "Reverb Pre High Cutoff",
+          "uiWidget": "slider",
+          "unit": "semitones"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Reverb Pre Low Cutoff",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "pre_low_cutoff",
+          "max": 128.0,
+          "min": 0.0,
+          "name": "Reverb Pre Low Cutoff",
+          "uiWidget": "slider",
+          "unit": "semitones"
+        },
+        {
+          "curve": "linear",
+          "default": 0.5,
+          "doc": "Reverb Size",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "size",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Reverb Size",
+          "uiWidget": "slider",
+          "unit": "percent"
+        }
+      ]
+    },
+    {
+      "category": "io",
+      "doc": "Sends stereo audio to the engine output. Voices are summed.",
+      "flags": {
+        "needsTransport": false,
+        "terminal": true,
+        "writesTelemetry": false
+      },
+      "id": "io.audioOut",
+      "inputs": [
+        {
+          "doc": "Left channel (L lanes). If inR is unconnected, also used for R.",
+          "id": "inL",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "In L",
+          "role": "audio"
+        },
+        {
+          "doc": "Right channel (R lanes)",
+          "id": "inR",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "In R",
+          "role": "audio"
+        },
+        {
+          "doc": "Output gain",
+          "id": "param:gain",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Gain",
+          "param": "gain",
+          "role": "cv"
+        }
+      ],
+      "name": "Audio Out",
+      "outputs": [],
+      "params": [
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "Output gain",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "gain",
+          "max": 2.0,
+          "min": 0.0,
+          "name": "Gain",
+          "uiWidget": "slider",
+          "unit": "ratio"
+        }
+      ]
+    },
+    {
+      "category": "math",
+      "doc": "Affine map of one signal: out = in * Scale + Offset, lane by lane. The usual way to turn a unipolar envelope or LFO into the bipolar range a pitch or pan input wants, and back.",
+      "flags": {
+        "needsTransport": false,
+        "terminal": false,
+        "writesTelemetry": false
+      },
+      "id": "math.scaleOffset",
+      "inputs": [
+        {
+          "doc": "Signal to scale and shift",
+          "id": "in",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "In",
+          "role": "any"
+        },
+        {
+          "doc": "What the input is multiplied by. Negative values invert it",
+          "id": "param:scale",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Scale",
+          "param": "scale",
+          "role": "cv"
+        },
+        {
+          "doc": "Added after the scale",
+          "id": "param:offset",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Offset",
+          "param": "offset",
+          "role": "cv"
+        }
+      ],
+      "name": "Scale / Offset",
+      "outputs": [
+        {
+          "doc": "in * Scale + Offset",
+          "id": "out",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Out",
+          "role": "any"
+        }
+      ],
+      "params": [
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "What the input is multiplied by. Negative values invert it",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "scale",
+          "max": 4.0,
+          "min": -4.0,
+          "name": "Scale",
+          "uiWidget": "slider",
+          "unit": "ratio"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Added after the scale",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "offset",
+          "max": 1.0,
+          "min": -1.0,
+          "name": "Offset",
+          "uiWidget": "slider",
+          "unit": "none"
+        }
+      ]
+    },
+    {
+      "category": "mix",
+      "doc": "Adds four signals, each through its own level. Unconnected channels are silent.",
+      "flags": {
+        "needsTransport": false,
+        "terminal": false,
+        "writesTelemetry": false
+      },
+      "id": "mix.mixer",
+      "inputs": [
+        {
+          "doc": "Channel 1",
+          "id": "in1",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "In 1",
+          "role": "audio"
+        },
+        {
+          "doc": "Channel 2",
+          "id": "in2",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "In 2",
+          "role": "audio"
+        },
+        {
+          "doc": "Channel 3",
+          "id": "in3",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "In 3",
+          "role": "audio"
+        },
+        {
+          "doc": "Channel 4",
+          "id": "in4",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "In 4",
+          "role": "audio"
+        },
+        {
+          "doc": "Gain of channel 1",
+          "id": "param:level1",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Level 1",
+          "param": "level1",
+          "role": "cv"
+        },
+        {
+          "doc": "Gain of channel 2",
+          "id": "param:level2",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Level 2",
+          "param": "level2",
+          "role": "cv"
+        },
+        {
+          "doc": "Gain of channel 3",
+          "id": "param:level3",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Level 3",
+          "param": "level3",
+          "role": "cv"
+        },
+        {
+          "doc": "Gain of channel 4",
+          "id": "param:level4",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Level 4",
+          "param": "level4",
+          "role": "cv"
+        }
+      ],
+      "name": "Mixer",
+      "outputs": [
+        {
+          "doc": "Sum of the four channels after their levels",
+          "id": "out",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Out",
+          "role": "audio"
+        }
+      ],
+      "params": [
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "Gain of channel 1",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "level1",
+          "max": 2.0,
+          "min": 0.0,
+          "name": "Level 1",
+          "uiWidget": "slider",
+          "unit": "ratio"
+        },
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "Gain of channel 2",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "level2",
+          "max": 2.0,
+          "min": 0.0,
+          "name": "Level 2",
+          "uiWidget": "slider",
+          "unit": "ratio"
+        },
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "Gain of channel 3",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "level3",
+          "max": 2.0,
+          "min": 0.0,
+          "name": "Level 3",
+          "uiWidget": "slider",
+          "unit": "ratio"
+        },
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "Gain of channel 4",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "level4",
+          "max": 2.0,
+          "min": 0.0,
+          "name": "Level 4",
+          "uiWidget": "slider",
+          "unit": "ratio"
+        }
+      ]
+    },
+    {
+      "category": "mod",
+      "doc": "Low-frequency oscillator over one of five built-in shapes. Output is 0..1. Frequency is a power of two in hertz (2 = 4 Hz) while Sync is Seconds; the other Sync modes divide the transport tempo or track the pitch input.",
+      "flags": {
+        "needsTransport": false,
+        "terminal": false,
+        "writesTelemetry": false
+      },
+      "id": "mod.lfo",
+      "inputs": [
+        {
+          "doc": "Gate: a rising edge restarts the shape, a falling edge ends the sustain sync modes",
+          "id": "gate",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Gate",
+          "role": "gate"
+        },
+        {
+          "doc": "How many notes are held; the phase output encodes it",
+          "id": "count",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Note Count",
+          "role": "cv"
+        },
+        {
+          "doc": "Pitch the Keytrack sync mode tunes the rate to",
+          "id": "pitch",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Pitch",
+          "role": "pitch"
+        },
+        {
+          "doc": "LFO 1 Delay",
+          "id": "param:delay_time",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Delay",
+          "param": "delay_time",
+          "role": "cv"
+        },
+        {
+          "doc": "LFO 1 Fade In",
+          "id": "param:fade_time",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Fade In",
+          "param": "fade_time",
+          "role": "cv"
+        },
+        {
+          "doc": "LFO 1 Frequency",
+          "id": "param:frequency",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Frequency",
+          "param": "frequency",
+          "role": "cv"
+        },
+        {
+          "doc": "LFO 1 Tune",
+          "id": "param:keytrack_tune",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Tune",
+          "param": "keytrack_tune",
+          "role": "cv"
+        },
+        {
+          "doc": "LFO 1 Phase",
+          "id": "param:phase",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Phase",
+          "param": "phase",
+          "role": "cv"
+        },
+        {
+          "doc": "LFO 1 Smooth Time",
+          "id": "param:smooth_time",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Smooth Time",
+          "param": "smooth_time",
+          "role": "cv"
+        },
+        {
+          "doc": "LFO 1 Stereo",
+          "id": "param:stereo",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Stereo",
+          "param": "stereo",
+          "role": "cv"
+        }
+      ],
+      "name": "LFO",
+      "outputs": [
+        {
+          "doc": "The shape, 0..1",
+          "id": "out",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Out",
+          "role": "cv"
+        },
+        {
+          "doc": "Position in the shape plus the note count, encoded the same way as the envelope's phase: 2.0 is the start of the cycle, 2.5 halfway",
+          "id": "phase",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Phase",
+          "role": "phase"
+        },
+        {
+          "doc": "The rate the oscillator settled on this block, in hertz",
+          "id": "frequency",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Frequency",
+          "role": "cv"
+        }
+      ],
+      "params": [
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Wave the oscillator runs over",
+          "enumLabels": [
+            "Sine",
+            "Triangle",
+            "Square",
+            "Saw Up",
+            "Saw Down"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": true
+          },
+          "id": "shape",
+          "max": 4.0,
+          "min": 0.0,
+          "name": "Shape",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "LFO 1 Delay",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "delay_time",
+          "max": 4.0,
+          "min": 0.0,
+          "name": "Delay",
+          "uiWidget": "slider",
+          "unit": "seconds"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "LFO 1 Fade In",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "fade_time",
+          "max": 8.0,
+          "min": 0.0,
+          "name": "Fade In",
+          "uiWidget": "slider",
+          "unit": "seconds"
+        },
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "LFO 1 Frequency",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "frequency",
+          "max": 9.0,
+          "min": -7.0,
+          "name": "Frequency",
+          "uiWidget": "slider",
+          "unit": "seconds"
+        },
+        {
+          "curve": "linear",
+          "default": -12.0,
+          "doc": "LFO 1 Transpose",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "keytrack_transpose",
+          "max": 36.0,
+          "min": -60.0,
+          "name": "Transpose",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "LFO 1 Tune",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "keytrack_tune",
+          "max": 1.0,
+          "min": -1.0,
+          "name": "Tune",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "LFO 1 Phase",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "phase",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Phase",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "LFO 1 Smooth Mode",
+          "enumLabels": [
+            "Off",
+            "On"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "smooth_mode",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Smooth Mode",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": -7.5,
+          "doc": "LFO 1 Smooth Time",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "smooth_time",
+          "max": 4.0,
+          "min": -10.0,
+          "name": "Smooth Time",
+          "uiWidget": "slider",
+          "unit": "seconds"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "LFO 1 Stereo",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "stereo",
+          "max": 0.5,
+          "min": -0.5,
+          "name": "Stereo",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "LFO 1 Sync",
+          "enumLabels": [
+            "Seconds",
+            "Tempo",
+            "Tempo Dotted",
+            "Tempo Triplets",
+            "Keytrack"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "sync",
+          "max": 4.0,
+          "min": 0.0,
+          "name": "Sync",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "LFO 1 Sync Type",
+          "enumLabels": [
+            "Trigger",
+            "Sync",
+            "Envelope",
+            "Sustain Envelope",
+            "Loop Point",
+            "Loop Hold"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "sync_type",
+          "max": 5.0,
+          "min": 0.0,
+          "name": "Sync Type",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 7.0,
+          "doc": "LFO 1 Tempo",
+          "enumLabels": [
+            "Freeze",
+            "32/1",
+            "16/1",
+            "8/1",
+            "4/1",
+            "2/1",
+            "1/1",
+            "1/2",
+            "1/4",
+            "1/8",
+            "1/16",
+            "1/32",
+            "1/64"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "tempo",
+          "max": 12.0,
+          "min": 0.0,
+          "name": "Tempo",
+          "uiWidget": "select",
+          "unit": "none"
+        }
+      ]
+    },
+    {
+      "category": "mod",
+      "doc": "Random modulator: perlin, sample & hold, sine interpolation or a Lorenz attractor. Output is 0..1. Frequency is a power of two in hertz (2 = 4 Hz) while Sync is Seconds.",
+      "flags": {
+        "needsTransport": false,
+        "terminal": false,
+        "writesTelemetry": false
+      },
+      "id": "mod.random",
+      "inputs": [
+        {
+          "doc": "Gate: a rising edge draws a fresh pair of random values and restarts the ramp between them",
+          "id": "gate",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Gate",
+          "role": "gate"
+        },
+        {
+          "doc": "Pitch the Keytrack sync mode tunes the rate to",
+          "id": "pitch",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Pitch",
+          "role": "pitch"
+        },
+        {
+          "doc": "Random LFO 1 Frequency",
+          "id": "param:frequency",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Frequency",
+          "param": "frequency",
+          "role": "cv"
+        },
+        {
+          "doc": "Random LFO 1 Tune",
+          "id": "param:keytrack_tune",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Tune",
+          "param": "keytrack_tune",
+          "role": "cv"
+        }
+      ],
+      "name": "Random",
+      "outputs": [
+        {
+          "doc": "The random signal, 0..1",
+          "id": "out",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Out",
+          "role": "cv"
+        }
+      ],
+      "params": [
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "Random LFO 1 Frequency",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "frequency",
+          "max": 9.0,
+          "min": -7.0,
+          "name": "Frequency",
+          "uiWidget": "slider",
+          "unit": "seconds"
+        },
+        {
+          "curve": "linear",
+          "default": -12.0,
+          "doc": "Random LFO 1 Transpose",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "keytrack_transpose",
+          "max": 36.0,
+          "min": -60.0,
+          "name": "Transpose",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Random LFO 1 Tune",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "keytrack_tune",
+          "max": 1.0,
+          "min": -1.0,
+          "name": "Tune",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Random LFO 1 Stereo",
+          "enumLabels": [
+            "Off",
+            "On"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "stereo",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Stereo",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Random LFO 1 Style",
+          "enumLabels": [
+            "Perlin",
+            "Sample & Hold",
+            "Sine Interpolate",
+            "Lorenz Attractor"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "style",
+          "max": 3.0,
+          "min": 0.0,
+          "name": "Style",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "Random LFO 1 Sync",
+          "enumLabels": [
+            "Seconds",
+            "Tempo",
+            "Tempo Dotted",
+            "Tempo Triplets",
+            "Keytrack"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "sync",
+          "max": 4.0,
+          "min": 0.0,
+          "name": "Sync",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Random LFO 1 Sync Type",
+          "enumLabels": [
+            "Off",
+            "On"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "sync_type",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Sync Type",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 8.0,
+          "doc": "Random LFO 1 Tempo",
+          "enumLabels": [
+            "Freeze",
+            "32/1",
+            "16/1",
+            "8/1",
+            "4/1",
+            "2/1",
+            "1/1",
+            "1/2",
+            "1/4",
+            "1/8",
+            "1/16",
+            "1/32",
+            "1/64"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "tempo",
+          "max": 12.0,
+          "min": 0.0,
+          "name": "Tempo",
+          "uiWidget": "select",
+          "unit": "none"
+        }
+      ]
+    },
+    {
+      "category": "note",
+      "doc": "Turns note events into pitch, gate and velocity signals. Monophonic: one note sounds at a time, chosen by the priority mode, and the gate stays high while any note is held.",
+      "flags": {
+        "needsTransport": false,
+        "terminal": false,
+        "writesTelemetry": false
+      },
+      "id": "note.toCv",
+      "inputs": [
+        {
+          "doc": "Note events to play, monophonically",
+          "id": "notes",
+          "implicit": false,
+          "kind": "event",
+          "name": "Notes",
+          "role": "any"
+        },
+        {
+          "doc": "Time constant of the slide from one note to the next; 0 jumps",
+          "id": "param:glide",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Glide",
+          "param": "glide",
+          "role": "cv"
+        }
+      ],
+      "name": "Note to CV",
+      "outputs": [
+        {
+          "doc": "Pitch of the sounding note, 0.1 per octave from middle C",
+          "id": "pitch",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Pitch",
+          "role": "pitch"
+        },
+        {
+          "doc": "1 while a note is held; drops for one frame when a new note arrives",
+          "id": "gate",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Gate",
+          "role": "gate"
+        },
+        {
+          "doc": "Velocity of the note that last started, 0..1",
+          "id": "velocity",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Velocity",
+          "role": "cv"
+        }
+      ],
+      "params": [
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Which of the held notes sounds: the newest, the lowest or the highest",
+          "enumLabels": [
+            "Last",
+            "Low",
+            "High"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "mode",
+          "max": 2.0,
+          "min": 0.0,
+          "name": "Priority",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Time constant of the slide from one note to the next; 0 jumps",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "glide",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Glide",
+          "uiWidget": "slider",
+          "unit": "seconds"
+        }
+      ]
+    },
+    {
+      "category": "osc",
+      "doc": "Wavetable oscillator with unison, phase distortion and spectral morphing. Pitch is 0.1 per octave from middle C; the oscillator tracks it while Midi Track is on.",
+      "flags": {
+        "needsTransport": false,
+        "terminal": false,
+        "writesTelemetry": false
+      },
+      "id": "osc.wavetable",
+      "inputs": [
+        {
+          "doc": "Gate: a rising edge resets the oscillator phase and the envelopes on its own controls",
+          "id": "gate",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Gate",
+          "role": "gate"
+        },
+        {
+          "doc": "Gate: a rising edge restarts the wave without resetting the rest of the oscillator",
+          "id": "retrigger",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Retrigger",
+          "role": "gate"
+        },
+        {
+          "doc": "Pitch to play, 0.1 per octave from middle C",
+          "id": "pitch",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Pitch",
+          "role": "pitch"
+        },
+        {
+          "doc": "Which voice lanes exist; the oscillator uses it to spread unison across them",
+          "id": "voices",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Voices",
+          "role": "cv"
+        },
+        {
+          "doc": "Oscillator 1 Detune Power",
+          "id": "param:detune_power",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Detune Power",
+          "param": "detune_power",
+          "role": "cv"
+        },
+        {
+          "doc": "Oscillator 1 Detune Range",
+          "id": "param:detune_range",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Detune Range",
+          "param": "detune_range",
+          "role": "cv"
+        },
+        {
+          "doc": "Oscillator 1 Distortion Amount",
+          "id": "param:distortion_amount",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Distortion Amount",
+          "param": "distortion_amount",
+          "role": "cv"
+        },
+        {
+          "doc": "Oscillator 1 Distortion Phase",
+          "id": "param:distortion_phase",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Distortion Phase",
+          "param": "distortion_phase",
+          "role": "cv"
+        },
+        {
+          "doc": "Oscillator 1 Distortion Spread",
+          "id": "param:distortion_spread",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Distortion Spread",
+          "param": "distortion_spread",
+          "role": "cv"
+        },
+        {
+          "doc": "Oscillator 1 Unison Frame Spread",
+          "id": "param:frame_spread",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Unison Frame Spread",
+          "param": "frame_spread",
+          "role": "cv"
+        },
+        {
+          "doc": "Oscillator 1 Level",
+          "id": "param:level",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Level",
+          "param": "level",
+          "role": "cv"
+        },
+        {
+          "doc": "Oscillator 1 Pan",
+          "id": "param:pan",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Pan",
+          "param": "pan",
+          "role": "cv"
+        },
+        {
+          "doc": "Oscillator 1 Phase",
+          "id": "param:phase",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Phase",
+          "param": "phase",
+          "role": "cv"
+        },
+        {
+          "doc": "Oscillator 1 Phase Randomization",
+          "id": "param:random_phase",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Phase Randomization",
+          "param": "random_phase",
+          "role": "cv"
+        },
+        {
+          "doc": "Oscillator 1 Frequency Morph Amount",
+          "id": "param:spectral_morph_amount",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Frequency Morph Amount",
+          "param": "spectral_morph_amount",
+          "role": "cv"
+        },
+        {
+          "doc": "Oscillator 1 Frequency Morph Spread",
+          "id": "param:spectral_morph_spread",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Frequency Morph Spread",
+          "param": "spectral_morph_spread",
+          "role": "cv"
+        },
+        {
+          "doc": "Oscillator 1 Stereo Spread",
+          "id": "param:stereo_spread",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Stereo Spread",
+          "param": "stereo_spread",
+          "role": "cv"
+        },
+        {
+          "doc": "Oscillator 1 Tune",
+          "id": "param:tune",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Tune",
+          "param": "tune",
+          "role": "cv"
+        },
+        {
+          "doc": "Oscillator 1 Blend",
+          "id": "param:unison_blend",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Blend",
+          "param": "unison_blend",
+          "role": "cv"
+        },
+        {
+          "doc": "Oscillator 1 Unison Detune",
+          "id": "param:unison_detune",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Unison Detune",
+          "param": "unison_detune",
+          "role": "cv"
+        },
+        {
+          "doc": "Oscillator 1 Wave Frame",
+          "id": "param:wave_frame",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Wave Frame",
+          "param": "wave_frame",
+          "role": "cv"
+        }
+      ],
+      "name": "Wavetable Oscillator",
+      "outputs": [
+        {
+          "doc": "Audio after Level and Pan",
+          "id": "out",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Out",
+          "role": "audio"
+        },
+        {
+          "doc": "Audio before Level and Pan",
+          "id": "raw",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Raw",
+          "role": "audio"
+        }
+      ],
+      "params": [
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Built-in wavetable this oscillator plays",
+          "enumLabels": [
+            "Basic Shapes",
+            "Sine",
+            "Saturated Sine",
+            "Triangle",
+            "Square",
+            "Pulse",
+            "Saw"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": true
+          },
+          "id": "table",
+          "max": 6.0,
+          "min": 0.0,
+          "name": "Wavetable",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 1.5,
+          "doc": "Oscillator 1 Detune Power",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "detune_power",
+          "max": 5.0,
+          "min": -5.0,
+          "name": "Detune Power",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 2.0,
+          "doc": "Oscillator 1 Detune Range",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "detune_range",
+          "max": 48.0,
+          "min": 0.0,
+          "name": "Detune Range",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.5,
+          "doc": "Oscillator 1 Distortion Amount",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "distortion_amount",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Distortion Amount",
+          "uiWidget": "slider",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 0.5,
+          "doc": "Oscillator 1 Distortion Phase",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "distortion_phase",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Distortion Phase",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Oscillator 1 Distortion Spread",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "distortion_spread",
+          "max": 0.5,
+          "min": -0.5,
+          "name": "Distortion Spread",
+          "uiWidget": "slider",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Oscillator 1 Distortion Type",
+          "enumLabels": [
+            "None",
+            "Sync",
+            "Formant",
+            "Quantize",
+            "Bend",
+            "Squeeze",
+            "Pulse",
+            "FM <- Osc",
+            "FM <- Osc",
+            "FM <- Sample",
+            "RM <- Osc",
+            "RM <- Osc",
+            "RM <- Sample"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "distortion_type",
+          "max": 12.0,
+          "min": 0.0,
+          "name": "Distortion Type",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Oscillator 1 Unison Frame Spread",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "frame_spread",
+          "max": 128.0,
+          "min": -128.0,
+          "name": "Unison Frame Spread",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.7071067690849304,
+          "doc": "Oscillator 1 Level",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "level",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Level",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "Oscillator 1 Midi Track",
+          "enumLabels": [
+            "Off",
+            "On"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "midi_track",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Midi Track",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Oscillator 1 Pan",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "pan",
+          "max": 1.0,
+          "min": -1.0,
+          "name": "Pan",
+          "uiWidget": "slider",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 0.5,
+          "doc": "Oscillator 1 Phase",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "phase",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Phase",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "Oscillator 1 Phase Randomization",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "random_phase",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Phase Randomization",
+          "uiWidget": "slider",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Oscillator 1 Smooth Interpolation",
+          "enumLabels": [
+            "Off",
+            "On"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "smooth_interpolation",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Smooth Interpolation",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.5,
+          "doc": "Oscillator 1 Frequency Morph Amount",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "spectral_morph_amount",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Frequency Morph Amount",
+          "uiWidget": "slider",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Oscillator 1 Frequency Morph Spread",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "spectral_morph_spread",
+          "max": 0.5,
+          "min": -0.5,
+          "name": "Frequency Morph Spread",
+          "uiWidget": "slider",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Oscillator 1 Frequency Morph Type",
+          "enumLabels": [
+            "None",
+            "Vocode",
+            "Formant Scale",
+            "Harmonic Stretch",
+            "Inharmonic Stretch",
+            "Smear",
+            "Random Amplitudes",
+            "Low Pass",
+            "High Pass",
+            "Phase Disperse",
+            "Shepard Tone",
+            "Spectral Time Skew"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "spectral_morph_type",
+          "max": 11.0,
+          "min": 0.0,
+          "name": "Frequency Morph Type",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "Oscillator 1 Spectral Unison",
+          "enumLabels": [
+            "Off",
+            "On"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "spectral_unison",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Spectral Unison",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Oscillator 1 Stack Style",
+          "enumLabels": [
+            "Unison",
+            "Center Drop 12",
+            "Center Drop 24",
+            "Octave",
+            "2x Octave",
+            "Power Chord",
+            "2x Power Chord",
+            "Major Chord",
+            "Minor Chord",
+            "Harmonics",
+            "Odd Harmonics"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "stack_style",
+          "max": 10.0,
+          "min": 0.0,
+          "name": "Stack Style",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "Oscillator 1 Stereo Spread",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "stereo_spread",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Stereo Spread",
+          "uiWidget": "slider",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Oscillator 1 Transpose",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "transpose",
+          "max": 48.0,
+          "min": -48.0,
+          "name": "Transpose",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Oscillator 1 Transpose Quantize",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "transpose_quantize",
+          "max": 8191.0,
+          "min": 0.0,
+          "name": "Transpose Quantize",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Oscillator 1 Tune",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "tune",
+          "max": 1.0,
+          "min": -1.0,
+          "name": "Tune",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.800000011920929,
+          "doc": "Oscillator 1 Blend",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "unison_blend",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Blend",
+          "uiWidget": "slider",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 4.4721360206604,
+          "doc": "Oscillator 1 Unison Detune",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "unison_detune",
+          "max": 10.0,
+          "min": 0.0,
+          "name": "Unison Detune",
+          "uiWidget": "slider",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "Oscillator 1 Unison Voices",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "unison_voices",
+          "max": 16.0,
+          "min": 1.0,
+          "name": "Unison Voices",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Oscillator 1 Wave Frame",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "wave_frame",
+          "max": 256.0,
+          "min": 0.0,
+          "name": "Wave Frame",
+          "uiWidget": "slider",
+          "unit": "none"
+        }
+      ]
+    },
+    {
+      "category": "time",
+      "doc": "A phase ramp locked to the transport, plus a one-frame trigger at the start of each cycle. Drives sequencers and ramp-fed oscillators. While the transport is stopped it free-runs at its tempo.",
+      "flags": {
+        "needsTransport": true,
+        "terminal": false,
+        "writesTelemetry": false
+      },
+      "id": "phase.clock",
+      "inputs": [
+        {
+          "doc": "Delays the start of every second cycle by this fraction of a cycle",
+          "id": "param:swing",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Swing",
+          "param": "swing",
+          "role": "cv"
+        }
+      ],
+      "name": "Clock",
+      "outputs": [
+        {
+          "doc": "Ramp from 0 to just under 1 over each cycle",
+          "id": "phase",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Phase",
+          "role": "phase"
+        },
+        {
+          "doc": "1 for a single frame at the start of every cycle",
+          "id": "trigger",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Trigger",
+          "role": "gate"
+        }
+      ],
+      "params": [
+        {
+          "curve": "linear",
+          "default": 2.0,
+          "doc": "How long one cycle lasts, in musical time",
+          "enumLabels": [
+            "1/16",
+            "1/8",
+            "1/4",
+            "1/2",
+            "1 bar",
+            "2 bars",
+            "4 bars"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "division",
+          "max": 6.0,
+          "min": 0.0,
+          "name": "Division",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Delays the start of every second cycle by this fraction of a cycle",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "swing",
+          "max": 0.5,
+          "min": 0.0,
+          "name": "Swing",
+          "uiWidget": "slider",
+          "unit": "ratio"
+        }
+      ]
+    },
+    {
+      "category": "osc",
+      "doc": "Plays a sample. A rising gate restarts it; Loop and Bounce decide what happens at the end. Pitch only moves it while Keytrack is on. With no asset loaded it plays white noise.",
+      "flags": {
+        "needsTransport": false,
+        "terminal": false,
+        "writesTelemetry": false
+      },
+      "id": "sampler.player",
+      "inputs": [
+        {
+          "doc": "Gate: a rising edge restarts playback from the beginning",
+          "id": "gate",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Gate",
+          "role": "gate"
+        },
+        {
+          "doc": "Pitch to play at, 0.1 per octave from middle C. Only used while Keytrack is on",
+          "id": "pitch",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Pitch",
+          "role": "pitch"
+        },
+        {
+          "doc": "How many notes are held; the vendored player encodes it into its phase readout",
+          "id": "count",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Note Count",
+          "role": "cv"
+        },
+        {
+          "doc": "Sample Level",
+          "id": "param:level",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Sample Level",
+          "param": "level",
+          "role": "cv"
+        },
+        {
+          "doc": "Sample Pan",
+          "id": "param:pan",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Sample Pan",
+          "param": "pan",
+          "role": "cv"
+        },
+        {
+          "doc": "Sample Tune",
+          "id": "param:tune",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Sample Tune",
+          "param": "tune",
+          "role": "cv"
+        }
+      ],
+      "name": "Sampler",
+      "outputs": [
+        {
+          "doc": "Audio after Level and Pan",
+          "id": "out",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Out",
+          "role": "audio"
+        },
+        {
+          "doc": "Audio before Level and Pan",
+          "id": "raw",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Raw",
+          "role": "audio"
+        }
+      ],
+      "params": [
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Sample Bounce",
+          "enumLabels": [
+            "Off",
+            "On"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "bounce",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Sample Bounce",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Sample Keytrack",
+          "enumLabels": [
+            "Off",
+            "On"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "keytrack",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Sample Keytrack",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.7071067690849304,
+          "doc": "Sample Level",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "level",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Sample Level",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "Sample Loop",
+          "enumLabels": [
+            "Off",
+            "On"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "loop",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Sample Loop",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Sample Pan",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "pan",
+          "max": 1.0,
+          "min": -1.0,
+          "name": "Sample Pan",
+          "uiWidget": "slider",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Sample Random Phase",
+          "enumLabels": [
+            "Off",
+            "On"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "random_phase",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Sample Random Phase",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Sample Transpose",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "transpose",
+          "max": 48.0,
+          "min": -48.0,
+          "name": "Sample Transpose",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Bit field of the pitch classes Transpose snaps to; 0 does not snap. Bits 0-11 are the twelve notes, bit 12 quantizes globally",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "transpose_quantize",
+          "max": 8191.0,
+          "min": 0.0,
+          "name": "Sample Transpose Quantize",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Sample Tune",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "structural": false
+          },
+          "id": "tune",
+          "max": 1.0,
+          "min": -1.0,
+          "name": "Sample Tune",
+          "uiWidget": "slider",
+          "unit": "none"
+        }
+      ]
+    }
+  ]
+}

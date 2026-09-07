@@ -62,9 +62,25 @@ attributed to our sources.
 ## Modules
 
 Built-ins are registered in `engine/src/modules/builtin.cpp`, one line each. Own modules are a single `.cpp` under
-`engine/src/modules`; vendored-backed ones a single `ModuleSpec` under `engine/src/modules/vital`. Today:
-`io.audioOut`, `note.toCv`, `filter.multi`, `osc.wavetable`, `env.dahdsr`, `mod.lfo`, `mod.random`, and the eight
-effects `fx.reverb`, `fx.delay`, `fx.chorus`, `fx.flanger`, `fx.phaser`, `fx.distortion`, `fx.compressor`, `fx.eq`.
+`engine/src/modules`; vendored-backed ones a single `ModuleSpec` under `engine/src/modules/vital`. Today, twenty:
+
+- own: `io.audioOut`, `note.toCv`, `phase.clock`, `math.scaleOffset`, `mix.mixer`, `amp.vca`
+- vendored-backed: `osc.wavetable`, `sampler.player`, `filter.multi`, `env.dahdsr`, `mod.lfo`, `mod.random`, and the
+  eight effects `fx.reverb`, `fx.delay`, `fx.chorus`, `fx.flanger`, `fx.phaser`, `fx.distortion`, `fx.compressor`,
+  `fx.eq`.
+
+`phase.clock` follows `transport.ppq` while the transport is playing and free-runs off `transport.samplePos` at the
+transport tempo while it is stopped, so a patch keeps moving with nothing rolling. Its swing moves the boundary inside
+each *pair* of cycles (the second starts at `1 + swing` instead of `1`, and both are stretched back over a full 0..1
+ramp), which degenerates to plain `frac(position)` at swing 0. Its phase output is `0 <= phase < 1`: a double a hair
+under one rounds UP to exactly `1.0f` when narrowed, so the narrowing is clamped rather than trusted.
+
+`amp.vca` clamps `gain knob + gain input` at zero before applying its curve -- a control that swings negative closes
+the amplifier instead of inverting the signal, and squaring an unclamped negative sum would fold it back open.
+
+There is no built-in source of *events* yet (`io.midiIn` lands with phase 4), so `note.toCv` can only be driven from a
+test module today. A patch that needs a constant uses `math.scaleOffset` with nothing plugged in: `out = 0 * scale +
+offset`.
 
 The effects all share one shape, built by `effectSpec` in `engine/src/modules/vital/Effect.hpp`: the audio goes in
 through `processWithInput` rather than a plugged input, so the `in` port carries vendored input index -1. None of them
@@ -82,6 +98,16 @@ vendored authoring format from JSON. Message thread only: a render resizes the t
 vendored `setNumFrames` spins until the audio thread has released the old frames. The audio thread never touches a
 table except through the `markUsed()`/`markUnused()` handshake the vendored oscillator performs for itself, which is
 what lets a table be swapped under a running oscillator without a lock of ours.
+
+`pg::vendor::SampleBank` (`engine/src/vital/SampleBank.*`) is the same story for audio files: `loadWav` decodes
+anything miniaudio reads into the vendored `Sample` a sampler plays, mono or stereo, at the file's own rate.
+Message thread only, for the same two reasons -- it allocates the whole band-limited pyramid, and the vendored
+`loadSample` then SPINS until the audio thread has released the previous data. With nothing loaded a sampler plays
+the vendored default, a second of white noise, so the module is audible the moment it is placed.
+
+A vendored module whose controls are hard-coded rather than prefixed can still take a `ModuleSpec::prefix`: the
+sample player names its controls `sample_*` outright, and declaring `prefix = "sample"` is what turns them into the
+grid param ids `level`, `loop`, `pan` rather than `sample_level` and friends.
 
 ## Params
 
@@ -135,17 +161,52 @@ Back edges read from / write to a `FeedbackState`: an exact one-sample (or one-b
 Unconnected continuous inputs reach modules as empty `SignalView`s (data = nullptr). Read through `readOr()` to get silence.
 Event inputs are always valid buffers (empty when unconnected).
 
+## Catalog
+
+`phasegrid-engine --catalog` prints every registered module's ports, params, ranges, units and enum labels as JSON,
+plus the engine-wide `conventions` a patch is written against. This is the renderer's *only* description of what a
+module is: adding a module changes the JSON, not any TypeScript. `shared/protocol/catalog.ts` holds the zod schemas
+for that document, and `engine/tests/golden/catalog.json` is a committed copy that `shared/protocol/catalog.test.ts`
+parses (so the unit tests do not need a built engine) and `engine/tests/test_catalog.cpp` compares against a freshly
+generated one (so the copy cannot go stale). Regenerate it with:
+
+```
+./build/engine/phasegrid-engine --catalog > engine/tests/golden/catalog.json
+```
+
+Modules are sorted by id and params keep their descriptor order, so the document is byte-stable for a given registry.
+`catalogHash` is a 64-bit FNV-1a of the serialized module list, 16 hex chars, meant as the renderer's cache key.
+The registry's input list is the declared ports followed by one implicit `param:<id>` port per modulatable param, in
+the order the compiler assigns buffers; each port carries `implicit` and, when implicit, the `param` it feeds, so the
+editor can draw it on the knob instead of in the port list. Every port carries its `role`, and every param its
+`unit`, `curve`, `uiWidget`, `enumLabels` and the six `flags`.
+
+The catalog is the one place the vendored DSP's own parameter table reaches strings the user interface displays, and
+`scripts/check-trademark.mjs` reads sources rather than generated documents — so `test_catalog.cpp` scans the
+generated JSON for the vendored names itself.
+
 ## Tests
 
-`npm run engine:test` runs 97 Catch2 tests. `PG_WERROR=ON npm run engine:test` additionally builds with `-Werror`
+`npm run engine:test` runs 121 Catch2 tests. `PG_WERROR=ON npm run engine:test` additionally builds with `-Werror`
 (CI does this; it is off by default because `postinstall` builds the engine on end-user machines).
 
 Headless render, using a patch built from builtin modules only:
 
 ```
-./build/engine/phasegrid-engine --render engine/tests/golden/silence.json --seconds 2 --out out.wav
+./build/engine/phasegrid-engine --render engine/tests/golden/synth_voice.json --seconds 1 --out out.wav
 ```
 
-`engine/tests/golden/silence.json` is that patch — a bare `io.audioOut`, so it writes 2 s of silence.
-`engine/tests/golden/const_to_out.json` is a **test-only** fixture: it uses `test.const`,
-which only `pg_tests` registers, so `--render` on it exits 1 with `E_UNKNOWN_TYPE`.
+`engine/tests/golden/synth_voice.json` is one whole synth voice: gate and pitch (constants from `math.scaleOffset`
+nodes with nothing plugged in) into `osc.wavetable` (saw), into `filter.multi` (12 dB low pass at MIDI 83), into
+`amp.vca` whose gain is `env.dahdsr` on the same gate, into `io.audioOut`. `engine/tests/test_golden_synth.cpp`
+renders it and asserts on the signal rather than the file size: it is audible (RMS), it is a *note* (near-silent
+through the 62 ms attack, decayed to the sustain level by 450 ms and flat from there), it is *pitched* (the strongest
+partial of the settled note is within 15 Hz of 523.25 Hz, the pitch the patch asks for), it is *filtered* (a thousand
+times more energy below 1 kHz than above 8 kHz, and opening the cutoff on the same running engine raises the high band
+a hundredfold — which a source that simply had no harmonics could not do), and both channels carry it.
+
+The voice has no `note.toCv` in it because there is no built-in event source yet; that arrives with `notes.clip` and a
+polyphonic golden render in the next phase. `engine/tests/golden/silence.json` is a bare `io.audioOut`, so it writes
+silence. `engine/tests/golden/const_to_out.json` is a **test-only** fixture: it uses `test.const`, which only
+`pg_tests` registers, so `--render` on it exits 1 with `E_UNKNOWN_TYPE` — which is why the synth voice deliberately
+uses no test module.
