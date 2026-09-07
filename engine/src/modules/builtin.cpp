@@ -18,6 +18,7 @@ const ModuleDescriptor& fxPhaser();
 const ModuleDescriptor& fxDistortion();
 const ModuleDescriptor& fxCompressor();
 const ModuleDescriptor& fxEq();
+const ModuleDescriptor& samplerPlayer();
 }  // namespace modules
 
 void registerBuiltinModules(Registry& r) {
@@ -27,6 +28,7 @@ void registerBuiltinModules(Registry& r) {
     &modules::modLfo(), &modules::modRandom(),
     &modules::fxReverb(), &modules::fxDelay(), &modules::fxChorus(), &modules::fxFlanger(),
     &modules::fxPhaser(), &modules::fxDistortion(), &modules::fxCompressor(), &modules::fxEq(),
+    &modules::samplerPlayer(),
   };
   for (const ModuleDescriptor* d : all)
     if (auto err = r.add(*d)) throw std::runtime_error("registerBuiltinModules: " + *err);

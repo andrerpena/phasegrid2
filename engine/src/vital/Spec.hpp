@@ -89,8 +89,10 @@ public:
 
 /// Constructs a vendored module that runs in sorted order. Every `ModuleSpec::create` should use this
 /// rather than `new` -- for a module that was already in a safe order it costs one rebuild at prepare time.
+/// Returns the derived type, not `vital::SynthModule*`, so a spec that has to reach a member the base does
+/// not declare (the sampler's `getSample()`) can do it without a cast; it converts to what `create` returns.
 template <class Vendored, class... Args>
-vital::SynthModule* makeModule(Args&&... args) {
+Sorted<Vendored>* makeModule(Args&&... args) {
   return new Sorted<Vendored>(std::forward<Args>(args)...);
 }
 
