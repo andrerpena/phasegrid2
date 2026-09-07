@@ -126,7 +126,7 @@ CompileOutput compileGraph(const GraphModel& model, const Registry& registry, In
     // already thrown away every module's DSP state, and the next successful commit silently starts
     // from fresh instances. Left as is deliberately; restructuring would mean compiling into a
     // scratch table and merging on success.
-    s.inst = instances.acquire(nodes[i]->id, *types[i], info, nodes[i]->params);
+    s.inst = instances.acquire(nodes[i]->id, *types[i], info, nodes[i]->params, nodes[i]->data);
     s.inBuf.assign(d.numInputs, kNone); s.inEvt.assign(d.numInputs, kNone);
     s.outBuf.assign(d.numOutputs, kNone); s.outEvt.assign(d.numOutputs, kNone);
     s.paramBuf.assign(d.numParams, kNone);

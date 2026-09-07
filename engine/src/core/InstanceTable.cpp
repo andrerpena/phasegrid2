@@ -3,7 +3,8 @@
 namespace pg {
 
 std::shared_ptr<ModuleInstance> InstanceTable::acquire(const std::string& id, const RegisteredModule& type,
-                                                       const PrepareInfo& info, const std::map<std::string, float>& params) {
+                                                       const PrepareInfo& info, const std::map<std::string, float>& params,
+                                                       const NodeData& data) {
   if (!(info == lastInfo_)) {
     byId_.clear();   // old instances stay alive through the retired program's shared_ptrs; feedback states may stay
     lastInfo_ = info;
@@ -15,7 +16,9 @@ std::shared_ptr<ModuleInstance> InstanceTable::acquire(const std::string& id, co
 
   auto it = byId_.find(id);
   if (it != byId_.end() && it->second->type == &type) {
-    bool structuralSame = true;
+    // Node data is structural for the same reason a kParamStructural param is: `configure` reads it once,
+    // before `prepare`, so the only way to apply a change is to build the instance again.
+    bool structuralSame = it->second->nodeData == data;
     for (uint32_t i = 0; i < type.desc->numParams && structuralSame; ++i) {
       const ParamDesc& d = type.desc->params[i];
       if (!(d.flags & kParamStructural)) continue;
@@ -35,7 +38,8 @@ std::shared_ptr<ModuleInstance> InstanceTable::acquire(const std::string& id, co
   inst->params.resize(type.desc->numParams);
   inst->structuralValues.reserve(type.desc->numParams);
   for (uint32_t i = 0; i < type.desc->numParams; ++i) inst->structuralValues.push_back(modelValue(type.desc->params[i]));
-  inst->module->configure(params);   // structural params take effect here; prepare() may allocate around them
+  inst->nodeData = data;
+  inst->module->configure(params, data);   // structural params and node data take effect here; prepare() may allocate around them
   inst->module->prepare(info);
   for (uint32_t i = 0; i < type.desc->numParams; ++i) {
     const ParamDesc& d = type.desc->params[i];

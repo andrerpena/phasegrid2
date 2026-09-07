@@ -29,6 +29,8 @@ struct ModuleInstance {
   /// Display-unit value of every param at creation time (missing model params recorded as the default).
   /// `InstanceTable::acquire` compares the kParamStructural entries to decide whether it may reuse this instance.
   std::vector<float> structuralValues;
+  /// `NodeModel::data` at creation time, compared the same way and for the same reason.
+  NodeData nodeData = NodeData::object();
 };
 
 /// Delay memory for one back edge, one slot per voice PAIR: `z[pair].data[i]` holds the last written

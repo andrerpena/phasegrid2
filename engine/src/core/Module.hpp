@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <map>
+#include <nlohmann/json_fwd.hpp>
 #include <string>
 #include <vector>
 #include "core/Conventions.hpp"
@@ -13,6 +14,11 @@ namespace pg {
 
 /// Model param values by param id, in display units. What `NodeModel::params` carries.
 using ParamValues = std::map<std::string, float>;
+
+/// Structured per-node state that no param can express -- a clip's notes, a curve's breakpoints. What
+/// `NodeModel::data` carries: an arbitrary JSON object, owned by the patch document so it undoes with the
+/// rest of it. Always an object, empty when the node has none. Message thread only.
+using NodeData = nlohmann::json;
 
 struct PrepareInfo {
   double sampleRate = 48000.0;
@@ -60,10 +66,11 @@ struct ProcessContext {
 class Module {
 public:
   virtual ~Module() = default;
-  /// Message thread, once, before `prepare`: the model's param values for this instance. A module that
-  /// declares `kParamStructural` params reads them here, because such a param can only take effect while
-  /// the instance is being built. Never called again — `InstanceTable::acquire` rebuilds instead.
-  virtual void configure(const ParamValues&) {}
+  /// Message thread, once, before `prepare`: the model's param values and structured data for this
+  /// instance. A module that declares `kParamStructural` params reads them here, because such a param can
+  /// only take effect while the instance is being built; node data is structural for the same reason, and
+  /// is compared the same way. Never called again — `InstanceTable::acquire` rebuilds instead.
+  virtual void configure(const ParamValues&, const NodeData&) {}
   virtual void prepare(const PrepareInfo&) = 0;   // message thread; the only place to allocate
   virtual void reset(uint32_t /*voicePair*/) {}
   virtual void process(ProcessContext&) = 0;      // audio thread; no alloc/lock/IO/exceptions

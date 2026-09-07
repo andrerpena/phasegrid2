@@ -160,14 +160,32 @@ as `at(i) - knob`.
 `kParamStructural` marks a param that cannot be applied to a live instance (an LFO shape, a wavetable choice):
 `InstanceTable::acquire` builds a fresh instance instead of reusing the old one. A structural param may never be
 `kParamModulatable` -- `Registry::add` rejects that -- because it is read once, on the message thread, by
-`Module::configure(const ParamValues&)`, which runs before `prepare()`.
+`Module::configure(const ParamValues&, const NodeData&)`, which runs before `prepare()`.
+
+## Node data
+
+`NodeModel::data` is an arbitrary JSON **object** per node: structured state the module owns and no param can
+express -- a clip's notes, a curve's breakpoints. It lives in the patch document, so it undoes and saves with the
+rest of it, and it reaches the module as `configure`'s second argument, on the message thread, before `prepare`.
+Nothing between the patch file and the module looks inside it: `GraphModel::addNode` and `setNodeData` are the
+only gate, and they check only that it is an object (`E_SCHEMA` otherwise -- `loadPatchJson` returns that rather
+than throwing, like every other bad shape), so validating the contents is the module's own job. `savePatchJson` writes it back out, omitting an empty one.
+
+Node data is **structural**, exactly like a `kParamStructural` param and for the same reason: `configure` is the
+only place it is ever read, so the only way to apply a change is to build the instance again --
+`InstanceTable::acquire` compares the blob and rebuilds when it differs. That is a heavy hammer for something
+edited as often as a clip's notes, and it is affordable only because such a module derives its position from
+`transport.ppq` every block, so a rebuilt instance resumes where the old one was rather than restarting. Unlike
+`params`, `data` is genuinely diffed here, so the model cannot get ahead of the engine the way param values can.
+If editing ever proves too slow, the upgrade is the pattern the program swap already uses: build the new list on
+the message thread, swap an atomic pointer, retire the old one.
 
 ## Program and hot-swap
 
 `GraphModel` → `compileGraph` → `Program` (Block buffers, event buffers, ops, feedback states) on the message thread.
 `Engine::commit` publishes with one atomic exchange; the audio thread adopts it at the next block and retires the old one.
 When the retire queue fills, `Engine` keeps a `deferred_` program and adopts it on a later block; `commit()` runs `collectGarbage()` at entry.
-`InstanceTable` reuses a `ModuleInstance` when `(id, type)` and every `kParamStructural` param value are unchanged;
+`InstanceTable` reuses a `ModuleInstance` when `(id, type)`, every `kParamStructural` param value and `NodeModel::data` are unchanged;
 a change of sample rate or voice count makes it create fresh instances (DSP state resets).
 Feedback memory is reused by edge id. Param changes never compile: `Engine::setParam` enqueues `{serial, param, norm}`; the audio thread applies it by binary search.
 
@@ -232,7 +250,7 @@ generated JSON for the vendored names itself.
 
 ## Tests
 
-`npm run engine:test` runs 133 Catch2 tests. `PG_WERROR=ON npm run engine:test` additionally builds with `-Werror`
+`npm run engine:test` runs 137 Catch2 tests. `PG_WERROR=ON npm run engine:test` additionally builds with `-Werror`
 (CI does this; it is off by default because `postinstall` builds the engine on end-user machines).
 
 Headless render, using a patch built from builtin modules only:

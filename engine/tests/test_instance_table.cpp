@@ -28,8 +28,11 @@ const ParamDesc kStructuralParams[] = {
 class Structural : public VoicedModule<int> {
 public:
   static inline ParamValues lastConfigured{};
+  static inline NodeData lastData = NodeData::object();
   static inline bool configuredBeforePrepare = false;
-  void configure(const ParamValues& values) override { lastConfigured = values; sawConfigure_ = true; }
+  void configure(const ParamValues& values, const NodeData& data) override {
+    lastConfigured = values; lastData = data; sawConfigure_ = true;
+  }
   void onPrepare(const PrepareInfo&) override { configuredBeforePrepare = sawConfigure_; }
   void process(ProcessContext&) override {}
 private:

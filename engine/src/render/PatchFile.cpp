@@ -27,6 +27,9 @@ Result loadPatchJsonUnguarded(const nlohmann::json& j, const Registry& registry,
       if (!v.is_number()) return Result::fail("E_SCHEMA", "param " + k + " must be a number");
       n.params[k] = v.get<float>();
     }
+    // Structured state the module owns and no param can express: a clip's notes, a curve's breakpoints.
+    // Its shape is the module's business, so nothing here validates it beyond "it is an object".
+    n.data = m.value("data", nlohmann::json::object());   // `addNode` is the one gate on its shape
     if (Result r = fresh.addNode(registry, std::move(n)); !r) return r;
   }
   const nlohmann::json edges = j.value("edges", nlohmann::json::array());
@@ -58,6 +61,25 @@ Result loadPatchJson(const nlohmann::json& j, const Registry& registry, GraphMod
   } catch (const nlohmann::json::exception& e) {
     return Result::fail("E_SCHEMA", e.what());
   }
+}
+
+nlohmann::json savePatchJson(const GraphModel& model) {
+  nlohmann::json j;
+  j["schemaVersion"] = 1;
+  j["voiceCount"] = model.voiceCount;
+  j["feedbackMode"] = model.feedbackMode == FeedbackMode::Block ? "block" : "sample";
+  j["modules"] = nlohmann::json::array();
+  for (const auto& [id, n] : model.nodes()) {
+    nlohmann::json m{{"id", n.id}, {"type", n.type}, {"params", nlohmann::json::object()}};
+    for (const auto& [k, v] : n.params) m["params"][k] = v;
+    if (!n.data.empty()) m["data"] = n.data;   // omitted rather than written as {}, so patches stay readable
+    j["modules"].push_back(std::move(m));
+  }
+  j["edges"] = nlohmann::json::array();
+  for (const auto& [id, e] : model.edges())
+    j["edges"].push_back({{"id", e.id}, {"from", {{"module", e.fromNode}, {"port", e.fromPort}}},
+                          {"to", {{"module", e.toNode}, {"port", e.toPort}}}});
+  return j;
 }
 
 Result loadPatchFile(const std::string& path, const Registry& registry, GraphModel& model) {

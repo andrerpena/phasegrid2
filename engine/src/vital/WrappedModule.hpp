@@ -35,7 +35,7 @@ public:
   static Module* createFromRegistry();   // reads pg::g_creatingDescriptor
   explicit WrappedModule(const ModuleDescriptor& desc);
 
-  void configure(const ParamValues& values) override { configured_ = values; }
+  void configure(const ParamValues& values, const NodeData&) override { configured_ = values; }
   void prepare(const PrepareInfo&) override;
   void reset(uint32_t voicePair) override;
   void process(ProcessContext&) override;

@@ -7,6 +7,7 @@ Result GraphModel::addNode(const Registry& reg, NodeModel node) {
   if (nodes_.contains(node.id)) return Result::fail("E_DUP_ID", "node exists: " + node.id);
   const RegisteredModule* type = reg.find(node.type);
   if (!type) return Result::fail("E_UNKNOWN_TYPE", "unknown module type: " + node.type);
+  if (!node.data.is_object()) return Result::fail("E_SCHEMA", node.id + ": data must be an object");
   for (const auto& [k, v] : node.params) {
     (void)v;
     if (type->findParam(k) < 0) return Result::fail("E_PARAM_NOT_FOUND", node.type + " has no param " + k);
@@ -55,6 +56,14 @@ Result GraphModel::setParam(const Registry& reg, const std::string& node, const 
   if (!type) return Result::fail("E_UNKNOWN_TYPE", "module type not registered");
   if (type->findParam(param) < 0) return Result::fail("E_PARAM_NOT_FOUND", node + " has no param " + param);
   it->second.params[param] = value;
+  return {};
+}
+
+Result GraphModel::setNodeData(const std::string& node, NodeData data) {
+  auto it = nodes_.find(node);
+  if (it == nodes_.end()) return Result::fail("E_NODE_NOT_FOUND", "no node " + node);
+  if (!data.is_object()) return Result::fail("E_SCHEMA", node + ": data must be an object");
+  it->second.data = std::move(data);
   return {};
 }
 

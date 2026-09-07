@@ -25,8 +25,12 @@ public:
   /// Any future path that loads a patch into a *live* engine has to diff against a message-thread
   /// "last applied" snapshot and push each changed value through `Engine::setParam` (the queue).
   /// No such path exists yet: `--render` builds a fresh Engine per patch.
+  ///
+  /// `data` is `NodeModel::data`, and unlike `params` it IS diffed: it is structural, so a change to it
+  /// builds a fresh instance rather than leaving the model ahead of the engine.
   std::shared_ptr<ModuleInstance> acquire(const std::string& id, const RegisteredModule& type,
-                                          const PrepareInfo& info, const std::map<std::string, float>& params);
+                                          const PrepareInfo& info, const std::map<std::string, float>& params,
+                                          const NodeData& data = NodeData::object());
   /// One state per back edge, holding one delay slot per voice pair. Reused across compiles so a
   /// hot-swap keeps the loop running; a change of voice count makes a fresh one instead of resizing the
   /// live one, because the audio thread may still be reading the program that holds it.
