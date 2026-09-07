@@ -13,7 +13,18 @@ public:
   /// Reuses the instance when the type is unchanged; otherwise creates and prepares a new one.
   /// A change of sample rate, block size or voice count creates fresh instances (DSP state resets);
   /// reuse only happens while PrepareInfo is unchanged.
-  /// Params are applied only to newly created instances (live ones change through the param queue).
+  ///
+  /// `params` is applied at creation ONLY. A reused instance keeps the values it already has, so a
+  /// `NodeModel::params` change that reaches the model by any route other than `Engine::setParam`
+  /// (today: `loadPatchJson`, which writes straight into the `GraphModel`) leaves the model ahead of
+  /// the engine for every node whose `(id, type)` survived the compile.
+  ///
+  /// This is deliberate and must stay that way: `ParamState` is owned by the audio thread once
+  /// `prepare` has run — the param drain calls `setTargetNorm` on it every block — so the message
+  /// thread must never write it. Calling `setTargetNorm` from here would be a data race, not a fix.
+  /// Any future path that loads a patch into a *live* engine has to diff against a message-thread
+  /// "last applied" snapshot and push each changed value through `Engine::setParam` (the queue).
+  /// No such path exists yet: `--render` builds a fresh Engine per patch.
   std::shared_ptr<ModuleInstance> acquire(const std::string& id, const RegisteredModule& type,
                                           const PrepareInfo& info, const std::map<std::string, float>& params);
   std::shared_ptr<FeedbackState> acquireFeedback(const std::string& edgeId);

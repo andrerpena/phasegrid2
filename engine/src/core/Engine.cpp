@@ -52,6 +52,9 @@ Result Engine::setParam(const std::string& node, const std::string& param, float
   const int32_t idx = inst->type->findParam(param);
   if (inst->type != modelType || idx < 0) return {};   // instance predates a retype; the next commit rebuilds it
   const ParamDesc& d = inst->type->desc->params[idx];
+  // A drop leaves the model ahead of the engine: the value is already in GraphModel but never
+  // reaches ParamState, and nothing reconciles the two until a future patch-reload path exists
+  // (see InstanceTable::acquire). The caller is expected to retry.
   if (!params_.try_enqueue(ParamChange{inst->serial, static_cast<uint32_t>(idx), paramNormalize(d, value)}))
     return Result::fail("E_QUEUE_FULL", "param queue full");
   return {};

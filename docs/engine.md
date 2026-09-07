@@ -36,6 +36,16 @@ When the retire queue fills, `Engine` keeps a `deferred_` program and adopts it 
 `InstanceTable` reuses a `ModuleInstance` when `(id, type)` is unchanged; a change of sample rate or voice count makes it create fresh instances (DSP state resets).
 Feedback memory is reused by edge id. Param changes never compile: `Engine::setParam` enqueues `{serial, param, norm}`; the audio thread applies it by binary search.
 
+**Model params are applied at instance creation only.** `InstanceTable::acquire` copies `NodeModel::params` into a
+`ModuleInstance` when it creates one; a reused instance keeps the values it already has. After `prepare`, `ParamState`
+belongs to the audio thread (the param drain writes it every block), so the message thread must never touch it — that is
+why `acquire` does not "fix up" a reused instance. The consequence: anything that changes model params without going
+through `Engine::setParam` — today only `loadPatchJson`, which writes straight into the `GraphModel` — leaves the model
+ahead of the engine for every node whose `(id, type)` survived the compile. This is harmless now because `--render`
+builds a fresh `Engine` per patch. Any future path that loads a patch into a live engine must diff against a
+message-thread "last applied" snapshot and push each changed value through the param queue, never through the model
+alone. A dropped `E_QUEUE_FULL` enqueue has the same effect until the caller retries.
+
 ## Feedback
 
 Tarjan SCCs. Nodes in an SCC (or with a self loop) form a cluster run once per sample (`feedbackMode: sample`) or per block (`block`).
