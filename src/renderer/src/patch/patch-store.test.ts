@@ -104,3 +104,81 @@ describe("the patch document", () => {
     stop();
   });
 });
+
+describe("an edit that carries its own inverse", () => {
+  /**
+   * A knob drag writes the document on every frame and is recorded once, at the end. By then the
+   * document no longer remembers where the knob was when the hand went down, so the gesture hands
+   * over the inverse itself. Without it, undo steps back to the last frame of the drag, which looks
+   * like undo doing nothing at all.
+   */
+  it("undoes to the value the caller named, not to the one the document had", () => {
+    const store = usePatchStore.getState();
+    store.replace(EMPTY_PATCH);
+    store.apply([
+      { op: "moduleAdd", id: "g", type: "amp.vca", params: { gain: 0.2 } },
+    ]);
+
+    // The gesture: three frames written straight into the document, none of them a step back.
+    for (const value of [0.4, 0.6, 0.8])
+      usePatchStore.getState().apply([
+        {
+          op: "paramSet",
+          module: "g",
+          param: "gain",
+          value,
+          transient: true,
+        },
+      ]);
+    expect(useHistoryStore.getState().past).toHaveLength(0); // nothing recorded yet
+
+    usePatchStore
+      .getState()
+      .apply([{ op: "paramSet", module: "g", param: "gain", value: 0.9 }], {
+        label: "Set parameter",
+        inverse: [{ op: "paramSet", module: "g", param: "gain", value: 0.2 }],
+      });
+    expect(gainOf()).toBe(0.9);
+
+    useHistoryStore.getState().undo();
+    expect(gainOf()).toBe(0.2);
+  });
+
+  it("derives the inverse from the document when the caller names none", () => {
+    const store = usePatchStore.getState();
+    store.replace(EMPTY_PATCH);
+    store.apply([
+      { op: "moduleAdd", id: "g", type: "amp.vca", params: { gain: 0.2 } },
+    ]);
+    usePatchStore
+      .getState()
+      .apply([{ op: "paramSet", module: "g", param: "gain", value: 0.7 }], {
+        label: "Set parameter",
+      });
+    useHistoryStore.getState().undo();
+    expect(gainOf()).toBe(0.2);
+  });
+
+  it("writes a mid-gesture value to the document without recording a step", () => {
+    const store = usePatchStore.getState();
+    store.replace(EMPTY_PATCH);
+    store.apply([{ op: "moduleAdd", id: "g", type: "amp.vca" }]);
+    const before = useHistoryStore.getState().past.length;
+    usePatchStore.getState().apply([
+      {
+        op: "paramSet",
+        module: "g",
+        param: "gain",
+        value: 0.33,
+        transient: true,
+      },
+    ]);
+    expect(gainOf()).toBe(0.33);
+    expect(useHistoryStore.getState().past).toHaveLength(before);
+  });
+});
+
+function gainOf(): number | undefined {
+  return usePatchStore.getState().doc.modules.find((m) => m.id === "g")?.params
+    ?.gain;
+}

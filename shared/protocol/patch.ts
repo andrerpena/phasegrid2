@@ -59,6 +59,14 @@ export const ParamSetOpSchema = z.object({
   module: z.string().min(1),
   param: z.string().min(1),
   value: z.number(),
+  /**
+   * Mid-gesture: the knob is still under a hand.
+   *
+   * The value belongs in the document like any other — it is what every view draws, and there is no
+   * second place a value is ever kept — but the gesture is not over, so it is not its own step back.
+   * The one entry for the whole gesture is recorded when the hand lifts.
+   */
+  transient: z.boolean().optional(),
 });
 
 /** User-interface only: layout, not signal. `isEngineOp` is false for this and only this op. */

@@ -19,8 +19,6 @@ interface FakeNode {
   };
   layout: ReturnType<typeof measureNode>;
   descriptor: ModuleDescriptor;
-  valueFor: (id: string) => number;
-  setParamValue: (id: string, value: number) => void;
   setPosition: (x: number, y: number) => void;
 }
 
@@ -38,8 +36,6 @@ function fakeNode(type: string, x: number, y: number): FakeNode {
     view: { position },
     layout: measureNode(desc),
     descriptor: desc,
-    valueFor: (id) => desc.params.find((p) => p.id === id)?.default ?? 0,
-    setParamValue: () => {},
     setPosition: (nx, ny) => position.set(nx, ny),
   };
 }
@@ -105,6 +101,7 @@ beforeEach(() => {
     ["vca", fakeNode("amp.vca", 240, 120)],
     ["env", fakeNode("env.dahdsr", 480, 120)],
   ]);
+  documentValues.clear();
 });
 
 /** Reaches the private handlers the way the attached listeners would. */
@@ -172,6 +169,33 @@ describe("dragging a module", () => {
   });
 });
 
+/**
+ * The values the interaction is told the document holds. Written by a test, read through `readParam`,
+ * exactly as `GridView` reads the real store: the interaction never asks the drawing what a value is.
+ */
+const documentValues = new Map<string, number>();
+const readParam = (module: string, param: string): number =>
+  documentValues.get(`${module}.${param}`) ??
+  nodes.get(module)?.descriptor.params.find((p) => p.id === param)?.default ??
+  0;
+const setDocumentValue = (
+  module: string,
+  param: string,
+  value: number,
+): void => {
+  documentValues.set(`${module}.${param}`, value);
+};
+
+interface ParamChange {
+  module: string;
+  param: string;
+  value: number;
+  done: boolean;
+  previous: number;
+}
+const changes = (fn: ReturnType<typeof vi.fn>): ParamChange[] =>
+  fn.mock.calls.map((c) => c[0] as ParamChange);
+
 describe("dragging a knob", () => {
   /** The centre of a node's first knob, in patch coordinates. */
   function knobAt(id: string) {
@@ -189,7 +213,9 @@ describe("dragging a knob", () => {
     // gesture, so only the release says it is done.
     const onParamChange = vi.fn();
     const { renderer, canvas } = rig(nodes);
-    const d = driver(new GridInteraction(renderer, canvas, { onParamChange }));
+    const d = driver(
+      new GridInteraction(renderer, canvas, { onParamChange, readParam }),
+    );
     const knob = knobAt("env");
 
     d.down(knob.x, knob.y);
@@ -197,37 +223,74 @@ describe("dragging a knob", () => {
     d.move(knob.x, knob.y - 80);
     d.up(knob.x, knob.y - 80);
 
-    const calls = onParamChange.mock.calls as [
-      string,
-      string,
-      number,
-      boolean,
-    ][];
+    const calls = changes(onParamChange);
     expect(calls.length).toBeGreaterThanOrEqual(3);
-    expect(calls.slice(0, -1).every((c) => c[3] === false)).toBe(true);
-    expect(calls.at(-1)?.[3]).toBe(true);
-    expect(calls[0][0]).toBe("env");
+    expect(calls.slice(0, -1).every((c) => c.done === false)).toBe(true);
+    expect(calls.at(-1)?.done).toBe(true);
+    expect(calls[0].module).toBe("env");
+  });
+
+  it("starts from where the parameter is now, not where it was first drawn", () => {
+    // The document is the only place a value lives, so a gesture has to begin from what it says. A
+    // node that kept a copy from when it was built started every drag from that copy instead, which
+    // made a knob jump back to its opening value the moment it was touched a second time.
+    const onParamChange = vi.fn();
+    const { renderer, canvas } = rig(nodes);
+    const node = nodes.get("env");
+    if (node === undefined) throw new Error("env");
+    const param = node.layout.controls[0].param;
+    const moved = param.min + (param.max - param.min) * 0.8;
+    setDocumentValue("env", param.id, moved);
+
+    const d = driver(
+      new GridInteraction(renderer, canvas, { onParamChange, readParam }),
+    );
+    const knob = knobAt("env");
+    d.down(knob.x, knob.y);
+    d.move(knob.x, knob.y - 1); // the smallest move there is: the value must barely leave where it was
+
+    const first = changes(onParamChange)[0];
+    expect(first.value).toBeCloseTo(moved, 1);
+    expect(first.previous).toBeCloseTo(moved, 5);
+  });
+
+  it("reports what the parameter was before the gesture, for undo to step back to", () => {
+    const onParamChange = vi.fn();
+    const { renderer, canvas } = rig(nodes);
+    const node = nodes.get("env");
+    if (node === undefined) throw new Error("env");
+    const param = node.layout.controls[0].param;
+    setDocumentValue("env", param.id, param.min);
+
+    const d = driver(
+      new GridInteraction(renderer, canvas, { onParamChange, readParam }),
+    );
+    const knob = knobAt("env");
+    d.down(knob.x, knob.y);
+    d.move(knob.x, knob.y - 60);
+    d.up(knob.x, knob.y - 60);
+
+    const last = changes(onParamChange).at(-1);
+    expect(last?.done).toBe(true);
+    expect(last?.previous).toBeCloseTo(param.min, 5);
+    expect(last?.value).toBeGreaterThan(param.min);
   });
 
   it("increases when dragged upward", () => {
     const onParamChange = vi.fn();
     const { renderer, canvas } = rig(nodes);
-    const d = driver(new GridInteraction(renderer, canvas, { onParamChange }));
+    const d = driver(
+      new GridInteraction(renderer, canvas, { onParamChange, readParam }),
+    );
     const knob = knobAt("env");
-    const start =
-      nodes
-        .get("env")
-        ?.valueFor(nodes.get("env")?.layout.controls[0].param.id ?? "") ?? 0;
+    const start = readParam(
+      "env",
+      nodes.get("env")?.layout.controls[0].param.id ?? "",
+    );
 
     d.down(knob.x, knob.y);
     d.move(knob.x, knob.y - 60);
-    const [, , value] = onParamChange.mock.calls.at(-1) as [
-      string,
-      string,
-      number,
-      boolean,
-    ];
-    expect(value).toBeGreaterThan(start);
+    expect(changes(onParamChange).at(-1)?.value).toBeGreaterThan(start);
   });
 
   it("moves less far with the fine modifier held", () => {
@@ -240,19 +303,52 @@ describe("dragging a knob", () => {
       nodes = new Map([["env", fakeNode("env.dahdsr", 480, 120)]]);
       const { renderer, canvas } = rig(nodes);
       const d = driver(
-        new GridInteraction(renderer, canvas, { onParamChange }),
+        new GridInteraction(renderer, canvas, { onParamChange, readParam }),
       );
       const knob = knobAt("env");
       d.down(knob.x, knob.y);
       d.move(knob.x, knob.y - 60, { shiftKey: shift });
     }
-    const coarseValue = (
-      coarse.mock.calls.at(-1) as [string, string, number, boolean]
-    )[2];
-    const fineValue = (
-      fine.mock.calls.at(-1) as [string, string, number, boolean]
-    )[2];
+    const coarseValue = changes(coarse).at(-1)?.value ?? 0;
+    const fineValue = changes(fine).at(-1)?.value ?? 0;
     expect(fineValue).toBeLessThan(coarseValue);
+  });
+
+  it("puts a knob back to its default when it is double-clicked", () => {
+    const onParamChange = vi.fn();
+    const { renderer, canvas } = rig(nodes);
+    const interaction = new GridInteraction(renderer, canvas, {
+      onParamChange,
+      readParam,
+    });
+    const node = nodes.get("env");
+    if (node === undefined) throw new Error("env");
+    const param = node.layout.controls[0].param;
+    setDocumentValue("env", param.id, param.max);
+    const knob = knobAt("env");
+    (
+      interaction as unknown as { onDoubleClick: (e: MouseEvent) => void }
+    ).onDoubleClick(pointer(knob.x, knob.y) as unknown as MouseEvent);
+
+    const change = changes(onParamChange).at(-1);
+    expect(change?.value).toBe(param.default);
+    expect(change?.previous).toBe(param.max);
+    // Finished, because it is: one edit, one step back, nothing still under a hand.
+    expect(change?.done).toBe(true);
+  });
+
+  it("has nothing to record when the knob is already at its default", () => {
+    const onParamChange = vi.fn();
+    const { renderer, canvas } = rig(nodes);
+    const interaction = new GridInteraction(renderer, canvas, {
+      onParamChange,
+      readParam,
+    });
+    const knob = knobAt("env");
+    (
+      interaction as unknown as { onDoubleClick: (e: MouseEvent) => void }
+    ).onDoubleClick(pointer(knob.x, knob.y) as unknown as MouseEvent);
+    expect(onParamChange).not.toHaveBeenCalled();
   });
 
   it("grabs the knob rather than the module under it", () => {
@@ -262,7 +358,11 @@ describe("dragging a knob", () => {
     const onNodesMoved = vi.fn();
     const { renderer, canvas } = rig(nodes);
     const d = driver(
-      new GridInteraction(renderer, canvas, { onParamChange, onNodesMoved }),
+      new GridInteraction(renderer, canvas, {
+        onParamChange,
+        readParam,
+        onNodesMoved,
+      }),
     );
     const knob = knobAt("env");
     d.down(knob.x, knob.y);
@@ -341,7 +441,7 @@ describe("an example project, where only the parameters may change", () => {
       new GridInteraction(
         renderer,
         canvas,
-        { onParamChange },
+        { onParamChange, readParam },
         { parametersOnly: true },
       ),
     );

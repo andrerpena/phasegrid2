@@ -1,5 +1,5 @@
 import { useCatalogStore } from "@renderer/catalog/catalog-store";
-import { sendTransientParam } from "@renderer/patch/engine-sync";
+import { paramValue } from "@renderer/patch/params";
 import { usePatchStore } from "@renderer/patch/patch-store";
 import { useProjectStore } from "@renderer/project/project-store";
 import { useThemeStore } from "@renderer/theming/theme-store";
@@ -111,20 +111,46 @@ export const GridView = () => {
               },
             );
           },
-          onParamChange: (module, param, value, done) => {
-            // While the knob is moving, the value goes to the engine and nowhere else, so the sound
-            // follows the pointer. The document is written once, on release: one undo entry for the
-            // gesture, and undo returns to where the knob was before it started, not to the last frame.
-            if (!done) {
-              sendTransientParam(module, param, value);
-              preview.refresh(module);
-              return;
-            }
-            usePatchStore
+          // The one place a parameter value is read from: the document, through the accessor everything
+          // else uses. Nothing on the canvas keeps a copy to answer with.
+          readParam: (module, param) => {
+            const doc = usePatchStore.getState().doc;
+            const found = doc.modules.find((m) => m.id === module);
+            const descriptor = useCatalogStore
               .getState()
-              .apply([{ op: "paramSet", module, param, value }], {
-                label: "Set parameter",
-              });
+              .byId.get(found?.type ?? "");
+            return descriptor === undefined
+              ? 0
+              : paramValue(found, descriptor, param);
+          },
+          onParamChange: ({ module, param, value, done, previous }) => {
+            // Every value goes to the document, including the ones passing under a moving hand: it is
+            // the only place a parameter value lives, and everything that draws one reads it from
+            // there. Engine sync and the wave panels are watching the same stream, so neither is told
+            // anything here.
+            //
+            // Only the release is labelled, so the gesture is one step back rather than a hundred, and
+            // it carries its own inverse because the document no longer remembers where the knob was
+            // when the hand went down.
+            usePatchStore.getState().apply(
+              [
+                {
+                  op: "paramSet",
+                  module,
+                  param,
+                  value,
+                  ...(done ? {} : { transient: true }),
+                },
+              ],
+              done
+                ? {
+                    label: "Set parameter",
+                    inverse: [
+                      { op: "paramSet", module, param, value: previous },
+                    ],
+                  }
+                : {},
+            );
           },
         },
         // An example demonstrates a module: its wiring is fixed and its knobs are live. Read once,

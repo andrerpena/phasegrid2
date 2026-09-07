@@ -69,6 +69,14 @@ export const KNOB_DRAG_RANGE = 180;
 /** With a modifier held. Slow enough to set a filter cutoff by ear rather than by luck. */
 export const KNOB_FINE_RANGE = 900;
 
+/** A fraction of a parameter's range as the number the parameter actually takes. */
+export function paramValueAt(
+  param: { min: number; max: number },
+  fraction: number,
+): number {
+  return param.min + fraction * (param.max - param.min);
+}
+
 export function beginDragParam(
   module: string,
   param: string,
@@ -156,8 +164,19 @@ export interface EndResult {
   };
   /** Where a cable was released, for the caller to hit test. */
   cableDrop?: { from: PortRef; fromSide: "input" | "output"; at: Point };
-  /** A finished knob drag: the point at which it becomes one undo entry rather than a hundred. */
-  committedParam?: { module: string; param: string; fraction: number };
+  /**
+   * A finished knob drag: the point at which it becomes one undo entry rather than a hundred.
+   *
+   * `startFraction` is where the knob was when the hand went down. The document has been rewritten on
+   * every frame since, so it no longer remembers, and undo would otherwise step back to the last
+   * frame of the drag rather than to before it.
+   */
+  committedParam?: {
+    module: string;
+    param: string;
+    fraction: number;
+    startFraction: number;
+  };
 }
 
 export function pointerUp(state: Interaction, at: Point): EndResult {
@@ -169,6 +188,7 @@ export function pointerUp(state: Interaction, at: Point): EndResult {
           module: state.module,
           param: state.param,
           fraction: state.fraction,
+          startFraction: state.startFraction,
         },
       };
     case "dragNodes":

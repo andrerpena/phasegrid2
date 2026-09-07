@@ -2,7 +2,7 @@ import { useEngineStore } from "@renderer/engine/engine-store";
 import { useHistoryStore } from "@renderer/history/history-store";
 import { EMPTY_PATCH } from "@shared/protocol/patch";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { sendTransientParam, startEngineSync } from "./engine-sync";
+import { startEngineSync } from "./engine-sync";
 import { usePatchStore } from "./patch-store";
 
 /**
@@ -80,16 +80,23 @@ describe("engine sync", () => {
     ]);
   });
 
-  it("sends a mid-gesture value to the engine and not to the document", () => {
-    const before = usePatchStore.getState().doc;
-    sendTransientParam("g", "gain", 0.7);
+  it("sends a mid-gesture value straight out, ahead of anything queued", async () => {
+    // A drag makes one of these per frame. Queued behind a batch they would build a backlog that keeps
+    // playing after the hand has stopped, so they go immediately and out of order on purpose.
+    const stop = startEngineSync();
+    usePatchStore.getState().apply([add]);
+    usePatchStore.getState().apply([{ ...set(0.7), transient: true }]);
     expect(calls).toEqual([
       {
         cmd: "param.set",
         args: { module: "g", param: "gain", value: 0.7, transient: true },
       },
     ]);
-    expect(usePatchStore.getState().doc).toBe(before);
+    await flush();
+    stop();
+    expect(calls.map((c) => c.cmd)).toEqual(["param.set", "patch.batch"]);
+    // It is in the document like any other value, and it is not its own step back.
+    expect(usePatchStore.getState().doc.modules[0]?.params?.gain).toBe(0.7);
     expect(useHistoryStore.getState().past).toHaveLength(0);
   });
 

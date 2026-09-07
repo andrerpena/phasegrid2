@@ -1,4 +1,5 @@
 import { hexToNumber } from "@renderer/lib/color";
+import { paramValue } from "@renderer/patch/params";
 import type { GridColors } from "@renderer/theming/theme";
 import type { ModuleDescriptor } from "@shared/protocol/catalog";
 import type { PatchModule } from "@shared/protocol/patch";
@@ -43,7 +44,15 @@ export class NodeView {
   private selected = false;
 
   constructor(
-    readonly module: PatchModule,
+    /**
+     * The module as the document last described it, for drawing and for nothing else.
+     *
+     * Deliberately not readable from outside. A value read back off a node is a value read off a copy,
+     * and a copy is a thing that can be out of date; anything that needs to know what a parameter is
+     * set to asks the document, which is where parameter values live. This is only ever compared with
+     * the next module handed in, to tell whether there is anything to redraw.
+     */
+    private module: PatchModule,
     readonly descriptor: ModuleDescriptor,
     private style: NodeStyle,
   ) {
@@ -77,7 +86,12 @@ export class NodeView {
         KNOB_CELL_WIDTH - 4,
       );
       knob.view.position.set(control.x, control.y);
-      knob.update(paramFraction(control.param, this.valueOf(control.param.id)));
+      knob.update(
+        paramFraction(
+          control.param,
+          paramValue(module, descriptor, control.param.id),
+        ),
+      );
       this.knobs.set(control.param.id, knob);
       this.view.addChild(knob.view);
     }
@@ -109,19 +123,6 @@ export class NodeView {
     this.view.position.set(module.x ?? 0, module.y ?? 0);
   }
 
-  /** The value a parameter currently shows: the module's own, or the descriptor's default. */
-  valueFor(paramId: string): number {
-    return this.valueOf(paramId);
-  }
-
-  /** Moves one knob without going through the document, so a drag is smooth before it is committed. */
-  setParamValue(paramId: string, value: number): void {
-    const param = this.descriptor.params.find((p) => p.id === paramId);
-    const knob = this.knobs.get(paramId);
-    if (param === undefined || knob === undefined) return;
-    knob.update(paramFraction(param, value));
-  }
-
   /**
    * The wave to show on the panel: one cycle, -1..1, as the engine drew it.
    *
@@ -131,12 +132,6 @@ export class NodeView {
    */
   setWave(samples: ArrayLike<number>): void {
     this.wave?.setSamples(samples);
-  }
-
-  private valueOf(paramId: string): number {
-    const explicit = this.module.params?.[paramId];
-    if (explicit !== undefined) return explicit;
-    return this.descriptor.params.find((p) => p.id === paramId)?.default ?? 0;
   }
 
   private drawFrame(): void {
@@ -172,17 +167,29 @@ export class NodeView {
     this.view.position.set(x, y);
   }
 
-  /** Re-reads the module's values. Called when the patch changes rather than every frame. */
+  /**
+   * Re-reads the module from the document. Called whenever the patch changes, which during a knob drag
+   * is every frame.
+   *
+   * The knobs are only redrawn when the module is a different object than last time. `applyOps` builds
+   * a new object for the module it changed and reuses every other, so a drag on one knob costs one
+   * node's redraw rather than the whole patch's. The ports are refreshed regardless, because hovering
+   * changes them without the document changing at all.
+   */
   update(
     module: PatchModule,
     connectedPorts: ReadonlySet<string>,
     hoveredPort: string | null,
   ): void {
-    for (const [id, knob] of this.knobs) {
-      const param = this.descriptor.params.find((p) => p.id === id);
-      if (param === undefined) continue;
-      const value = module.params?.[id] ?? param.default;
-      knob.update(paramFraction(param, value));
+    if (module !== this.module) {
+      this.module = module;
+      for (const [id, knob] of this.knobs) {
+        const param = this.descriptor.params.find((p) => p.id === id);
+        if (param === undefined) continue;
+        knob.update(
+          paramFraction(param, paramValue(module, this.descriptor, id)),
+        );
+      }
     }
     for (const [id, socket] of this.ports) {
       const connected = connectedPorts.has(id);

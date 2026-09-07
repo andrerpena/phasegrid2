@@ -25,6 +25,15 @@ interface ApplyOptions {
   /** A sentence for the history widget. Omitting it means the edit is not undoable. */
   label?: string;
   source?: EditSource;
+  /**
+   * How to undo this edit, when deriving it from the document would be wrong.
+   *
+   * Needed by a gesture that showed its result live and is only now being recorded: a knob drag has
+   * already written the document sixty times, so the document no longer remembers where the knob was
+   * when the hand went down. The caller does, and passes it here. Everything else leaves this alone
+   * and gets the inverse derived from the document, which cannot drift from what the edit did.
+   */
+  inverse?: PatchOp[];
 }
 
 interface PatchState {
@@ -53,9 +62,10 @@ export const usePatchStore = create<PatchState & PatchActions>((set, get) => ({
 
     // History is recorded from the same operations that were applied, and its inverse is derived from
     // the document they were applied to. Undo therefore cannot drift from what the edit actually did,
-    // which it would if the two were written separately.
+    // which it would if the two were written separately. The exception is a caller that hands over an
+    // inverse of its own, because the document has already moved under it; see `ApplyOptions`.
     if (options.label !== undefined) {
-      const inverse = invert(before, ops);
+      const inverse = options.inverse ?? invert(before, ops);
       useHistoryStore.getState().push({
         label: options.label,
         apply: () => get().apply(ops, { source: "user" }),

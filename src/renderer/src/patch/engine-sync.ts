@@ -26,7 +26,15 @@ export function startEngineSync(): () => void {
       enqueue(sendWholePatch);
       return;
     }
-    const params = ops.filter(isParamSet);
+    // Mid-gesture values go straight out, ahead of the queue. A drag makes one of these per frame and
+    // the release that follows carries the value that counts, so making them wait would build a
+    // backlog that keeps playing after the hand has stopped.
+    for (const op of ops
+      .filter(isParamSet)
+      .filter((op) => op.transient === true))
+      sendTransientParam(op.module, op.param, op.value);
+
+    const params = ops.filter(isParamSet).filter((op) => op.transient !== true);
     const structural = engineOps(ops).filter((op) => !isParamSet(op));
     if (structural.length === 0 && params.length === 0) return;
     enqueue(async () => {
@@ -48,13 +56,10 @@ export function startEngineSync(): () => void {
 }
 
 /**
- * A value mid-gesture: the knob is still being dragged.
- *
- * Not a document edit, so it does not go through the store, and not queued behind structural edits,
- * because a drag produces one of these per frame and the release that follows carries the value that
- * counts. A failure is not worth resyncing over for the same reason.
+ * A value mid-gesture. A failure is not worth resyncing over: the release that follows carries the
+ * value that counts, and it goes through the queue like every other document edit.
  */
-export function sendTransientParam(
+function sendTransientParam(
   module: string,
   param: string,
   value: number,
