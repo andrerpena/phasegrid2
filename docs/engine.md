@@ -201,6 +201,22 @@ as `at(i) - knob`.
 `kParamModulatable` -- `Registry::add` rejects that -- because it is read once, on the message thread, by
 `Module::configure(const ParamValues&, const NodeData&)`, which runs before `prepare()`.
 
+**A vendored module's params are in the vendored pre-scale domain, and the unit label can be misleading.**
+Descriptors for vendored modules are generated from the vendored parameter table, taking min, max, default
+and unit straight from it, with a linear curve because the vendored code applies its own scaling
+internally. For a param whose scaling is not linear, the number is therefore not in the unit the label
+names. The envelope's times are the sharpest case: `decay` says "seconds" and runs 0 to 2.378, but the
+real time is close to the fourth power of the value, so `0.25` is about four milliseconds and `1.0` is
+about a second. The range makes sense once you see that 2.378 to the fourth is roughly the 32 seconds the
+vendored envelope actually offers.
+
+Nothing is wrong with the audio; it is the metadata that lies, and it will mislead a user interface that
+renders "seconds" beside the number and a person who types what they mean. Fixing it properly is a choice
+between two options that have not been made yet: keep the pre-scale value and carry the real curve in the
+descriptor so the display can transform it, or expose display units and have the adapter invert the
+vendored scaling, which also moves what "knob plus modulation" means into display units. Until then, set
+these params by ear or by measurement, not by reading the unit.
+
 ## Node data
 
 `NodeModel::data` is an arbitrary JSON **object** per node: structured state the module owns and no param can
