@@ -14,6 +14,12 @@ import type {
 } from "../../shared/protocol/commands";
 import type { EventEnvelope } from "../../shared/protocol/envelope";
 import {
+  type AppStorageBridge,
+  STORAGE_READ_CHANNEL,
+  STORAGE_WRITE_CHANNEL,
+  type StorageKey,
+} from "../../shared/protocol/storage";
+import {
   decodeSlot,
   readHeader,
   type SlotReading,
@@ -140,13 +146,22 @@ const telemetry: TelemetryBridge = {
   close: closeSegment,
 };
 
+/** Application settings. A plain pass-through: the main process owns the files and validates the key. */
+const appStorage: AppStorageBridge = {
+  read: (key: StorageKey) => ipcRenderer.invoke(STORAGE_READ_CHANNEL, key),
+  write: (key: StorageKey, text: string) =>
+    ipcRenderer.invoke(STORAGE_WRITE_CHANNEL, key, text),
+};
+
 if (process.contextIsolated) {
   contextBridge.exposeInMainWorld("electron", electronAPI);
   contextBridge.exposeInMainWorld("engine", engine);
   contextBridge.exposeInMainWorld("telemetry", telemetry);
+  contextBridge.exposeInMainWorld("appStorage", appStorage);
 } else {
   const win = window as unknown as Record<string, unknown>;
   win.electron = electronAPI;
   win.engine = engine;
   win.telemetry = telemetry;
+  win.appStorage = appStorage;
 }

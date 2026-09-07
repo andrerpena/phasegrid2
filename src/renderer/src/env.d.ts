@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 import type { EngineBridge, TelemetryBridge } from "@shared/protocol/bridge";
+import type { AppStorageBridge } from "@shared/protocol/storage";
 
 declare global {
   /** Injected by the bundler from package.json. */
@@ -10,5 +11,7 @@ declare global {
     engine: EngineBridge;
     /** The telemetry segment, read directly rather than through a message per frame. */
     telemetry: TelemetryBridge;
+    /** Application settings: keybindings, layout and the chosen theme. Not project data. */
+    appStorage: AppStorageBridge;
   }
 }

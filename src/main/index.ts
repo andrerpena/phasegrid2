@@ -8,6 +8,7 @@ import {
   EngineSupervisor,
   resolveEnginePath,
 } from "./engine/supervisor";
+import { registerAppStorageIpc } from "./storage/app-storage";
 
 let supervisor: EngineSupervisor | null = null;
 
@@ -76,6 +77,7 @@ app.whenReady().then(() => {
   app.on("browser-window-created", (_, window) =>
     optimizer.watchWindowShortcuts(window),
   );
+  registerAppStorageIpc(ipcMain, app.getPath("userData"));
   const window = createWindow();
   void startEngine(window);
   app.on("activate", () => {
