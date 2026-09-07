@@ -68,16 +68,41 @@ function score(query: string, target: string): number | null {
   return total - t.length * 0.01;
 }
 
+/**
+ * The fields are not equal, and weighting them is what makes the ranking usable.
+ *
+ * A label match is what someone meant. An id match is deliberate too. Keywords are prose, and a
+ * subsequence of two or three letters can be found scattered through almost any sentence, so an
+ * unweighted keyword match drowns the labels: typing "os" put the flanger above the oscillator,
+ * because its description happened to contain an o and then an s.
+ *
+ * Keywords still earn their place, because they are how you find something by what it does rather
+ * than by its name. They just cannot outrank the thing actually called that.
+ */
+const HINT_WEIGHT = 0.8;
+const KEYWORD_WEIGHT = 0.25;
+/** Whatever the prose scored, it ends up below every name match. */
+const KEYWORD_CEILING = -1;
+
 function defaultRank(items: NavigatorItem[], query: string): NavigatorItem[] {
   const trimmed = query.trim();
   if (trimmed === "") return items;
   const ranked: { item: NavigatorItem; score: number }[] = [];
   for (const item of items) {
-    const best = Math.max(
-      score(trimmed, item.label) ?? Number.NEGATIVE_INFINITY,
-      score(trimmed, item.hint ?? "") ?? Number.NEGATIVE_INFINITY,
-      score(trimmed, item.keywords ?? "") ?? Number.NEGATIVE_INFINITY,
+    const label = score(trimmed, item.label);
+    const hint = item.hint === undefined ? null : score(trimmed, item.hint);
+    const keywords =
+      item.keywords === undefined ? null : score(trimmed, item.keywords);
+    const named = Math.max(
+      label ?? Number.NEGATIVE_INFINITY,
+      hint === null ? Number.NEGATIVE_INFINITY : hint * HINT_WEIGHT,
     );
+    const best =
+      named > Number.NEGATIVE_INFINITY
+        ? named
+        : keywords === null
+          ? Number.NEGATIVE_INFINITY
+          : Math.min(KEYWORD_CEILING, keywords * KEYWORD_WEIGHT);
     if (best > Number.NEGATIVE_INFINITY) ranked.push({ item, score: best });
   }
   return ranked

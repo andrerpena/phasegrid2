@@ -67,3 +67,48 @@ describe("ranking in the navigator", () => {
     expect(twice[0]).toEqual(twice[1]);
   });
 });
+
+describe("weighting the fields", () => {
+  const examples: NavigatorItem[] = [
+    {
+      id: "example.osc.wavetable",
+      label: "Example: Wavetable Oscillator",
+      hint: "example.osc.wavetable",
+      keywords: "An oscillator on its own, at middle C. Turn Level for volume.",
+    },
+    {
+      id: "example.fx.flanger",
+      label: "Example: Flanger",
+      hint: "example.fx.flanger",
+      keywords: "Flanger on a bare tone. Turn Feedback for the sweep to bite.",
+    },
+    {
+      id: "example.fx.reverb",
+      label: "Example: Reverb",
+      hint: "example.fx.reverb",
+      keywords:
+        "Reverb on a bare tone. Turn Dry/Wet, then Decay Time and Size.",
+    },
+  ];
+
+  it("puts a name match above a description match", () => {
+    // Two or three letters can be found scattered through almost any sentence, so an unweighted
+    // description match drowns the labels: typing "os" put the flanger above the oscillator.
+    expect(rankNavigatorItems(examples, "os")[0].id).toBe(
+      "example.osc.wavetable",
+    );
+  });
+
+  it("still finds something by what its description says", () => {
+    // Keywords earn their place: they are how you find a thing by what it does rather than its name.
+    expect(rankNavigatorItems(examples, "sweep").map((i) => i.id)).toContain(
+      "example.fx.flanger",
+    );
+  });
+
+  it("ranks an exact name first even when others mention the word", () => {
+    expect(rankNavigatorItems(examples, "reverb")[0].id).toBe(
+      "example.fx.reverb",
+    );
+  });
+});
