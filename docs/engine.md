@@ -23,6 +23,24 @@ No `new`/`delete`/growing containers, no locks, no syscalls, no exceptions, no l
 Allocate in `Module::prepare` only. `[rt]` tests fail on any global allocation inside an `RtScope`.
 `PG_RT_NONBLOCKING` (`[[clang::nonblocking]]`) marks audio functions as a trailing attribute paired with `noexcept`; on this toolchain it is documentation unless the `rtsan` preset is used; the `RtScope` tests enforce the rules in the test harness.
 
+## Voices and the scheduler contract
+
+`Program.voicePairs = ceil(voiceCount / 2)`, up to `kMaxVoices` = 32 voices (16 pairs). `Scheduler::run`
+executes the **whole op list once per pair**, in **ascending pair order**, inside one block, passing the pair
+index as `ctx.voice` and that pair's active-lane mask as `ctx.voiceMask`. Buffers and event buffers are shared
+by every pair, so a pair overwrites what the previous one left and only the last pair's values survive a block.
+
+That has one consequence every module has to honour:
+
+- **Per-block work runs on pair 0.** Work that is identical for every voice -- reading the block's note
+  events, deriving a playhead from `transport.ppq` -- must happen when `ctx.voice == 0`, with the result
+  reused for later pairs, or it happens `voicePairs` times. Ascending order is what makes "pair 0 first"
+  meaningful. Per-*voice* state is indexed by the pair instead: `VoicedModule<State>` sizes its vector to
+  `voicePairs` and `st(ctx)` picks `ctx.voice`.
+
+Parallelising pairs later would break both halves of this -- the ordering and the shared buffers -- so it
+would have to revisit this contract, not just the loop.
+
 ## Vendored Vital DSP
 
 `engine/vendor/vital` (GPL-3.0-or-later, see NOTICE.md) provides the SIMD types, fast math, oscillators, filters,
@@ -155,7 +173,7 @@ Back edges read from / write to a `FeedbackState`: an exact one-sample (or one-b
 
 ## Compilation constraints
 
-- Max 2 voices (one pair) per program; `compileGraph` rejects `voiceCount > 2` with `E_VOICES`.
+- Max `kMaxVoices` = 32 voices (16 pairs) per program; `compileGraph` rejects more with `E_VOICES`. `GraphModel` itself accepts 1..64.
 - Fan-in into one port is capped at `kMaxPortsPerModule` (32) → `E_FAN_IN`.
 
 ## Ops

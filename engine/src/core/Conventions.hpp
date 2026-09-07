@@ -17,6 +17,10 @@ static_assert(kMaxBlockSize == static_cast<uint32_t>(vital::kMaxBufferSize));
 inline constexpr uint32_t kDefaultBlockSize = 64;
 inline constexpr uint32_t kMaxEventsPerBlock = 256;
 inline constexpr uint32_t kMaxPortsPerModule = 32;
+/// Voices a program may hold. Voices run in pairs (two per `Sample`), so this is 16 pairs, and the
+/// scheduler runs the whole op list once per pair. `GraphModel` accepts 1..64; `compileGraph` rejects
+/// anything above this with E_VOICES.
+inline constexpr uint32_t kMaxVoices = 32;
 inline constexpr uint32_t kMaxParamsPerModule = 64;
 static_assert(vital::poly_float::kSize == 4, "phasegrid2 assumes 4 SIMD lanes: v0.L v0.R v1.L v1.R");
 

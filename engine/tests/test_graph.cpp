@@ -79,10 +79,23 @@ TEST_CASE("compile: reuses instances across compiles; voice pairs from voiceCoun
   REQUIRE(pg::lanes::lane(pg::Sample(1.f) & p2->activeVoiceMask[0], 2) == 1.f);   // voice 1 active
 }
 
-TEST_CASE("compile: rejects more than 2 voices", "[compiler]") {
+TEST_CASE("compile: accepts up to kMaxVoices and rejects more", "[compiler]") {
   GraphFixture f;
   f.node("c", "test.const", {{"value", 0.5f}});
-  f.model.setVoiceCount(3);
+
+  // An odd count still rounds up to a whole pair; the spare lane is what activeVoiceMask closes.
+  REQUIRE(f.model.setVoiceCount(5));
+  auto odd = f.compile();
+  REQUIRE(odd->voicePairs == 3);
+  REQUIRE(odd->activeVoiceMask.size() == 3);
+  REQUIRE(pg::lanes::lane(pg::Sample(1.f) & odd->activeVoiceMask[2], 0) == 1.f);   // voice 4 exists
+  REQUIRE(pg::lanes::lane(pg::Sample(1.f) & odd->activeVoiceMask[2], 2) == 0.f);   // voice 5 does not
+
+  REQUIRE(f.model.setVoiceCount(pg::kMaxVoices));
+  auto most = f.compile();
+  REQUIRE(most->voicePairs == pg::kMaxVoices / 2);
+
+  REQUIRE(f.model.setVoiceCount(pg::kMaxVoices + 1));
   pg::CompileOutput o = pg::compileGraph(f.model, f.reg, f.table, 1, 48000.0, 64);
   REQUIRE(o.program == nullptr);
   REQUIRE(o.error.find("E_VOICES") != std::string::npos);
