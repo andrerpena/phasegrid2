@@ -28,7 +28,10 @@ std::shared_ptr<ModuleInstance> InstanceTable::acquire(const std::string& id, co
   inst->id = id;
   inst->serial = nextSerial_++;
   inst->type = &type;
-  inst->module.reset(type.desc->create());
+  {
+    CreatingDescriptorScope creating(type.desc);   // generated module types read this to find their own descriptor
+    inst->module.reset(type.desc->create());
+  }
   inst->params.resize(type.desc->numParams);
   inst->structuralValues.reserve(type.desc->numParams);
   for (uint32_t i = 0; i < type.desc->numParams; ++i) inst->structuralValues.push_back(modelValue(type.desc->params[i]));

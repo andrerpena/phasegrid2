@@ -4,7 +4,7 @@ add_subdirectory(vendor/vital)
 
 file(GLOB_RECURSE PG_CORE_SOURCES CONFIGURE_DEPENDS
   src/core/*.cpp src/services/*.cpp src/render/*.cpp src/modules/*.cpp
-  src/dsp/*.cpp src/protocol/*.cpp src/platform/*.cpp)
+  src/dsp/*.cpp src/protocol/*.cpp src/platform/*.cpp src/vital/*.cpp)
 
 add_library(pg_core STATIC ${PG_CORE_SOURCES})
 target_include_directories(pg_core PUBLIC src)

@@ -83,9 +83,10 @@ void Scheduler::exec(Program& p, const Op& op, uint32_t offset, uint32_t n, uint
       }
       for (uint32_t i = 0; i < d.numParams; ++i) {
         const ParamState& ps = slot.inst->params[i];
-        if (slot.paramBuf[i] != kNone) params_[i] = ParamView{p.buffers[slot.paramBuf[i]].data.data() + offset, nullptr, 0.f};
-        else if (ps.rampIsConstant) params_[i] = ParamView{nullptr, nullptr, ps.constValue};
-        else params_[i] = ParamView{nullptr, ps.rampValue.data() + offset, 0.f};
+        const float knob = ps.rampIsConstant ? ps.constValue : ps.rampValue[offset];
+        if (slot.paramBuf[i] != kNone) params_[i] = ParamView{p.buffers[slot.paramBuf[i]].data.data() + offset, nullptr, 0.f, knob};
+        else if (ps.rampIsConstant) params_[i] = ParamView{nullptr, nullptr, ps.constValue, knob};
+        else params_[i] = ParamView{nullptr, ps.rampValue.data() + offset, 0.f, knob};
       }
       AudioBus busSlice;
       if (bus) { busSlice.data = bus->data + offset; busSlice.frames = n; }

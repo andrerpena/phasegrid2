@@ -22,6 +22,24 @@ struct RegisteredModule {
   int32_t findParam(std::string_view id) const;
 };
 
+/// The descriptor whose `create()` is running right now, or nullptr. `ModuleDescriptor::create` is a plain
+/// C function pointer taking no argument (so descriptors can cross a future dlopen boundary unchanged), which
+/// leaves a module type that is *generated* rather than hand-written with no way to know which of its many
+/// generated descriptors it is being built for. `InstanceTable::acquire` publishes it here for the duration of
+/// the call and clears it afterwards; message thread only, hence thread_local rather than a lock.
+extern thread_local const ModuleDescriptor* g_creatingDescriptor;
+
+/// Sets `g_creatingDescriptor` for the lifetime of the scope, restoring whatever was there before.
+class CreatingDescriptorScope {
+public:
+  explicit CreatingDescriptorScope(const ModuleDescriptor* d) : previous_(g_creatingDescriptor) { g_creatingDescriptor = d; }
+  ~CreatingDescriptorScope() { g_creatingDescriptor = previous_; }
+  CreatingDescriptorScope(const CreatingDescriptorScope&) = delete;
+  CreatingDescriptorScope& operator=(const CreatingDescriptorScope&) = delete;
+private:
+  const ModuleDescriptor* previous_;
+};
+
 class Registry {
 public:
   std::optional<std::string> add(const ModuleDescriptor& desc);   // error message on rejection

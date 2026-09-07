@@ -3,6 +3,9 @@
 #include "core/Conventions.hpp"
 
 namespace pg {
+
+thread_local const ModuleDescriptor* g_creatingDescriptor = nullptr;
+
 namespace {
 /// A modulatable param gets an implicit `param:<id>` input port -- unless it is stepped, because a
 /// per-sample continuous modulation signal has no meaning for an integer or enum. Registry::add uses

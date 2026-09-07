@@ -49,6 +49,10 @@ struct ParamView {
   const Sample* polyBuf = nullptr;   // per-sample lane-wise values (modulated)
   const float* monoBuf = nullptr;    // per-sample scalar values (smoothing)
   float k = 0.f;                     // constant
+  /// The UNMODULATED knob value for this block, in display units, always filled. `at(i)` is knob + the
+  /// modulation signal, clamped; a module that has to hand the knob and the modulation to a downstream
+  /// engine separately (the vendored-DSP adapter) recovers the modulation as `at(i) - knob`.
+  float knob = 0.f;
   Sample at(uint32_t i) const { return polyBuf ? polyBuf[i] : Sample(monoBuf ? monoBuf[i] : k); }
 };
 
