@@ -161,6 +161,10 @@ struct ModuleSpec {
   /// asked. Everything else stays reachable through the inspector. See `kParamPrimary`.
   std::vector<std::string> face;
   std::vector<ControlOverride> overrides;
+  /// Optional: one cycle of the module's waveform at `values`, for `Module::preview`. Runs on the message
+  /// thread against the first voice pair's vendored module, which has been through `onConfigure` and `init`.
+  /// A spec that sets this also sets `kModulePreviewsWave` in `moduleFlags`.
+  std::function<bool(vital::SynthModule&, const ParamValues&, float*, uint32_t)> preview;
   bool processWithInput = false;   // effects: audio via processWithInput(buffer, n); input 0 must be Audio with vendorInput -1
   bool needsBeatsPerSecond = false;
   uint32_t moduleFlags = 0;

@@ -93,6 +93,11 @@ void WrappedModule::build(Pair& pair, const PrepareInfo& info) {
   pair.midiScratch.fill(Sample(kMiddleCMidi));
 }
 
+bool WrappedModule::preview(const ParamValues& values, float* out, uint32_t count) {
+  if (!spec_.preview || pairs_.empty() || !pairs_[0]->module) return false;
+  return spec_.preview(*pairs_[0]->module, values, out, count);
+}
+
 void WrappedModule::reset(uint32_t voicePair) {
   if (voicePair < pairs_.size() && pairs_[voicePair]->module) pairs_[voicePair]->module->hardReset();
 }

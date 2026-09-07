@@ -7,7 +7,7 @@
 #include "core/Engine.hpp"
 #include "modules/builtin.hpp"
 #include "render/OfflineRenderer.hpp"
-#include "util/Fft.hpp"
+#include "util/Harmonics.hpp"
 
 /**
  * The four basic waveforms, measured rather than eyeballed.
@@ -33,17 +33,8 @@
 namespace {
 
 constexpr double kSampleRate = 48000.0;
-constexpr size_t kWindow = 16384;
-/**
- * A fundamental that lands exactly on FFT bin 90, so every harmonic lands exactly on a bin too.
- *
- * A pitch chosen for musical tidiness instead (middle C) sits between bins, and its leakage skirt then
- * biases each harmonic by five to ten percent in alternating directions. That is enough to force
- * tolerances so wide that a genuinely wrong shape would pass, which defeats the point of measuring.
- */
-constexpr double kF0 = 90.0 * kSampleRate / static_cast<double>(kWindow);   // 263.671875 Hz
-constexpr float kMiddleC = 261.6256f;
-const float kPitch = std::log2(static_cast<float>(kF0) / kMiddleC) / 10.f;
+/// Bin 90: 263.67 Hz, a semitone-ish above middle C. See util/Harmonics.hpp for why a bin and not a note.
+const pg::test::OnBin kF0 = pg::test::onBin(90, kSampleRate);
 
 /// The built-in table indices, in the order `WavetableBank` declares them.
 enum Table { kBasicShapes = 0, kSine = 1, kSaturatedSine = 2, kTriangle = 3, kSquare = 4, kPulse = 5, kSaw = 6 };
@@ -53,7 +44,7 @@ std::vector<float> renderShape(Table table, float waveFrame = 0.f) {
   pg::Registry reg;
   pg::registerBuiltinModules(reg);
   pg::Engine engine{reg, pg::EngineConfig{kSampleRate, 64}};
-  REQUIRE(engine.model().addNode(reg, {"pitch", "math.scaleOffset", {{"offset", kPitch}}}));
+  REQUIRE(engine.model().addNode(reg, {"pitch", "math.scaleOffset", {{"offset", kF0.pitch}}}));
   REQUIRE(engine.model().addNode(reg, {"osc", "osc.wavetable",
                                        {{"table", static_cast<float>(table)}, {"wave_frame", waveFrame}}}));
   REQUIRE(engine.model().addNode(reg, {"out", "io.audioOut", {}}));
@@ -63,39 +54,11 @@ std::vector<float> renderShape(Table table, float waveFrame = 0.f) {
   return pg::renderInterleaved(engine, pg::RenderOptions{1.0, 2});
 }
 
-/// Half a second in, well past any start-up ramp, on the left channel.
-std::vector<float> analysisWindow(const std::vector<float>& interleaved) {
-  const size_t start = static_cast<size_t>(0.5 * kSampleRate);
-  REQUIRE((start + kWindow) * 2 <= interleaved.size());
-  std::vector<float> out(kWindow);
-  for (size_t i = 0; i < kWindow; ++i) out[i] = interleaved[(start + i) * 2];
-  return out;
-}
+using Series = pg::test::HarmonicSeries;
 
-/// Amplitude of the n-th harmonic. A Hann window spreads a bin-centred sinusoid over exactly three bins,
-/// so the three are combined rather than the peak taken, which would report only part of the energy.
-float harmonic(const std::vector<float>& mag, int n) {
-  const size_t centre = 90 * static_cast<size_t>(n);
-  if (centre + 1 >= mag.size()) return 0.f;
-  double sum = 0.0;
-  for (size_t k = centre - 1; k <= centre + 1; ++k) sum += static_cast<double>(mag[k]) * mag[k];
-  return static_cast<float>(std::sqrt(sum));
-}
-
-/// Every harmonic from 2 up, as a fraction of the fundamental.
-struct Series {
-  float h1 = 0.f;
-  std::vector<float> ratio{0.f, 1.f};   // index n holds harmonic n; index 0 unused
-  float operator[](int n) const { return static_cast<size_t>(n) < ratio.size() ? ratio[static_cast<size_t>(n)] : 0.f; }
-};
-
+/// Half a second in, well past any start-up ramp.
 Series seriesOf(Table table, float waveFrame = 0.f) {
-  const std::vector<float> mag = pg::test::magnitudeSpectrum(analysisWindow(renderShape(table, waveFrame)));
-  Series s;
-  s.h1 = harmonic(mag, 1);
-  REQUIRE(s.h1 > 1.f);   // there is a tone at all: every ratio below divides by this
-  for (int n = 2; n <= 9; ++n) s.ratio.push_back(harmonic(mag, n) / s.h1);
-  return s;
+  return pg::test::harmonicSeries(pg::test::analysisWindow(renderShape(table, waveFrame), kSampleRate, 0.5), kF0.bin);
 }
 
 /// Within a tenth of the theoretical ratio. The table is band-limited and interpolated, so the harmonics

@@ -1,3 +1,5 @@
+#include <algorithm>
+#include <cmath>
 #include <vector>
 #include "oscillator_module.h"
 #include "vital/Descriptors.hpp"
@@ -56,8 +58,24 @@ const ModuleDescriptor& oscWavetable() {
     spec.extraParams = {
       ParamDesc{"table", "Wavetable", 0.f, static_cast<float>(tableNames().size() - 1), 0.f, ParamUnit::None,
                 ParamCurve::Linear, kParamEnum | kParamInteger | kParamNoSmooth | kParamStructural,
-                tableNames().data(), static_cast<uint32_t>(tableNames().size()), "waveSelect", nullptr,
+                tableNames().data(), static_cast<uint32_t>(tableNames().size()), "select", nullptr,
                 "Built-in wavetable this oscillator plays"},
+    };
+    // The picture is the table itself: the frame `wave_frame` selects, read from the rendered wavetable
+    // rather than redrawn from its name. That is what makes the morph table and a loaded file show what
+    // they are instead of a blank panel or a guess.
+    spec.moduleFlags |= kModulePreviewsWave;
+    spec.preview = [](vital::SynthModule& m, const ParamValues& values, float* out, uint32_t count) {
+      vital::Wavetable* table = static_cast<vital::OscillatorModule&>(m).getWavetable();
+      const vital::Wavetable::WavetableData* data = table ? table->getAllData() : nullptr;
+      if (data == nullptr || data->num_frames <= 0 || count == 0) return false;
+      const auto wf = values.find("wave_frame");
+      const int wanted = wf == values.end() ? 0 : static_cast<int>(std::lround(wf->second));
+      const int frame = std::clamp(wanted, 0, data->num_frames - 1);
+      const float* wave = data->wave_data[frame];
+      constexpr int kSize = vital::Wavetable::kWaveformSize;
+      for (uint32_t i = 0; i < count; ++i) out[i] = wave[static_cast<size_t>(i) * kSize / count];
+      return true;
     };
     spec.onConfigure = [](vital::SynthModule& m, vendor::ModuleContext&, const ParamValues& values) {
       auto it = values.find("table");

@@ -39,6 +39,9 @@ inline constexpr uint32_t kParamPrimary    = 1u << 6;
 inline constexpr uint32_t kModuleTerminal        = 1u << 0;
 inline constexpr uint32_t kModuleNeedsTransport  = 1u << 1;
 inline constexpr uint32_t kModuleWritesTelemetry = 1u << 2;
+/// The module can draw one cycle of what it would sound like at given param values: `Module::preview`.
+/// An interface gives such a module a wave panel on its face and asks the engine what to put in it.
+inline constexpr uint32_t kModulePreviewsWave   = 1u << 3;
 
 // C-layout so descriptors can cross a dlopen boundary unchanged.
 struct PortDesc {

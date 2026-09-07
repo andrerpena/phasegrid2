@@ -95,7 +95,32 @@ Result Engine::setParam(const std::string& node, const std::string& param, float
   // (see InstanceTable::acquire). The caller is expected to retry.
   if (!params_.try_enqueue(ParamChange{inst->serial, static_cast<uint32_t>(idx), paramNormalize(d, value)}))
     return Result::fail("E_QUEUE_FULL", "param queue full");
-  const_cast<ModuleInstance*>(inst)->appliedValues[static_cast<size_t>(idx)] = model_.nodes().at(node).params.at(param);
+  // The snapshot follows the queue for an ordinary param. A structural one is deliberately left behind:
+  // it is applied by `InstanceTable::acquire` building a fresh instance on the next commit, and acquire
+  // decides that by finding the snapshot different from the model. Recording it here would tell acquire
+  // there was nothing to do, and the old instance would play on with the old table.
+  if (!(d.flags & kParamStructural))
+    const_cast<ModuleInstance*>(inst)->appliedValues[static_cast<size_t>(idx)] = model_.nodes().at(node).params.at(param);
+  return {};
+}
+
+Result Engine::preview(const std::string& node, float* out, uint32_t count) {
+  const auto it = model_.nodes().find(node);
+  if (it == model_.nodes().end()) return Result::fail("E_NODE_NOT_FOUND", "no module " + node);
+  const ModuleInstance* inst = instances_.find(node);
+  if (inst == nullptr) return Result::fail("E_NODE_NOT_FOUND", "module " + node + " is not built yet");
+  if ((inst->type->desc->flags & kModulePreviewsWave) == 0)
+    return Result::fail("E_UNSUPPORTED", "module " + node + " has no waveform to show");
+  // The model's values with the descriptor's defaults filled in, so a module reads every param by name
+  // and never has to know which ones the document happened to mention.
+  ParamValues values;
+  for (uint32_t i = 0; i < inst->type->desc->numParams; ++i) {
+    const ParamDesc& d = inst->type->desc->params[i];
+    const auto pv = it->second.params.find(d.id);
+    values[d.id] = pv == it->second.params.end() ? d.def : pv->second;
+  }
+  if (!inst->module->preview(values, out, count))
+    return Result::fail("E_UNSUPPORTED", "module " + node + " has no waveform to show");
   return {};
 }
 

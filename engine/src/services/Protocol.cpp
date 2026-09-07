@@ -66,6 +66,13 @@ public:
     return v->get<double>();
   }
 
+  double num(const char* key, double fallback) {
+    const json* v = get(key);
+    if (v == nullptr) return fallback;
+    if (!v->is_number()) { fail(key, "a number"); return fallback; }
+    return v->get<double>();
+  }
+
   bool flag(const char* key, bool fallback) {
     const json* v = get(key);
     if (v == nullptr) return fallback;
@@ -337,6 +344,18 @@ json dispatchCommand(const std::string& cmd, const json& id, const json& args, P
       slots[wanted[i]] = i;
     }
     return okResponse(id, json{{"slots", std::move(slots)}});
+  }
+  /// One cycle of a module's waveform at its current values, for the face to draw. Read from the model
+  /// and the instance on this thread; the audio thread is not involved, so asking costs no glitch.
+  if (cmd == "module.preview") {
+    ArgReader a(args);
+    const std::string node = a.str("module");
+    const double requested = a.num("count", 256.0);
+    if (!a) return errorResponse(id, a.result());
+    const uint32_t count = static_cast<uint32_t>(std::min(2048.0, std::max(16.0, requested)));
+    std::vector<float> samples(count);
+    if (Result r = ctx.engine.preview(node, samples.data(), count); !r) return errorResponse(id, r);
+    return okResponse(id, json{{"samples", samples}});
   }
   if (cmd == "telemetry.unsubscribe") {
     if (ctx.telemetry != nullptr) ctx.engine.clearTelemetrySlots();

@@ -34,6 +34,9 @@ public:
   const EngineConfig& config() const { return config_; }
   Result commit();
   Result setParam(const std::string& node, const std::string& param, float value);
+  /// One cycle of `node`'s waveform at the model's current values, or an error when there is no such node
+  /// or it has no picture to give. See `Module::preview`.
+  Result preview(const std::string& node, float* out, uint32_t count);
   void collectGarbage();
   uint64_t revision() const { return revision_; }
   size_t retiredCount() const { return retired_.size_approx(); }

@@ -46,6 +46,7 @@ public:
   void prepare(const PrepareInfo&) override;
   void reset(uint32_t voicePair) override;
   void process(ProcessContext&) override;
+  bool preview(const ParamValues& values, float* out, uint32_t count) override;
 
 private:
   struct BoundInput {

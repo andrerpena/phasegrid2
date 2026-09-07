@@ -624,3 +624,62 @@ TEST_CASE("the master output level refuses a value outside its range", "[protoco
   REQUIRE(errorCode(f.call("audio.setOutputGain", {{"gain", -1.0}})) == "E_SCHEMA");
   REQUIRE(errorCode(f.call("audio.setOutputGain", {{"gain", "loud"}})) == "E_SCHEMA");
 }
+
+// ---- module.preview
+
+namespace {
+/// Built-in modules, so there is something with a picture to ask for.
+struct BuiltinFixture {
+  pg::Registry registry;
+  pg::Engine engine{registry, pg::EngineConfig{48000.0, 64}};
+  pg::Transport transport;
+  pg::ProtocolContext ctx{.engine = engine, .registry = registry, .transport = transport};
+  BuiltinFixture() { pg::registerBuiltinModules(registry); }
+  json call(const std::string& cmd, json args = json::object()) {
+    ctx.events.clear();
+    return pg::dispatch(json{{"id", 1}, {"cmd", cmd}, {"args", std::move(args)}}, ctx);
+  }
+};
+}  // namespace
+
+TEST_CASE("module.preview returns one cycle of a module that draws itself", "[protocol][preview]") {
+  BuiltinFixture f;
+  REQUIRE(f.call("module.add", {{"id", "saw"}, {"type", "osc.sawtooth"}, {"params", {{"sync", 12.0}}}})["ok"] == true);
+  const json r = f.call("module.preview", {{"module", "saw"}, {"count", 64}});
+  REQUIRE(r["ok"] == true);
+  const std::vector<float> samples = r["result"]["samples"].get<std::vector<float>>();
+  REQUIRE(samples.size() == 64);
+  // At 12 st the synced ramp restarts halfway: the bottom of the wave at the start and again in the middle.
+  REQUIRE(samples[0] == Catch::Approx(-1.f));
+  REQUIRE(samples[32] == Catch::Approx(-1.f));
+  REQUIRE(samples[31] > 0.9f);
+}
+
+TEST_CASE("module.preview draws the wavetable oscillator's actual frame", "[protocol][preview]") {
+  BuiltinFixture f;
+  // Table 1 is the sine. The picture is read from the rendered table, not redrawn from its name, so it
+  // shows the table exactly as the oscillator plays it from phase 0. The vendored frames put the peak
+  // at phase 0 (every one of them: the saw starts halfway up its ramp), so the sine reads as a cosine:
+  // one at the start, zero a quarter in, minus one at the half.
+  REQUIRE(f.call("module.add", {{"id", "osc"}, {"type", "osc.wavetable"}, {"params", {{"table", 1.0}}}})["ok"] == true);
+  const json r = f.call("module.preview", {{"module", "osc"}, {"count", 256}});
+  REQUIRE(r["ok"] == true);
+  const std::vector<float> s = r["result"]["samples"].get<std::vector<float>>();
+  REQUIRE(s.size() == 256);
+  REQUIRE(s[0] == Catch::Approx(1.f).margin(0.02f));
+  REQUIRE(s[64] == Catch::Approx(0.f).margin(0.05f));
+  REQUIRE(s[128] == Catch::Approx(-1.f).margin(0.05f));
+  // And a different table is a different picture: the square holds its value where the sine falls.
+  REQUIRE(f.call("param.set", {{"module", "osc"}, {"param", "table"}, {"value", 4.0}})["ok"] == true);
+  const std::vector<float> sq = f.call("module.preview", {{"module", "osc"}, {"count", 256}})["result"]["samples"].get<std::vector<float>>();
+  REQUIRE(sq[32] == Catch::Approx(1.f).margin(0.05f));
+  REQUIRE(sq[96] == Catch::Approx(-1.f).margin(0.05f));
+}
+
+TEST_CASE("module.preview refuses what it cannot draw", "[protocol][preview]") {
+  BuiltinFixture f;
+  REQUIRE(f.call("module.add", {{"id", "vca"}, {"type", "amp.vca"}})["ok"] == true);
+  REQUIRE(errorCode(f.call("module.preview", {{"module", "vca"}})) == "E_UNSUPPORTED");
+  REQUIRE(errorCode(f.call("module.preview", {{"module", "nobody"}})) == "E_NODE_NOT_FOUND");
+  REQUIRE(errorCode(f.call("module.preview", {{"module", "vca"}, {"count", "lots"}})) == "E_SCHEMA");
+}

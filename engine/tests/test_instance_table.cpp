@@ -1,4 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
+#include "core/Engine.hpp"
 #include "core/InstanceTable.hpp"
 #include "modules/TestModules.hpp"
 
@@ -72,4 +73,21 @@ TEST_CASE("InstanceTable configures a new instance with the model params before 
   REQUIRE(Structural::configuredBeforePrepare);
   REQUIRE(Structural::lastConfigured.at("shape") == 1.f);
   REQUIRE(Structural::lastConfigured.at("gain") == 0.25f);
+}
+
+TEST_CASE("a structural param set through Engine::setParam is rebuilt on the next commit", "[instance_table][engine]") {
+  // `setParam` records ordinary values as applied so the commit-time reconcile does not send them
+  // twice. A structural value must NOT be recorded that way: acquire decides to rebuild by finding the
+  // snapshot different from the model, and a snapshot updated early tells it there is nothing to do.
+  // The symptom was an oscillator whose table was switched over the protocol playing the old table.
+  pg::Registry reg;
+  REQUIRE_FALSE(reg.add(kStructuralDesc).has_value());
+  pg::Engine engine{reg, pg::EngineConfig{48000.0, 64}};
+  REQUIRE(engine.model().addNode(reg, {"n", "test.structural", {{"shape", 0.f}}}));
+  REQUIRE(engine.commit());
+  REQUIRE(Structural::lastConfigured.at("shape") == 0.f);
+
+  REQUIRE(engine.setParam("n", "shape", 1.f));
+  REQUIRE(engine.commit());
+  REQUIRE(Structural::lastConfigured.at("shape") == 1.f);   // configure ran again: a fresh instance
 }

@@ -108,6 +108,17 @@ public:
   /// make it used. Kept in sync with the note in docs/engine.md.
   virtual void reset(uint32_t /*voicePair*/) {}
   virtual void process(ProcessContext&) = 0;      // audio thread; no alloc/lock/IO/exceptions
+  /**
+   * One cycle of the waveform this module would produce at `params`, written as `count` samples in
+   * -1..1, for an interface to draw. Message thread, never the audio thread: it may be as slow and as
+   * allocating as it likes, and it must not touch DSP state the audio thread is using.
+   *
+   * Returns false when the module has no such picture, which is what the default does. A module that
+   * returns true declares `kModulePreviewsWave` so an interface knows to ask. The picture is computed
+   * from the same parameters the sound is, by the module that makes the sound, which is the only way
+   * to keep the two from drifting apart.
+   */
+  virtual bool preview(const ParamValues& /*params*/, float* /*out*/, uint32_t /*count*/) { return false; }
 };
 
 /// Keeps all mutable DSP state in one State struct per voice pair.
