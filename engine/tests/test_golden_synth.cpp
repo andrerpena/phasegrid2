@@ -19,11 +19,10 @@ constexpr double kExpectedHz = 523.2511;
 /// The golden patch, built with a registry that holds ONLY the built-in modules -- the same set the CLI
 /// registers, so a patch that loads here is one `--render` can play.
 ///
-/// The chain has no `note.toCv` in it, and its gate and pitch come from `math.scaleOffset` nodes with
-/// nothing plugged in (`out = 0 * scale + offset`, i.e. a constant). That is not a preference: there is no
-/// built-in event source yet, so a patch that ran its pitch through `note.toCv` would sit silent with the
-/// gate low. The next phase adds a `notes.clip` module and a polyphonic golden render that does exercise
-/// the note path; until then the note path's coverage lives in engine/tests/test_note_to_cv.cpp.
+/// The chain has no note path in it: its gate and pitch come from `math.scaleOffset` nodes with nothing
+/// plugged in (`out = 0 * scale + offset`, i.e. a constant). That is not a preference -- it predates
+/// `notes.clip`, which is the first built-in event source -- and it stays that way as the monophonic
+/// reference. The note path's own golden render is the polyphonic one, engine/tests/test_golden_poly.cpp.
 struct Voice {
   pg::Registry reg;
   pg::Engine engine{reg, pg::EngineConfig{kSampleRate, 64}};

@@ -72,6 +72,16 @@ public:
   /// is compared the same way. Never called again — `InstanceTable::acquire` rebuilds instead.
   virtual void configure(const ParamValues&, const NodeData&) {}
   virtual void prepare(const PrepareInfo&) = 0;   // message thread; the only place to allocate
+  /// RESERVED, and CALLED BY NOTHING TODAY. Not the scheduler, not `Engine::renderBlock`, not the program
+  /// swap: implementing it gets you silence rather than behaviour, so never reach for it to clear per-voice
+  /// state. There are already two answers for that and they cover what the engine can currently ask for.
+  /// A stolen voice retriggers through the one-frame gate dip `note.toPoly` emits, which is the right
+  /// modular answer -- a downstream envelope sees an edge like any other. Everything else resets by being
+  /// built again: `InstanceTable::acquire` makes a fresh instance whenever the sample rate, the voice count,
+  /// a `kParamStructural` param or the node data changes. It stays declared because a transport-level panic
+  /// or an explicit voice-reset command is the one thing that would need it, and because `VoicedModule` and
+  /// the vendored adapter already implement it correctly for when that lands. Do not invent a caller to
+  /// make it used. Kept in sync with the note in docs/engine.md.
   virtual void reset(uint32_t /*voicePair*/) {}
   virtual void process(ProcessContext&) = 0;      // audio thread; no alloc/lock/IO/exceptions
 };

@@ -47,6 +47,15 @@ count's last pair through as a phantom voice.
 Parallelising pairs later would break both halves of the per-block rule -- the ordering and the shared
 buffers -- so it would have to revisit this contract, not just the loop.
 
+`Module::reset(uint32_t voicePair)` is **reserved and called by nothing**. No part of the engine invokes
+it -- not the scheduler, not `Engine::renderBlock`, not the program swap -- so a module that implements it
+gets silence rather than behaviour. Per-voice state is cleared the two ways the engine actually has: a
+stolen voice retriggers through the one-frame gate dip `note.toPoly` emits, which is the correct modular
+answer, and everything else resets by being rebuilt (`InstanceTable::acquire` makes a fresh instance
+whenever the sample rate, the voice count, a structural param or the node data changes). It stays declared
+for a future transport panic or voice-reset command, and because `VoicedModule` and the vendored adapter
+already implement it. Do not invent a caller to make it used.
+
 ## Vendored Vital DSP
 
 `engine/vendor/vital` (GPL-3.0-or-later, see NOTICE.md) provides the SIMD types, fast math, oscillators, filters,
@@ -57,7 +66,15 @@ never use the names "Vital"/"Tytel" in ids, UI or binaries. `npm run lint:tradem
 `engine/src/vital/` adapts that library to the Grid. `pg::vendor::WrappedModule` is a single `Module` implementation
 that wraps any `vital::SynthModule`; a module type is a `pg::vendor::ModuleSpec` value (see
 `engine/src/modules/vital/`), and `buildDescriptor` generates its `ModuleDescriptor` at registry time from the
-vendored parameter table, so param ranges and units are the DSP's own. Six traps the vendored framework sets:
+vendored parameter table, so param ranges and units are the DSP's own. Seven traps the vendored framework sets:
+
+- A vendored `SynthModule` holds the DSP state of exactly ONE `poly_float` -- one voice pair. The vendored
+  library handles polyphony by processing per-voice *copies* of its processors; we run the op list once per
+  pair through one `Module`, so `WrappedModule` builds one vendored module, one set of adapter Outputs and
+  one modulation scratch PER PAIR and `process` picks `ctx.voice`'s own. Sharing one between pairs is silent
+  and total: pair 1's gate and pitch land in pair 0's oscillator and filter, and a chord collapses onto
+  whichever pair went last. Building rather than cloning is deliberate -- `clone()` is unavailable on the
+  vendored modules that hold `Output`s by value.
 
 - Every `vital::Output` needs a non-null `owner` Processor: `ModulationSum::process` dereferences it to ask whether
   the signal is control rate. The adapter's own Outputs get the `AdapterSource` stub for that.
@@ -93,9 +110,10 @@ attributed to our sources.
 ## Modules
 
 Built-ins are registered in `engine/src/modules/builtin.cpp`, one line each. Own modules are a single `.cpp` under
-`engine/src/modules`; vendored-backed ones a single `ModuleSpec` under `engine/src/modules/vital`. Today, twenty-one:
+`engine/src/modules`; vendored-backed ones a single `ModuleSpec` under `engine/src/modules/vital`. Today, twenty-two:
 
-- own: `io.audioOut`, `note.toCv`, `note.toPoly`, `phase.clock`, `math.scaleOffset`, `mix.mixer`, `amp.vca`
+- own: `io.audioOut`, `note.toCv`, `note.toPoly`, `notes.clip`, `phase.clock`, `math.scaleOffset`, `mix.mixer`,
+  `amp.vca`
 - vendored-backed: `osc.wavetable`, `sampler.player`, `filter.multi`, `env.dahdsr`, `mod.lfo`, `mod.random`, and the
   eight effects `fx.reverb`, `fx.delay`, `fx.chorus`, `fx.flanger`, `fx.phaser`, `fx.distortion`, `fx.compressor`,
   `fx.eq`.
@@ -115,12 +133,33 @@ at the terminal and go silently missing. A note takes the lowest free voice, or 
 sounding longest, and a steal drops that voice's gate for exactly one frame so a downstream envelope retriggers.
 A note off matches on the note number, so a note off for a note that was already stolen releases nobody.
 
+`notes.clip` is the grid's own note source: a list of notes in musical time, played against the transport
+and emitted as a note stream, with the playhead out as a phase. The notes live in the node's `data` as
+`"notes"`, an array of `{start, length, pitch, velocity}` objects -- start and length in beats from the
+clip's start, pitch a MIDI note number, velocity 0..1. `configure` validates the whole array and a clip with
+anything malformed in it plays NOTHING, rather than throwing on the message thread or half-loading a list
+whose JSON has a typo in it.
+
+Its playhead is DERIVED from the transport every block rather than accumulated, which is what makes the
+notes affordable as structural node data (see below): a rebuilt instance lands where the old one was.
+Playing, it follows `transport.ppq`; stopped, it free-runs off `transport.samplePos` at the transport
+tempo, the way `phase.clock` does, which is also what makes it audible under `--render`. An unconnected
+`play` input runs the clip, so it is not silently stopped the moment it is placed.
+
+Every frame re-derives the set of notes the playhead is inside and emits the difference against what is
+sounding. A transport jump, a loop wrap, the play gate falling and a note simply ending are then one code
+path, and none of them can leave a note on without its note off, because the note off IS how a note leaves
+the set. A loop wrap releases everything first, so a note that fills the whole clip retriggers rather than
+hanging. That costs O(frames x notes) per block, which is why a clip is capped at 512 notes. Events are
+worked out once on pair 0 and replayed for every pair, per the scheduler contract; a note off carries the
+note number its note ON used, so moving `transpose` under a held note still releases the right one.
+
 `amp.vca` clamps `gain knob + gain input` at zero before applying its curve -- a control that swings negative closes
 the amplifier instead of inverting the signal, and squaring an unclamped negative sum would fold it back open.
 
-There is no built-in source of *events* yet (`io.midiIn` lands with phase 4), so `note.toCv` and `note.toPoly` can
-only be driven from a test module today. A patch that needs a constant uses `math.scaleOffset` with nothing plugged in: `out = 0 * scale +
-offset`.
+`notes.clip` is the only built-in source of *events* (`io.midiIn` lands with phase 4), so a patch that wants
+`note.toCv` or `note.toPoly` driven by anything else needs a test module. A patch that needs a constant uses
+`math.scaleOffset` with nothing plugged in: `out = 0 * scale + offset`.
 
 The effects all share one shape, built by `effectSpec` in `engine/src/modules/vital/Effect.hpp`: the audio goes in
 through `processWithInput` rather than a plugged input, so the `in` port carries vendored input index -1. None of them
@@ -175,7 +214,8 @@ Node data is **structural**, exactly like a `kParamStructural` param and for the
 only place it is ever read, so the only way to apply a change is to build the instance again --
 `InstanceTable::acquire` compares the blob and rebuilds when it differs. That is a heavy hammer for something
 edited as often as a clip's notes, and it is affordable only because such a module derives its position from
-`transport.ppq` every block, so a rebuilt instance resumes where the old one was rather than restarting. Unlike
+`transport.ppq` every block, so a rebuilt instance resumes where the old one was rather than restarting.
+`notes.clip` is the first module built this way. Unlike
 `params`, `data` is genuinely diffed here, so the model cannot get ahead of the engine the way param values can.
 If editing ever proves too slow, the upgrade is the pattern the program swap already uses: build the new list on
 the message thread, swap an atomic pointer, retire the old one.
@@ -250,7 +290,7 @@ generated JSON for the vendored names itself.
 
 ## Tests
 
-`npm run engine:test` runs 137 Catch2 tests. `PG_WERROR=ON npm run engine:test` additionally builds with `-Werror`
+`npm run engine:test` runs 160 Catch2 tests. `PG_WERROR=ON npm run engine:test` additionally builds with `-Werror`
 (CI does this; it is off by default because `postinstall` builds the engine on end-user machines).
 
 Headless render, using a patch built from builtin modules only:
@@ -268,8 +308,22 @@ partial of the settled note is within 15 Hz of 523.25 Hz, the pitch the patch as
 times more energy below 1 kHz than above 8 kHz, and opening the cutoff on the same running engine raises the high band
 a hundredfold — which a source that simply had no harmonics could not do), and both channels carry it.
 
-The voice has no `note.toCv` in it because there is no built-in event source yet; that arrives with `notes.clip` and a
-polyphonic golden render in the next phase. `engine/tests/golden/silence.json` is a bare `io.audioOut`, so it writes
-silence. `engine/tests/golden/const_to_out.json` is a **test-only** fixture: it uses `test.const`, which only
+The voice has no note path in it: it predates `notes.clip`, and it stays as the monophonic reference.
+
+`engine/tests/golden/poly_chord.json` is the polyphonic one: `notes.clip` holding a C major triad into
+`note.toPoly`, its pitch into `osc.wavetable` and its gate into `env.dahdsr`, through `filter.multi` and
+`amp.vca` into `io.audioOut`, at three voices -- so it also renders an odd voice count's empty lane.
+`engine/tests/test_golden_poly.cpp` asserts the three fundamentals are *individually identifiable* rather
+than that the render is loud: each peak lands within 3 Hz of its note and stands a hundred times above the
+loudest bin in the bands BETWEEN the notes, where the patch plays nothing, which is a resolution
+measurement rather than a level one. Two controls rule out the ways that could pass unwired: transposing
+the clip two semitones on the same running engine has to move all three peaks and empty all three bins they
+left, and dropping the program to a single voice has to leave only the note that stole it. Render it with:
+
+```
+./build/engine/phasegrid-engine --render engine/tests/golden/poly_chord.json --seconds 2 --out chord.wav
+```
+
+`engine/tests/golden/silence.json` is a bare `io.audioOut`, so it writes silence. `engine/tests/golden/const_to_out.json` is a **test-only** fixture: it uses `test.const`, which only
 `pg_tests` registers, so `--render` on it exits 1 with `E_UNKNOWN_TYPE` — which is why the synth voice deliberately
 uses no test module.
