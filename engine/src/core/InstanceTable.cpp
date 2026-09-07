@@ -8,20 +8,35 @@ std::shared_ptr<ModuleInstance> InstanceTable::acquire(const std::string& id, co
     byId_.clear();   // old instances stay alive through the retired program's shared_ptrs; feedback states may stay
     lastInfo_ = info;
   }
+  auto modelValue = [&params](const ParamDesc& d) {
+    auto pv = params.find(d.id);
+    return pv == params.end() ? d.def : pv->second;
+  };
+
   auto it = byId_.find(id);
-  if (it != byId_.end() && it->second->type == &type) return it->second;
+  if (it != byId_.end() && it->second->type == &type) {
+    bool structuralSame = true;
+    for (uint32_t i = 0; i < type.desc->numParams && structuralSame; ++i) {
+      const ParamDesc& d = type.desc->params[i];
+      if (!(d.flags & kParamStructural)) continue;
+      structuralSame = modelValue(d) == it->second->structuralValues[i];
+    }
+    if (structuralSame) return it->second;
+  }
 
   auto inst = std::make_shared<ModuleInstance>();
   inst->id = id;
   inst->serial = nextSerial_++;
   inst->type = &type;
   inst->module.reset(type.desc->create());
-  inst->module->prepare(info);
   inst->params.resize(type.desc->numParams);
+  inst->structuralValues.reserve(type.desc->numParams);
+  for (uint32_t i = 0; i < type.desc->numParams; ++i) inst->structuralValues.push_back(modelValue(type.desc->params[i]));
+  inst->module->configure(params);   // structural params take effect here; prepare() may allocate around them
+  inst->module->prepare(info);
   for (uint32_t i = 0; i < type.desc->numParams; ++i) {
     const ParamDesc& d = type.desc->params[i];
-    auto pv = params.find(d.id);
-    inst->params[i].prepare(&d, info.sampleRate, paramNormalize(d, pv == params.end() ? d.def : pv->second));
+    inst->params[i].prepare(&d, info.sampleRate, paramNormalize(d, modelValue(d)));
   }
   byId_[id] = inst;
   return inst;

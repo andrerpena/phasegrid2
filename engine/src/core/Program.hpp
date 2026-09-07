@@ -26,6 +26,9 @@ struct ModuleInstance {
   const RegisteredModule* type = nullptr;
   std::unique_ptr<Module> module;
   std::vector<ParamState> params;
+  /// Display-unit value of every param at creation time (missing model params recorded as the default).
+  /// `InstanceTable::acquire` compares the kParamStructural entries to decide whether it may reuse this instance.
+  std::vector<float> structuralValues;
 };
 
 /// Delay memory for one back edge: z[i] holds the last written frame(s).

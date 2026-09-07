@@ -68,3 +68,27 @@ TEST_CASE("Scheduler sums fan-in and routes events", "[scheduler]") {
   s.run(p, 64, t, nullptr);
   REQUIRE(lane0(p, tr.outBuf[0], 3) == Catch::Approx(7.f));
 }
+
+namespace {
+/// Records the voice mask the scheduler handed it, so the pair -> mask plumbing is covered without a real module.
+struct MaskProbe : pg::VoicedModule<int> {
+  static inline pg::Mask seen{};
+  void process(pg::ProcessContext& c) override { seen = c.voiceMask; }
+};
+const pg::PortDesc kProbeOut[] = {{"out", "Out", pg::PortKind::Continuous, 1, pg::SignalRole::Any, ""}};
+const pg::ModuleDescriptor kProbe{pg::kModuleAbiVersion, "test.maskProbe", "P", "test", "", nullptr, 0,
+                                  kProbeOut, 1, nullptr, 0, 0, 0, []() -> pg::Module* { return new MaskProbe(); }};
+}  // namespace
+
+TEST_CASE("Scheduler passes the pair's voice mask", "[scheduler]") {
+  pg::Registry reg; REQUIRE_FALSE(reg.add(kProbe).has_value());
+  pg::InstanceTable table; pg::PrepareInfo info{48000.0, pg::kMaxBlockSize, 1};
+  pg::Program p; p.allocBuffer(); p.allocEventBuffer();
+  p.activeVoiceMask = {pg::Program::voiceMaskFor(1, 0)};
+  pg::NodeSlot n; n.inst = table.acquire("m", *reg.find("test.maskProbe"), info, {});
+  n.outBuf = {p.allocBuffer()}; n.outEvt = {pg::kNone}; n.paramBuf = {};
+  p.nodes = {n}; p.ops = {pg::Op{pg::Op::Process, 0}}; p.buildSerialIndex();
+  pg::Scheduler s; s.run(p, 64, pg::TransportSnapshot{}, nullptr);
+  REQUIRE(pg::lanes::lane(pg::Sample(1.f) & MaskProbe::seen, 0) == 1.f);
+  REQUIRE(pg::lanes::lane(pg::Sample(1.f) & MaskProbe::seen, 2) == 0.f);
+}

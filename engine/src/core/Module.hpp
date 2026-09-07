@@ -1,5 +1,7 @@
 #pragma once
 #include <cstdint>
+#include <map>
+#include <string>
 #include <vector>
 #include "core/Conventions.hpp"
 #include "core/Descriptor.hpp"
@@ -8,6 +10,9 @@
 #include "core/Signal.hpp"
 
 namespace pg {
+
+/// Model param values by param id, in display units. What `NodeModel::params` carries.
+using ParamValues = std::map<std::string, float>;
 
 struct PrepareInfo {
   double sampleRate = 48000.0;
@@ -35,6 +40,7 @@ struct TelemetrySlot;  // phase 5
 struct ProcessContext {
   uint32_t numFrames = 0;
   uint32_t voice = 0;                 // voice PAIR index
+  Mask voiceMask = Mask(static_cast<uint32_t>(-1));   // lanes of voices that exist in this pair
   double sampleRate = 48000.0;
   const TransportSnapshot* transport = nullptr;
   AudioBus* outputBus = nullptr;
@@ -54,6 +60,10 @@ struct ProcessContext {
 class Module {
 public:
   virtual ~Module() = default;
+  /// Message thread, once, before `prepare`: the model's param values for this instance. A module that
+  /// declares `kParamStructural` params reads them here, because such a param can only take effect while
+  /// the instance is being built. Never called again — `InstanceTable::acquire` rebuilds instead.
+  virtual void configure(const ParamValues&) {}
   virtual void prepare(const PrepareInfo&) = 0;   // message thread; the only place to allocate
   virtual void reset(uint32_t /*voicePair*/) {}
   virtual void process(ProcessContext&) = 0;      // audio thread; no alloc/lock/IO/exceptions

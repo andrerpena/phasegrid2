@@ -49,6 +49,10 @@ std::optional<std::string> Registry::add(const ModuleDescriptor& d) {
     if (!(p.min < p.max)) return id + ": param " + p.id + " needs min < max";
     if (p.curve == ParamCurve::Log && p.min <= 0.f) return id + ": log param " + p.id + " needs min > 0";
     if ((p.flags & kParamEnum) && (p.enumLabels == nullptr || p.enumCount == 0)) return id + ": enum param " + p.id + " has no labels";
+    // A structural param is read once, on the message thread, while the instance is being built; a per-sample
+    // modulation signal has nowhere to go. Rejecting the combination keeps that impossible instead of silent.
+    if ((p.flags & kParamStructural) && (p.flags & kParamModulatable))
+      return id + ": structural param " + p.id + " cannot be modulatable";
     if (hasImplicitPort(p)) {
       const std::string implicitId = "param:" + std::string(p.id);
       for (uint32_t k = 0; k < d.numInputs; ++k) if (implicitId == d.inputs[k].id) return id + ": input collides with implicit port " + implicitId;

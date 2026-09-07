@@ -91,6 +91,7 @@ void Scheduler::exec(Program& p, const Op& op, uint32_t offset, uint32_t n, uint
       if (bus) { busSlice.data = bus->data + offset; busSlice.frames = n; }
       ProcessContext ctx;
       ctx.numFrames = n; ctx.voice = pair; ctx.sampleRate = p.sampleRate; ctx.transport = &t;
+      ctx.voiceMask = pair < p.activeVoiceMask.size() ? p.activeVoiceMask[pair] : Mask(static_cast<uint32_t>(-1));
       ctx.outputBus = bus ? &busSlice : nullptr;
       ctx.inputs = in_.data(); ctx.outputs = out_.data(); ctx.eventInputs = evIn_.data(); ctx.eventOutputs = evOut_.data();
       ctx.params = params_.data();

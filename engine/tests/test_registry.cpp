@@ -81,6 +81,12 @@ TEST_CASE("registry rejects invalid descriptors", "[registry]") {
   static pg::ModuleDescriptor badEnumDesc{pg::kModuleAbiVersion, "test.badEnum", "BadEnum", "test", "", nullptr, 0, nullptr, 0, &badEnum, 1, 0, 0, [] () -> pg::Module* { return nullptr; }};
   REQUIRE(reg.add(badEnumDesc).has_value());
 
+  // Structural param that is also modulatable: a structural value is read once while the instance is built,
+  // so there is nowhere for a per-sample modulation signal to go.
+  static pg::ParamDesc badStructural{"s", "S", 0.f, 1.f, 0.f, pg::ParamUnit::None, pg::ParamCurve::Linear, pg::kParamStructural | pg::kParamModulatable, nullptr, 0, "select", nullptr, ""};
+  static pg::ModuleDescriptor badStructuralDesc{pg::kModuleAbiVersion, "test.badStructural", "BadStructural", "test", "", nullptr, 0, nullptr, 0, &badStructural, 1, 0, 0, [] () -> pg::Module* { return nullptr; }};
+  REQUIRE(reg.add(badStructuralDesc).has_value());
+
   // Implicit port collision (modulatable param "gain" collides with declared input "param:gain")
   static pg::PortDesc collideInput[] = {{"param:gain", "Gain In", pg::PortKind::Continuous, 1, pg::SignalRole::Cv, ""}};
   static pg::ParamDesc collideParam{"gain", "Gain", 0.f, 1.f, 0.5f, pg::ParamUnit::None, pg::ParamCurve::Linear, pg::kParamModulatable, nullptr, 0, "slider", nullptr, ""};

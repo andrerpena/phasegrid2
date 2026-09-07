@@ -16,6 +16,9 @@ inline constexpr uint32_t kParamInteger     = 1u << 1;
 inline constexpr uint32_t kParamEnum        = 1u << 2;
 inline constexpr uint32_t kParamHidden      = 1u << 3;
 inline constexpr uint32_t kParamNoSmooth    = 1u << 4;
+/// Changing this param cannot be done on a live instance: `InstanceTable::acquire` builds a new one.
+/// Implies kParamNoSmooth in spirit and may never be kParamModulatable (Registry::add rejects that).
+inline constexpr uint32_t kParamStructural  = 1u << 5;
 
 inline constexpr uint32_t kModuleTerminal        = 1u << 0;
 inline constexpr uint32_t kModuleNeedsTransport  = 1u << 1;
