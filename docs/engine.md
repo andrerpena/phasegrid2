@@ -93,9 +93,9 @@ attributed to our sources.
 ## Modules
 
 Built-ins are registered in `engine/src/modules/builtin.cpp`, one line each. Own modules are a single `.cpp` under
-`engine/src/modules`; vendored-backed ones a single `ModuleSpec` under `engine/src/modules/vital`. Today, twenty:
+`engine/src/modules`; vendored-backed ones a single `ModuleSpec` under `engine/src/modules/vital`. Today, twenty-one:
 
-- own: `io.audioOut`, `note.toCv`, `phase.clock`, `math.scaleOffset`, `mix.mixer`, `amp.vca`
+- own: `io.audioOut`, `note.toCv`, `note.toPoly`, `phase.clock`, `math.scaleOffset`, `mix.mixer`, `amp.vca`
 - vendored-backed: `osc.wavetable`, `sampler.player`, `filter.multi`, `env.dahdsr`, `mod.lfo`, `mod.random`, and the
   eight effects `fx.reverb`, `fx.delay`, `fx.chorus`, `fx.flanger`, `fx.phaser`, `fx.distortion`, `fx.compressor`,
   `fx.eq`.
@@ -106,11 +106,20 @@ each *pair* of cycles (the second starts at `1 + swing` instead of `1`, and both
 ramp), which degenerates to plain `frac(position)` at swing 0. Its phase output is `0 <= phase < 1`: a double a hair
 under one rounds UP to exactly `1.0f` when narrowed, so the narrowing is clamped rather than trusted.
 
+`note.toPoly` is the polyphonic sibling of `note.toCv`: its pitch, gate and velocity outputs carry a different
+value in each voice lane. Its voice table is per *program*, not per pair, so it is not a `VoicedModule`: pair 0
+runs the whole block's allocation once and records a change list, and every pair (0 included) then replays that
+list for the two voices its lanes carry. The table has `2 * voicePairs` entries so every lane index is in range,
+but allocation stops at `voiceCount` -- a note on the empty lane of an odd count's last pair would be masked away
+at the terminal and go silently missing. A note takes the lowest free voice, or steals the one that has been
+sounding longest, and a steal drops that voice's gate for exactly one frame so a downstream envelope retriggers.
+A note off matches on the note number, so a note off for a note that was already stolen releases nobody.
+
 `amp.vca` clamps `gain knob + gain input` at zero before applying its curve -- a control that swings negative closes
 the amplifier instead of inverting the signal, and squaring an unclamped negative sum would fold it back open.
 
-There is no built-in source of *events* yet (`io.midiIn` lands with phase 4), so `note.toCv` can only be driven from a
-test module today. A patch that needs a constant uses `math.scaleOffset` with nothing plugged in: `out = 0 * scale +
+There is no built-in source of *events* yet (`io.midiIn` lands with phase 4), so `note.toCv` and `note.toPoly` can
+only be driven from a test module today. A patch that needs a constant uses `math.scaleOffset` with nothing plugged in: `out = 0 * scale +
 offset`.
 
 The effects all share one shape, built by `effectSpec` in `engine/src/modules/vital/Effect.hpp`: the audio goes in
@@ -223,7 +232,7 @@ generated JSON for the vendored names itself.
 
 ## Tests
 
-`npm run engine:test` runs 126 Catch2 tests. `PG_WERROR=ON npm run engine:test` additionally builds with `-Werror`
+`npm run engine:test` runs 133 Catch2 tests. `PG_WERROR=ON npm run engine:test` additionally builds with `-Werror`
 (CI does this; it is off by default because `postinstall` builds the engine on end-user machines).
 
 Headless render, using a patch built from builtin modules only:

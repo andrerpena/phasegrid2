@@ -1,5 +1,5 @@
 {
-  "catalogHash": "3ca74be70c0c8c09",
+  "catalogHash": "b026417ebced6584",
   "conventions": {
     "blockSize": 128,
     "gateThreshold": 0,
@@ -4571,6 +4571,54 @@
           "unit": "seconds"
         }
       ]
+    },
+    {
+      "category": "note",
+      "doc": "Spreads note events across the program's voices: each output carries a different value per voice lane. A note takes a free voice, or steals the one that has been sounding longest, and releases its voice on the matching note off.",
+      "flags": {
+        "needsTransport": false,
+        "terminal": false,
+        "writesTelemetry": false
+      },
+      "id": "note.toPoly",
+      "inputs": [
+        {
+          "doc": "Note events to spread across the program's voices",
+          "id": "notes",
+          "implicit": false,
+          "kind": "event",
+          "name": "Notes",
+          "role": "note"
+        }
+      ],
+      "name": "Note to Poly",
+      "outputs": [
+        {
+          "doc": "Pitch of each voice's note, 0.1 per octave from middle C",
+          "id": "pitch",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Pitch",
+          "role": "pitch"
+        },
+        {
+          "doc": "1 while that voice holds a note; drops for one frame when the voice is stolen",
+          "id": "gate",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Gate",
+          "role": "gate"
+        },
+        {
+          "doc": "Velocity of the note each voice is playing, 0..1",
+          "id": "velocity",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Velocity",
+          "role": "cv"
+        }
+      ],
+      "params": []
     },
     {
       "category": "osc",

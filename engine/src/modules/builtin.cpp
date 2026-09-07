@@ -5,6 +5,7 @@ namespace pg {
 namespace modules {
 extern const ModuleDescriptor kAudioOut;
 extern const ModuleDescriptor kNoteToCv;
+extern const ModuleDescriptor kNoteToPoly;
 extern const ModuleDescriptor kPhaseClock;
 extern const ModuleDescriptor kScaleOffset;
 extern const ModuleDescriptor kMixer;
@@ -27,7 +28,7 @@ const ModuleDescriptor& samplerPlayer();
 
 void registerBuiltinModules(Registry& r) {
   const ModuleDescriptor* all[] = {
-    &modules::kAudioOut, &modules::kNoteToCv,
+    &modules::kAudioOut, &modules::kNoteToCv, &modules::kNoteToPoly,
     &modules::kPhaseClock, &modules::kScaleOffset, &modules::kMixer, &modules::kVca,
     &modules::filterMulti(), &modules::oscWavetable(), &modules::envDahdsr(),
     &modules::modLfo(), &modules::modRandom(),
