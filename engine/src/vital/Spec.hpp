@@ -3,6 +3,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 #include "core/Descriptor.hpp"
 #include "core/Module.hpp"
@@ -45,7 +46,47 @@ struct OutputMap {
   int vendorOutput;
   SignalRole role;
   const char* doc;
+  /// Set when the vendored module writes only `buffer[0]` of this output even though the Output itself is
+  /// full size (the envelope's phase output is like that: `Envelope::processAudioRate` fills the value
+  /// buffer per sample but writes the phase once at the end). Without this the adapter would copy a block
+  /// of samples the module never wrote. The adapter broadcasts frame 0 across the block instead.
+  bool firstFrameOnly = false;
 };
+
+/// A vendored `SynthModule` subclass whose processing order is the sorted one.
+///
+/// The vendored router keeps two copies of its order: `global_order_`, which every `plug()` re-sorts
+/// topologically, and `local_order_`, which is what `process()` actually runs. `local_order_` is only
+/// rebuilt from `global_order_` when the router's local change counter disagrees with the shared global
+/// one -- and on the object that owns the graph the two always move together, so the rebuild never
+/// happens and `process()` runs things in the order they were *added*. Upstream never notices because it
+/// processes per-voice COPIES of the router, and the copy constructor builds `local_order_` from the
+/// sorted `global_order_`. We process the router itself.
+///
+/// The difference is visible whenever a module plugs a processor before creating the controls that feed
+/// it: the vendored envelope adds its envelope processor in its constructor and creates its controls in
+/// `init()`, so the envelope runs first and reads every control one block late -- and on the first block
+/// reads zero, i.e. a zero attack time, i.e. an instant attack. Bumping the shared counter once makes the
+/// next `updateAllProcessors()` do its work; after that the two counters agree again and nothing further
+/// happens at run time.
+template <class Vendored>
+class Sorted final : public Vendored {
+public:
+  using Vendored::Vendored;
+  vital::Processor* clone() const override { return new Sorted(*this); }
+  void init() override {
+    Vendored::init();
+    ++(*this->global_changes_);
+    this->updateAllProcessors();
+  }
+};
+
+/// Constructs a vendored module that runs in sorted order. Every `ModuleSpec::create` should use this
+/// rather than `new` -- for a module that was already in a safe order it costs one rebuild at prepare time.
+template <class Vendored, class... Args>
+vital::SynthModule* makeModule(Args&&... args) {
+  return new Sorted<Vendored>(std::forward<Args>(args)...);
+}
 
 /// Per-control tweaks applied after a param has been generated from the vendored parameter table.
 /// `exposeNonParameter` emits a control that the table does not describe (e.g. the `_sync` values a tempo

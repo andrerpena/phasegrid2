@@ -15,7 +15,7 @@ const ModuleDescriptor& filterMulti() {
     spec.doc = "Multi-model filter: analog, dirty, ladder, digital, diode, formant, comb, phaser. "
                "Cutoff is a MIDI note number, so a semitone of modulation is a semitone of cutoff.";
     spec.prefix = "filter_1";
-    spec.create = [](vendor::ModuleContext&) -> vital::SynthModule* { return new vital::FilterModule("filter_1"); };
+    spec.create = [](vendor::ModuleContext&) { return vendor::makeModule<vital::FilterModule>("filter_1"); };
     // A grid module is always on -- there is no bypass knob, so the module never creates its `_on` control.
     spec.configure = [](vital::SynthModule& m) { static_cast<vital::FilterModule&>(m).setCreateOnValue(false); };
     spec.inputs = {

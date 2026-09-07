@@ -30,7 +30,7 @@ const ModuleDescriptor& oscWavetable() {
     spec.doc = "Wavetable oscillator with unison, phase distortion and spectral morphing. Pitch is 0.1 per "
                "octave from middle C; the oscillator tracks it while Midi Track is on.";
     spec.prefix = "osc_1";
-    spec.create = [](vendor::ModuleContext&) -> vital::SynthModule* { return new vital::OscillatorModule("osc_1"); };
+    spec.create = [](vendor::ModuleContext&) { return vendor::makeModule<vital::OscillatorModule>("osc_1"); };
     spec.inputs = {
       {"gate", "Gate", vital::OscillatorModule::kReset, vendor::BindKind::Gate, SignalRole::Gate,
        "Gate: a rising edge resets the oscillator phase and the envelopes on its own controls"},

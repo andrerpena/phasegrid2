@@ -165,7 +165,7 @@ void WrappedModule::process(ProcessContext& c) {
     Sample* dst = c.out(o).data;
     if (dst == nullptr) continue;   // output not connected to anything
     const vital::Output* out = module_->output(spec_.outputs[o].vendorOutput);
-    if (out->isControlRate()) {
+    if (out->isControlRate() || spec_.outputs[o].firstFrameOnly) {
       const Sample v = out->buffer[0];
       for (uint32_t k = 0; k < n; ++k) dst[k] = v;
     } else {
