@@ -259,14 +259,25 @@ json helloJson(ProtocolContext& ctx) {
   const json catalog = catalogJson(ctx.registry);
   json capabilities = json::array({"patch", "transport"});
   if (ctx.device != nullptr) capabilities.push_back("device");
-  // No "telemetry" and no "midi": those commands have no handler, and a capability for a command the
-  // engine cannot answer is worse than no capability at all.
+  if (ctx.telemetry != nullptr && ctx.telemetry->valid()) capabilities.push_back("telemetry");
+  // Still no "midi": that command has no handler, and a capability for a command the engine cannot
+  // answer is worse than no capability at all.
   json result;
   result["protocolVersion"] = kProtocolVersion;
   result["engineVersion"] = engineVersion();
   result["catalogHash"] = catalog["catalogHash"];
   result["conventions"] = catalog["conventions"];
-  result["shm"] = nullptr;   // phase 5 opens the segment; null is the honest answer until it does
+  // The segment, when there is one. A client needs the name and the size to map it, and the layout
+  // version to refuse a segment it does not know how to read.
+  if (ctx.telemetry != nullptr && ctx.telemetry->valid())
+    // Name, size and layout version: exactly what it takes to map the segment and refuse one whose
+    // layout this client does not know. The slot count is deliberately not here -- it is in the segment
+    // header, which a reader validates anyway, and one fact in two places is one fact that can disagree.
+    result["shm"] = json{{"name", ctx.telemetry->name()},
+                         {"size", ctx.telemetry->byteLength()},
+                         {"layoutVersion", kTelemetryLayoutVersion}};
+  else
+    result["shm"] = nullptr;
   result["capabilities"] = std::move(capabilities);
   return result;
 }
@@ -289,6 +300,48 @@ json dispatchCommand(const std::string& cmd, const json& id, const json& args, P
     return okResponse(id, json::object());
   }
   if (cmd == "catalog.get") return okResponse(id, catalogJson(ctx.registry));
+
+  // ---- telemetry
+  //
+  // Slots are handed out here rather than by the compiler, so subscribing never recompiles the graph and
+  // cannot glitch the audio. The map goes back in the reply; a client never infers it from the segment,
+  // which carries no module names at all.
+  if (cmd == "telemetry.subscribe") {
+    if (ctx.telemetry == nullptr || !ctx.telemetry->valid())
+      return errorResponse(id, "E_UNSUPPORTED", "this engine has no telemetry segment");
+    ArgReader a(args);
+    const json& modules = a.arr("modules");
+    if (!a) return errorResponse(id, a.result());
+
+    // Assign against a copy and only publish it if every module resolves, so a request naming one bad
+    // module leaves every existing subscription exactly as it was.
+    std::vector<std::string> wanted;
+    for (const json& m : modules) {
+      if (!m.is_string()) return errorResponse(id, "E_SCHEMA", "modules must be strings");
+      wanted.push_back(m.get<std::string>());
+    }
+    if (wanted.size() > ctx.telemetry->slotCount())
+      return errorResponse(id, "E_NO_SLOTS",
+                           "asked for " + std::to_string(wanted.size()) + " slots, segment has " +
+                               std::to_string(ctx.telemetry->slotCount()));
+    for (const std::string& moduleId : wanted)
+      if (!ctx.engine.hasInstance(moduleId))
+        return errorResponse(id, "E_NODE_NOT_FOUND", "no module " + moduleId);
+
+    // Every previous subscription is dropped first: the request is the whole set, not an addition, so a
+    // module the interface stopped watching stops writing rather than lingering in a slot forever.
+    ctx.engine.clearTelemetrySlots();
+    json slots = json::object();
+    for (uint32_t i = 0; i < wanted.size(); ++i) {
+      ctx.engine.setTelemetrySlot(wanted[i], i);
+      slots[wanted[i]] = i;
+    }
+    return okResponse(id, json{{"slots", std::move(slots)}});
+  }
+  if (cmd == "telemetry.unsubscribe") {
+    if (ctx.telemetry != nullptr) ctx.engine.clearTelemetrySlots();
+    return okResponse(id, json::object());
+  }
 
   // ---- patch
   if (cmd == "patch.load") {

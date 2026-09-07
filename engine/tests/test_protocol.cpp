@@ -1,3 +1,6 @@
+#include <unistd.h>
+
+#include <algorithm>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <string>
@@ -7,6 +10,7 @@
 #include "modules/builtin.hpp"
 #include "services/Catalog.hpp"
 #include "services/Protocol.hpp"
+#include "services/Telemetry.hpp"
 #include "util/RtGuard.hpp"
 
 using nlohmann::json;
@@ -19,7 +23,7 @@ struct Fixture {
   pg::Registry registry;
   pg::Engine engine{registry, pg::EngineConfig{48000.0, 64}};
   pg::Transport transport;
-  pg::ProtocolContext ctx{engine, registry, transport, nullptr, {}, false};
+  pg::ProtocolContext ctx{.engine = engine, .registry = registry, .transport = transport};
 
   Fixture() { pg::test::registerTestModules(registry); }
 
@@ -87,7 +91,7 @@ TEST_CASE("hello reports this build's protocol version, engine version and catal
   pg::registerBuiltinModules(registry);
   pg::Engine engine{registry, pg::EngineConfig{48000.0, 64}};
   pg::Transport transport;
-  pg::ProtocolContext ctx{engine, registry, transport, nullptr, {}, false};
+  pg::ProtocolContext ctx{.engine = engine, .registry = registry, .transport = transport};
 
   const json response = pg::dispatch(json{{"id", 1}, {"cmd", "hello"}, {"args", {{"protocolVersion", 1}}}}, ctx);
   REQUIRE(response["ok"] == true);
@@ -128,9 +132,12 @@ TEST_CASE("an unknown command is an error, not a throw", "[protocol]") {
   REQUIRE(response["ok"] == false);
   REQUIRE(response["id"] == 1);
   REQUIRE(errorCode(response) == "E_UNKNOWN_CMD");
-  // Later phases own these; answering them today would be a lie.
-  REQUIRE(errorCode(f.call("telemetry.subscribe")) == "E_UNKNOWN_CMD");
+  // MIDI is still a later phase; answering it today would be a lie.
   REQUIRE(errorCode(f.call("midi.list")) == "E_UNKNOWN_CMD");
+  // Telemetry exists now, and this fixture has no segment. That is a different answer on purpose: "the
+  // command is not in this build" and "this engine cannot do it right now" send a client to different
+  // places, so they must not share a code.
+  REQUIRE(errorCode(f.call("telemetry.subscribe")) == "E_UNSUPPORTED");
 }
 
 TEST_CASE("every command in the shared table has a handler", "[protocol]") {
@@ -498,4 +505,104 @@ TEST_CASE("the transport does not allocate on the render path", "[rt][transport]
     for (int i = 0; i < 100; ++i) t.advance(64);
   }
   REQUIRE(pg::test::rtViolations() == 0);
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Telemetry subscription. Slots are handed out here rather than by the compiler, so subscribing never
+// recompiles the graph; these tests pin that contract as much as the replies.
+
+namespace {
+
+/// A context with a real segment behind it, so `hello` and `telemetry.*` have something to report.
+struct TelemetryFixture {
+  pg::Registry registry;
+  pg::Engine engine{registry, pg::EngineConfig{48000.0, 64}};
+  pg::Transport transport;
+  pg::TelemetryWriter writer;
+  pg::ProtocolContext ctx{.engine = engine, .registry = registry, .transport = transport};
+
+  TelemetryFixture() {
+    registerBuiltinModules(registry);
+    std::string error;
+    REQUIRE(writer.create("/pg-proto-" + std::to_string(getpid()), 4, 48000.0, 64, error));
+    engine.setTelemetry(&writer);
+    ctx.telemetry = &writer;
+    REQUIRE(engine.model().addNode(registry, {"m1", "display.meter", {}}));
+    REQUIRE(engine.model().addNode(registry, {"m2", "display.scope", {}}));
+    REQUIRE(engine.commit());
+  }
+};
+
+}  // namespace
+
+TEST_CASE("hello reports the segment once there is one", "[protocol][telemetry]") {
+  TelemetryFixture f;
+  const json reply = dispatch({{"id", 1}, {"cmd", "hello"}, {"args", {{"protocolVersion", 1}}}}, f.ctx);
+  REQUIRE(reply["ok"] == true);
+  const json& shm = reply["result"]["shm"];
+  REQUIRE(shm.is_object());
+  REQUIRE(shm["name"] == f.writer.name());
+  REQUIRE(shm["layoutVersion"] == pg::kTelemetryLayoutVersion);
+  // The slot count is not here on purpose: it lives in the segment header, which a reader checks anyway.
+  REQUIRE_FALSE(shm.contains("slotCount"));
+  // A client needs the size to map it; a name alone is not enough to attach.
+  REQUIRE(shm["size"] == f.writer.byteLength());
+  const json& caps = reply["result"]["capabilities"];
+  REQUIRE(std::find(caps.begin(), caps.end(), "telemetry") != caps.end());
+}
+
+TEST_CASE("subscribing returns the module to slot map", "[protocol][telemetry]") {
+  TelemetryFixture f;
+  const json reply = dispatch(
+      {{"id", 2}, {"cmd", "telemetry.subscribe"}, {"args", {{"modules", {"m2", "m1"}}}}}, f.ctx);
+  REQUIRE(reply["ok"] == true);
+  // The order asked for is the order assigned, so a client can predict nothing and must read the map.
+  REQUIRE(reply["result"]["slots"]["m2"] == 0);
+  REQUIRE(reply["result"]["slots"]["m1"] == 1);
+}
+
+TEST_CASE("a subscription naming an unknown module changes nothing", "[protocol][telemetry]") {
+  TelemetryFixture f;
+  REQUIRE(dispatch({{"id", 1}, {"cmd", "telemetry.subscribe"}, {"args", {{"modules", {"m1"}}}}},
+                   f.ctx)["ok"] == true);
+
+  const json reply = dispatch(
+      {{"id", 2}, {"cmd", "telemetry.subscribe"}, {"args", {{"modules", {"m2", "ghost"}}}}}, f.ctx);
+  REQUIRE(reply["ok"] == false);
+  REQUIRE(reply["error"]["code"] == "E_NODE_NOT_FOUND");
+
+  // The point of validating before assigning: one bad name must not tear down what was working.
+  const json again = dispatch({{"id", 3}, {"cmd", "engine.ping"}, {"args", json::object()}}, f.ctx);
+  REQUIRE(again["ok"] == true);
+}
+
+TEST_CASE("subscribing replaces the previous set rather than adding to it", "[protocol][telemetry]") {
+  TelemetryFixture f;
+  REQUIRE(dispatch({{"id", 1}, {"cmd", "telemetry.subscribe"}, {"args", {{"modules", {"m1", "m2"}}}}},
+                   f.ctx)["ok"] == true);
+  const json reply = dispatch(
+      {{"id", 2}, {"cmd", "telemetry.subscribe"}, {"args", {{"modules", {"m2"}}}}}, f.ctx);
+  REQUIRE(reply["ok"] == true);
+  REQUIRE(reply["result"]["slots"].size() == 1);
+  // A module the interface stopped watching must stop writing, not linger in the slot it used to own.
+  REQUIRE(reply["result"]["slots"]["m2"] == 0);
+}
+
+TEST_CASE("telemetry commands are refused when there is no segment", "[protocol][telemetry]") {
+  pg::Registry registry;
+  registerBuiltinModules(registry);
+  pg::Engine engine{registry, pg::EngineConfig{48000.0, 64}};
+  pg::Transport transport;
+  pg::ProtocolContext ctx{.engine = engine, .registry = registry, .transport = transport};
+
+  const json reply = dispatch(
+      {{"id", 1}, {"cmd", "telemetry.subscribe"}, {"args", {{"modules", json::array()}}}}, ctx);
+  REQUIRE(reply["ok"] == false);
+  REQUIRE(reply["error"]["code"] == "E_UNSUPPORTED");
+
+  // And `hello` says so rather than advertising a capability the engine cannot deliver.
+  const json hello = dispatch({{"id", 2}, {"cmd", "hello"}, {"args", {{"protocolVersion", 1}}}}, ctx);
+  REQUIRE(hello["result"]["shm"].is_null());
+  const json& caps = hello["result"]["capabilities"];
+  REQUIRE(std::find(caps.begin(), caps.end(), "telemetry") == caps.end());
 }

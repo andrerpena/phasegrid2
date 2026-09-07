@@ -7,6 +7,7 @@
 #include "core/Registry.hpp"
 #include "core/Result.hpp"
 #include "services/AudioDevice.hpp"
+#include "services/Telemetry.hpp"
 #include "services/Transport.hpp"
 
 namespace pg {
@@ -45,6 +46,9 @@ struct ProtocolContext {
   Registry& registry;
   Transport& transport;
   DeviceHost* device = nullptr;
+  /// The shared-memory segment, when this process opened one. Null means telemetry is off, and
+  /// `hello` and `telemetry.*` say so rather than pretending.
+  TelemetryWriter* telemetry = nullptr;
   /// Filled by handlers, drained by the caller after each dispatch.
   std::vector<ProtocolEvent> events;
   /// Set by `engine.shutdown`. The caller answers first, then closes.

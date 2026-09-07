@@ -105,6 +105,20 @@ export const COMMANDS = {
 
   "catalog.get": { args: NoArgs, result: CatalogSchema },
 
+  /**
+   * Watch these modules and no others. The request is the whole set rather than an addition, so a
+   * module left out stops publishing; the reply carries the module-to-slot map, which is the only place
+   * that mapping exists. The segment itself holds no module names, deliberately: a reader parsing bytes
+   * from another process should not also be trusted to identify them.
+   *
+   * Subscribing does not recompile the graph and cannot interrupt the audio.
+   */
+  "telemetry.subscribe": {
+    args: z.object({ modules: z.array(z.string().min(1)) }),
+    result: z.object({ slots: z.record(z.number().int().nonnegative()) }),
+  },
+  "telemetry.unsubscribe": { args: NoArgs, result: z.object({}) },
+
   "patch.load": {
     args: z.object({ patch: PatchDocSchema }),
     result: RevisionResultSchema,

@@ -67,7 +67,7 @@ struct ServerFixture {
   pg::Registry registry;
   pg::Engine engine{registry, pg::EngineConfig{48000.0, 64}};
   pg::Transport transport;
-  pg::ProtocolContext ctx{engine, registry, transport, nullptr, {}, false};
+  pg::ProtocolContext ctx{.engine = engine, .registry = registry, .transport = transport};
   pg::CommandServer server{ctx};
   std::string path;
 
@@ -122,7 +122,7 @@ TEST_CASE("a socket path longer than the platform allows is refused, not truncat
   pg::Registry registry;
   pg::Engine engine{registry, pg::EngineConfig{48000.0, 64}};
   pg::Transport transport;
-  pg::ProtocolContext ctx{engine, registry, transport, nullptr, {}, false};
+  pg::ProtocolContext ctx{.engine = engine, .registry = registry, .transport = transport};
   pg::CommandServer server{ctx};
 
   const pg::Result refused = server.listen("/tmp/" + std::string(200, 'x') + ".sock");

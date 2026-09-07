@@ -43,6 +43,8 @@ public:
   TelemetryWriter* telemetry() const { return telemetry_; }
   /// Message thread. Points a module at a slot, or `kNoTelemetrySlot` to stop it publishing.
   bool setTelemetrySlot(const std::string& node, uint32_t slot);
+  void clearTelemetrySlots() { instances_.clearTelemetrySlots(); }
+  bool hasInstance(const std::string& node) const { return instances_.find(node) != nullptr; }
 
   void renderBlock(float* const* out, uint32_t channels, uint32_t numFrames, const TransportSnapshot& t) noexcept PG_RT_NONBLOCKING;
   void renderInterleaved(float* out, uint32_t frames, uint32_t channels, const TransportSnapshot& t) noexcept PG_RT_NONBLOCKING;

@@ -17,6 +17,7 @@
 #include "services/CommandServer.hpp"
 #include "services/MiniaudioBackend.hpp"
 #include "services/Protocol.hpp"
+#include "services/Telemetry.hpp"
 #include "services/Transport.hpp"
 
 static int usage() {
@@ -26,7 +27,8 @@ static int usage() {
       "  --tone [seconds]      play a 440 Hz test tone on the default device\n"
       "  --render <patch.json> --out <file.wav> [--seconds N] [--sr N] [--block N]\n"
       "  --catalog             print the module catalog as JSON\n"
-      "  --socket <path>       open the audio device and take commands on a Unix socket");
+      "  --socket <path> [--shm <name>]\n"
+      "                        open the audio device and take commands on a Unix socket");
   return 2;
 }
 
@@ -153,7 +155,7 @@ private:
 };
 
 /// Opens the audio device, then takes commands on a Unix socket until the client goes away.
-static int runSocket(const std::string& path) {
+static int runSocket(const std::string& path, const std::string& shmName) {
   pg::Registry registry;
   pg::registerBuiltinModules(registry);
   pg::Transport transport;
@@ -183,8 +185,24 @@ static int runSocket(const std::string& path) {
   pg::Engine engine{registry, pg::EngineConfig{backend.sampleRate(), pg::kDefaultBlockSize}};
   live.store(&engine, std::memory_order_release);
 
+  // Telemetry is optional. A segment that cannot be created leaves the engine fully working with no
+  // meters, which is a far better outcome than refusing to make sound because a display failed.
+  pg::TelemetryWriter telemetry;
+  if (!shmName.empty()) {
+    std::string shmError;
+    if (telemetry.create(shmName, pg::kTelemetryMaxSlots, backend.sampleRate(), pg::kDefaultBlockSize,
+                         shmError))
+      engine.setTelemetry(&telemetry);
+    else
+      std::fprintf(stderr, "telemetry disabled: %s\n", shmError.c_str());
+  }
+
   BackendDeviceHost host{backend, config, render, transport};
-  pg::ProtocolContext ctx{engine, registry, transport, &host, {}, false};
+  pg::ProtocolContext ctx{.engine = engine,
+                          .registry = registry,
+                          .transport = transport,
+                          .device = &host,
+                          .telemetry = telemetry.valid() ? &telemetry : nullptr};
   pg::CommandServer server{ctx};
   if (pg::Result r = server.listen(path); !r) {
     std::fprintf(stderr, "%s: %s\n", r.code.c_str(), r.message.c_str());
@@ -219,8 +237,11 @@ int main(int argc, char** argv) {
   if (argc >= 2 && std::strcmp(argv[1], "--render") == 0) return runRender(argc, argv);
   if (argc >= 2 && std::strcmp(argv[1], "--catalog") == 0) return runCatalog();
   if (argc >= 2 && std::strcmp(argv[1], "--socket") == 0) {
-    if (argc < 3) { std::fprintf(stderr, "usage: --socket <path>\n"); return 2; }
-    return runSocket(argv[2]);
+    if (argc < 3) { std::fprintf(stderr, "usage: --socket <path> [--shm <name>]\n"); return 2; }
+    std::string shmName;
+    for (int i = 3; i + 1 < argc; ++i)
+      if (std::strcmp(argv[i], "--shm") == 0) shmName = argv[i + 1];
+    return runSocket(argv[2], shmName);
   }
   return usage();
 }

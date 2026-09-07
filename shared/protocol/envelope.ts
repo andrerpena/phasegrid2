@@ -91,6 +91,12 @@ export const ERROR_CODES = [
   "E_QUEUE_FULL",
   "E_COMPILE",
   "E_IO",
+  /** The command exists in this build but this engine cannot serve it right now, e.g. no telemetry
+   * segment was opened. Deliberately distinct from E_UNKNOWN_CMD: "not in this build" and "not
+   * available now" send a client to different places. */
+  "E_UNSUPPORTED",
+  /** More telemetry subscriptions were asked for than the segment has slots. */
+  "E_NO_SLOTS",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

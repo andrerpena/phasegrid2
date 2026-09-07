@@ -37,6 +37,8 @@ public:
   std::shared_ptr<FeedbackState> acquireFeedback(const std::string& edgeId, uint32_t voicePairs);
   void prune(const std::set<std::string>& liveNodeIds, const std::set<std::string>& liveEdgeIds);
   const ModuleInstance* find(const std::string& id) const;
+  /// Stops every module publishing telemetry. Message thread; the audio thread reads these atomically.
+  void clearTelemetrySlots();
   size_t size() const { return byId_.size(); }
 private:
   std::map<std::string, std::shared_ptr<ModuleInstance>> byId_;

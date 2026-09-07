@@ -1,5 +1,7 @@
 #include "core/InstanceTable.hpp"
 
+#include "services/Telemetry.hpp"
+
 namespace pg {
 
 std::shared_ptr<ModuleInstance> InstanceTable::acquire(const std::string& id, const RegisteredModule& type,
@@ -60,6 +62,10 @@ std::shared_ptr<FeedbackState> InstanceTable::acquireFeedback(const std::string&
 void InstanceTable::prune(const std::set<std::string>& liveNodeIds, const std::set<std::string>& liveEdgeIds) {
   for (auto it = byId_.begin(); it != byId_.end();) it = liveNodeIds.contains(it->first) ? std::next(it) : byId_.erase(it);
   for (auto it = feedbackById_.begin(); it != feedbackById_.end();) it = liveEdgeIds.contains(it->first) ? std::next(it) : feedbackById_.erase(it);
+}
+
+void InstanceTable::clearTelemetrySlots() {
+  for (auto& [id, inst] : byId_) inst->telemetrySlot.store(kNoTelemetrySlot, std::memory_order_relaxed);
 }
 
 const ModuleInstance* InstanceTable::find(const std::string& id) const {

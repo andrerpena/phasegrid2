@@ -41,6 +41,11 @@ const cases: Record<CommandName, { valid: unknown; invalid: unknown }> = {
   "engine.ping": { valid: {}, invalid: 42 },
   "engine.shutdown": { valid: {}, invalid: "now" },
   "catalog.get": { valid: {}, invalid: null },
+  "telemetry.subscribe": {
+    valid: { modules: ["meter1", "scope1"] },
+    invalid: { modules: [1, 2] },
+  },
+  "telemetry.unsubscribe": { valid: {}, invalid: "all" },
   "patch.load": {
     valid: { patch: { schemaVersion: 1, modules: [], edges: [] } },
     invalid: { patch: { schemaVersion: 1, modules: {}, edges: [] } },
@@ -96,6 +101,8 @@ describe("command table", () => {
       "engine.ping",
       "engine.shutdown",
       "catalog.get",
+      "telemetry.subscribe",
+      "telemetry.unsubscribe",
       "patch.load",
       "patch.clear",
       "patch.batch",
@@ -114,9 +121,10 @@ describe("command table", () => {
       "device.list",
       "device.select",
     ]);
-    // `midi.*` and `telemetry.*` are later phases; a stub in the table would be a lie.
+    // `midi.*` is still a later phase; a stub in the table would be a lie, because a typed client
+    // would build against it and only find out at runtime that nothing answers.
     for (const name of COMMAND_NAMES) {
-      expect(name).not.toMatch(/^(midi|telemetry)\./);
+      expect(name).not.toMatch(/^midi\./);
     }
   });
 
@@ -150,7 +158,7 @@ describe("command results", () => {
     expect(COMMANDS["catalog.get"].result.safeParse(golden).success).toBe(true);
   });
 
-  it("describes the handshake, with the telemetry segment absent until phase 5", () => {
+  it("describes the handshake, with or without a telemetry segment", () => {
     const catalog = golden as { catalogHash: string; conventions: unknown };
     const hello = {
       protocolVersion: PROTOCOL_VERSION,
@@ -160,7 +168,25 @@ describe("command results", () => {
       shm: null,
       capabilities: ["audio", "render"],
     };
+    // Null is a real answer, not a gap: an engine built without a segment says so, and a client that
+    // treats null as "not yet known" would wait forever for a value that is never coming.
     expect(COMMANDS.hello.result.parse(hello).shm).toBeNull();
+
+    // And when there is one, every field a client needs to map it survives the parse. A name alone is
+    // not enough to attach to shared memory.
+    const withShm = {
+      ...hello,
+      shm: { name: "/pg-1234", size: 524352, layoutVersion: 1 },
+      capabilities: ["patch", "transport", "telemetry"],
+    };
+    expect(COMMANDS.hello.result.parse(withShm).shm).toEqual(withShm.shm);
+    // A segment described without its size cannot be mapped, so a partial description is refused.
+    expect(
+      COMMANDS.hello.result.safeParse({
+        ...withShm,
+        shm: { name: "/pg-1234", layoutVersion: 1 },
+      }).success,
+    ).toBe(false);
     expect(
       COMMANDS.hello.result.safeParse({ ...hello, catalogHash: "nope" })
         .success,
