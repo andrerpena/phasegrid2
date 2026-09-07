@@ -60,4 +60,10 @@ struct Base64 {
   }
 };
 
-namespace ProjectInfo { inline constexpr const char* versionString = "phasegrid2"; }
+// Stamped into the "version" field of every wavetable JSON document the vendored WavetableCreator writes, and
+// read back by WavetableCreator::updateJson to decide which format migrations a document needs. It must
+// therefore be a dotted version number at or above the newest migration the vendored code knows (0.7.7):
+// LoadSave::compareVersionStrings parses a non-numeric component as 0, so a name here ("phasegrid2") reads as
+// version 0.0.0 and sends every document we write through the 0.3.3 migration, which assumes a numeric
+// component "type" and throws on the string the current format uses. Not a display string; nothing shows it.
+namespace ProjectInfo { inline constexpr const char* versionString = "1.0.0"; }
