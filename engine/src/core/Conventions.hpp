@@ -3,8 +3,8 @@
 #include <cstdint>
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wconversion"
-#include "common.h"        // vital: kMaxBufferSize, mono_float, poly_values.h
-#include "futils.h"        // vital fast math with poly_float overloads
+#include "common.h"        // engine/vendor/vital: kMaxBufferSize, mono_float, poly_values.h
+#include "futils.h"        // engine/vendor/vital: fast math with poly_float overloads
 #pragma clang diagnostic pop
 
 namespace pg {
