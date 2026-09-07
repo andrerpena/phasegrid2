@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "lib": ["ESNext", "DOM"],
+    "outDir": "./out",
+    "types": ["node"]
+  },
+  "include": [
+    "src/main/**/*",
+    "src/preload/**/*",
+    "shared/**/*",
+    "electron.vite.config.ts",
+    "vitest.config.ts",
+    "package.json"
+  ]
+}

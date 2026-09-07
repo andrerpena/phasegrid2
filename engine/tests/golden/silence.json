@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "voiceCount": 1,
+  "feedbackMode": "sample",
+  "modules": [
+    { "id": "out", "type": "io.audioOut", "params": { "gain": 1 } }
+  ],
+  "edges": []
+}

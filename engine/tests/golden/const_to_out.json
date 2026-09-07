@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "voiceCount": 1,
+  "feedbackMode": "sample",
+  "modules": [
+    { "id": "c", "type": "test.const", "params": { "value": 0.25 }, "x": 10, "y": 20 },
+    { "id": "out", "type": "io.audioOut", "params": { "gain": 1 } }
+  ],
+  "edges": [
+    { "id": "e1", "from": { "module": "c", "port": "out" }, "to": { "module": "out", "port": "inL" } },
+    { "id": "e2", "from": { "module": "c", "port": "out" }, "to": { "module": "out", "port": "inR" } }
+  ]
+}

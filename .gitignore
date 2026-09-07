@@ -1,0 +1,14 @@
+.superpowers/
+node_modules/
+out/
+dist/
+build/
+build-*/
+*.log
+*.tsbuildinfo
+.DS_Store
+.vscode/
+.idea/
+*.wav
+!engine/tests/golden/*.wav
+.cache/

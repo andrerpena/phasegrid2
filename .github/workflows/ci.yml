@@ -1,0 +1,29 @@
+name: ci
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+# Only the newest run for a given ref matters; cancel anything older still in flight.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: brew install ninja
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      # PG_WERROR=ON is set here and nowhere in the default build: CI is what enforces
+      # compiler warnings, so a warning from a future compiler cannot break `npm install`
+      # for end users (postinstall builds the engine from source).
+      - run: npm run engine:test
+        env:
+          PG_WERROR: "ON"
