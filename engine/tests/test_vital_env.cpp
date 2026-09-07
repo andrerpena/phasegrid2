@@ -34,6 +34,28 @@ struct Rig {
   float phase(uint32_t frame) { return f.out(*program, "env", "phase", frame); }
 };
 
+/// A gate that is high on voice pair 0 and low on every other pair.
+struct PairGate : pg::VoicedModule<int> {
+  void process(pg::ProcessContext& c) override {
+    for (uint32_t i = 0; i < c.numFrames; ++i) c.out(0).data[i] = pg::Sample(c.voice == 0 ? 1.f : 0.f);
+  }
+};
+const pg::PortDesc kPairGateOut[] = {{"out", "Out", pg::PortKind::Continuous, 1, pg::SignalRole::Gate, ""}};
+const pg::ModuleDescriptor kPairGate{pg::kModuleAbiVersion, "test.pairGate", "PairGate", "test", "",
+  nullptr, 0, kPairGateOut, 1, nullptr, 0, 0, 0, [] () -> pg::Module* { return new PairGate(); }};
+
+/// Captures the last frame of one input per voice pair, WHILE that pair runs: the buffers are shared, so
+/// once a block is over only the last pair's values are still in them.
+struct PairProbe : pg::VoicedModule<int> {
+  static inline std::array<float, 16> last{};
+  void process(pg::ProcessContext& c) override {
+    last[c.voice] = pg::lanes::lane(c.in(0).readOr()[c.numFrames - 1], 0);
+  }
+};
+const pg::PortDesc kPairProbeIn[] = {{"in", "In", pg::PortKind::Continuous, 1, pg::SignalRole::Cv, ""}};
+const pg::ModuleDescriptor kPairProbe{pg::kModuleAbiVersion, "test.pairProbe", "PairProbe", "test", "",
+  kPairProbeIn, 1, nullptr, 0, nullptr, 0, 0, 0, [] () -> pg::Module* { return new PairProbe(); }};
+
 const std::map<std::string, float> kInstant = {
   {"delay", 0.f}, {"attack", 0.f}, {"hold", 0.f}, {"decay", 0.f}, {"sustain", 1.f}, {"release", 0.f}};
 
@@ -110,4 +132,33 @@ TEST_CASE("env.dahdsr steady state is allocation free", "[vital][rt]") {
   pg::test::resetRtViolations();
   { pg::test::RtScope scope; rig.run(200); }
   REQUIRE(pg::test::rtViolations() == 0);
+}
+
+TEST_CASE("a vendored module keeps one DSP state per voice pair", "[vital]") {
+  // The scheduler runs the op list once per pair through the same Module, and a vendored SynthModule holds
+  // the state of exactly one poly_float -- one pair. Sharing one between pairs puts pair 1's gate on pair
+  // 0's envelope, so here pair 1's closed gate would release pair 0's envelope every block and it would
+  // never get past the first block's worth of attack.
+  pg::test::GraphFixture f;
+  pg::registerBuiltinModules(f.reg);
+  REQUIRE_FALSE(f.reg.add(kPairGate).has_value());
+  REQUIRE_FALSE(f.reg.add(kPairProbe).has_value());
+  PairProbe::last = {};
+  REQUIRE(f.model.setVoiceCount(4));   // two pairs
+  f.node("gate", "test.pairGate");
+  f.node("env", "env.dahdsr",
+         {{"delay", 0.f}, {"attack", 0.5f}, {"hold", 0.f}, {"decay", 0.f}, {"sustain", 1.f}, {"release", 0.f}});
+  f.node("probe", "test.pairProbe");
+  f.edge("e0", "gate.out", "env.gate");
+  f.edge("e1", "env.out", "probe.in");
+  auto program = f.compile();
+
+  f.run(*program, 64);
+  const float early = PairProbe::last[0];
+  REQUIRE(early > 0.f);                    // pair 0's envelope really did open, so what follows measures it
+  for (int i = 0; i < 120; ++i) f.run(*program, 64);   // 163 ms, well past the 62 ms attack
+  const float later = PairProbe::last[0];
+  REQUIRE(later > early * 5.f);            // and it kept climbing across blocks rather than restarting
+  REQUIRE(later > 0.5f);
+  REQUIRE(PairProbe::last[1] == 0.f);      // pair 1's gate never went high, so its envelope never opened
 }
