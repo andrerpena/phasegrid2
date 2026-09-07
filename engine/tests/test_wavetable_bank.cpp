@@ -21,17 +21,6 @@ float framePeak(vital::Wavetable& table, int frame) {
   return peak;
 }
 
-/// Fraction of the frame spent within 10% of its own peak. A square is nearly all extremes (~1), a sine
-/// spends most of its time away from them (~0.15). Enough to tell the built-in shapes apart.
-float flatness(vital::Wavetable& table, int frame) {
-  const vital::Wavetable::WavetableData* data = table.getAllData();
-  const float peak = framePeak(table, frame);
-  int extreme = 0;
-  for (int i = 0; i < vital::Wavetable::kWaveformSize; ++i)
-    if (std::fabs(data->wave_data[frame][i]) > 0.9f * peak) ++extreme;
-  return static_cast<float>(extreme) / vital::Wavetable::kWaveformSize;
-}
-
 }  // namespace
 
 TEST_CASE("wavetable bank names its built-ins", "[wavetable]") {
@@ -42,24 +31,27 @@ TEST_CASE("wavetable bank names its built-ins", "[wavetable]") {
   REQUIRE(std::string(pg::vendor::WavetableBank::builtinName(99)) == "Basic Shapes");   // clamped, never OOB
 }
 
-TEST_CASE("wavetable bank renders each built-in as its own shape", "[wavetable]") {
+/**
+ * What the bank is responsible for is the SHAPE of the table -- how many frames it holds and that they
+ * carry a wave at all. Which waveform each one is belongs to the oscillator that plays it, and is measured
+ * against its harmonic series in test_osc_shapes.cpp; a check here could only compare samples against a
+ * hand-written curve, which tests the vendored frames rather than our use of them.
+ */
+TEST_CASE("wavetable bank renders a single frame per shape, and a full table for the morph", "[wavetable]") {
   vital::Wavetable table(vital::kNumOscillatorWaveFrames);
 
-  pg::vendor::WavetableBank::renderBuiltin(1, table);   // Sine
-  REQUIRE(table.getAllData()->num_frames == 1);
-  REQUIRE(framePeak(table, 0) > 0.5f);
-  const float sineFlatness = flatness(table, 0);
-  REQUIRE(sineFlatness < 0.3f);
+  for (uint32_t shape = 1; shape < pg::vendor::WavetableBank::numBuiltins(); ++shape) {
+    INFO("built-in " << shape << ": " << pg::vendor::WavetableBank::builtinName(shape));
+    pg::vendor::WavetableBank::renderBuiltin(shape, table);   // same table, re-rendered in place each time
+    REQUIRE(table.getAllData()->num_frames == 1);
+    REQUIRE(framePeak(table, 0) > 0.5f);
+  }
 
-  pg::vendor::WavetableBank::renderBuiltin(4, table);   // Square: same table, re-rendered in place
-  REQUIRE(table.getAllData()->num_frames == 1);
-  REQUIRE(framePeak(table, 0) > 0.5f);
-  REQUIRE(flatness(table, 0) > 0.8f);
-
-  pg::vendor::WavetableBank::renderBuiltin(0, table);   // Basic Shapes: sine .. saw across the whole table
+  // Index 0 is the odd one out: it holds the whole morph rather than one shape, so it fills every frame.
+  pg::vendor::WavetableBank::renderBuiltin(0, table);
   REQUIRE(table.getAllData()->num_frames == vital::kNumOscillatorWaveFrames);
-  REQUIRE(flatness(table, 0) < 0.3f);                                            // first frame is the sine
-  REQUIRE(flatness(table, vital::kNumOscillatorWaveFrames * 2 / 3) > 0.6f);       // two thirds in: the square
+  REQUIRE(framePeak(table, 0) > 0.5f);
+  REQUIRE(framePeak(table, vital::kNumOscillatorWaveFrames - 1) > 0.5f);
 }
 
 TEST_CASE("wavetable bank loads the JSON the vendored creator writes", "[wavetable]") {

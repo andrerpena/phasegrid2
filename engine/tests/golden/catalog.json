@@ -1,5 +1,5 @@
 {
-  "catalogHash": "b5160b706fcea45e",
+  "catalogHash": "429b9d0279a5aeba",
   "conventions": {
     "blockSize": 128,
     "gateThreshold": 0,
@@ -5153,7 +5153,7 @@
           "max": 6.0,
           "min": 0.0,
           "name": "Wavetable",
-          "uiWidget": "select",
+          "uiWidget": "waveSelect",
           "unit": "none"
         },
         {
@@ -5385,7 +5385,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
-            "primary": true,
+            "primary": false,
             "structural": false
           },
           "id": "phase",

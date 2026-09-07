@@ -76,8 +76,8 @@ register({
   moduleId: "osc.wavetable",
   name: "Wavetable Oscillator",
   description:
-    "An oscillator on its own, at middle C. Turn Level for volume, Tune for pitch, and Phase and Pan " +
-    "to hear what they do to a bare tone.",
+    "An oscillator on its own, playing a saw at middle C. Turn Level for volume, Tune for pitch and " +
+    "Pan to hear what they do to a bare tone.",
   patch: {
     schemaVersion: 1,
     voiceCount: 1,
@@ -88,7 +88,10 @@ register({
         type: "osc.wavetable",
         x: col(2),
         y: col(2),
-        params: { level: 0.7 },
+        // Table 6 is the saw: every harmonic, so it is the shape you can hear a filter working on, and
+        // the one the face draws. The default table morphs across four shapes and so has no single
+        // curve to show.
+        params: { level: 0.7, table: 6 },
       },
       {
         id: "out",

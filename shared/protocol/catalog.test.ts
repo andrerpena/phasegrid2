@@ -75,7 +75,9 @@ describe("catalog schema", () => {
     expect(table?.flags.structural).toBe(true);
     expect(table?.flags.modulatable).toBe(false);
     expect(table?.enumLabels?.length).toBeGreaterThan(1);
-    expect(table?.uiWidget).toBe("select");
+    // A select whose entries are waveforms: still a dropdown to edit, but the module is also telling
+    // the editor it may draw the chosen wave on the node's face.
+    expect(table?.uiWidget).toBe("waveSelect");
   });
 
   it("carries only names the UI can show", () => {

@@ -1,16 +1,17 @@
 import { CatalogSchema, type ModuleDescriptor } from "@shared/protocol/catalog";
 import type { PatchDoc, PatchModule } from "@shared/protocol/patch";
-import golden from "../../../../../engine/tests/golden/catalog.json";
+import golden from "../../../../engine/tests/golden/catalog.json";
 
 /**
  * Real module descriptors, with no engine running.
  *
  * This is the catalogue the engine itself prints, committed as a golden file and already checked by a
- * test that compares it against a live `--catalog`. So a story draws the same ports, roles and
- * parameters the application will, and cannot drift into a fiction that only exists in Storybook.
+ * test that compares it against a live `--catalog`. A layout test that invents its own descriptors
+ * proves only that the layout is self-consistent; measured against these it is measured against the
+ * ports, roles and parameter counts the application will actually be handed.
  *
- * Parsed rather than cast, so a change to the engine's output that breaks the schema breaks the stories
- * too, which is where it should be noticed.
+ * Parsed rather than cast, so a change to the engine's output that breaks the schema breaks the tests
+ * that read it, which is where it should be noticed.
  */
 export const CATALOG = CatalogSchema.parse(golden);
 

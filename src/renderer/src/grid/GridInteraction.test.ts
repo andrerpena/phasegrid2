@@ -1,9 +1,9 @@
 import type { ModuleDescriptor } from "@shared/protocol/catalog";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { descriptor } from "./fixtures";
 import { GridInteraction } from "./GridInteraction";
 import type { GridRenderer } from "./GridRenderer";
 import { CELL, measureNode } from "./layout";
-import { descriptor } from "./stories/fixtures";
 
 /**
  * The interaction controller against a fake renderer.

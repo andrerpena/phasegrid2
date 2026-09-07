@@ -49,11 +49,14 @@ const ModuleDescriptor& oscWavetable() {
     // also has to go: its range is 0..2 while its name table holds two entries, so exposing it would generate
     // a label off the end of that table.
     spec.hidden = {"on", "view_2d"};
-  spec.face = {"level", "tune", "pan", "phase"};
+    // Three, not four: the face also carries the wave panel, which takes one of its four slots. Tune
+    // stays because pitch is the control anyone reaches for first; Phase goes because it is the one of
+    // the four you set once and leave.
+    spec.face = {"level", "tune", "pan"};
     spec.extraParams = {
       ParamDesc{"table", "Wavetable", 0.f, static_cast<float>(tableNames().size() - 1), 0.f, ParamUnit::None,
                 ParamCurve::Linear, kParamEnum | kParamInteger | kParamNoSmooth | kParamStructural,
-                tableNames().data(), static_cast<uint32_t>(tableNames().size()), "select", nullptr,
+                tableNames().data(), static_cast<uint32_t>(tableNames().size()), "waveSelect", nullptr,
                 "Built-in wavetable this oscillator plays"},
     };
     spec.onConfigure = [](vital::SynthModule& m, vendor::ModuleContext&, const ParamValues& values) {

@@ -42,7 +42,22 @@ export const ParamUnitSchema = z.enum([
 
 export const ParamCurveSchema = z.enum(["linear", "log", "exp"]);
 
-export const UiWidgetSchema = z.enum(["slider", "knob", "toggle", "select"]);
+/**
+ * How a parameter wants to be edited.
+ *
+ * `waveSelect` is a `select` that happens to choose a waveform, and is the module telling the editor it
+ * may draw the chosen wave on the node's face. Whether a list of names is a list of waveforms is the
+ * module's knowledge, not the editor's: an editor left to guess would have to match label text, and
+ * would then put an oscilloscope on any unrelated parameter that offered a "Square". Anywhere a control
+ * is only being edited rather than pictured, `waveSelect` is a `select`.
+ */
+export const UiWidgetSchema = z.enum([
+  "slider",
+  "knob",
+  "toggle",
+  "select",
+  "waveSelect",
+]);
 
 /**
  * One port. `implicit` marks the port the engine adds for a modulatable param (`param:<id>`): the editor

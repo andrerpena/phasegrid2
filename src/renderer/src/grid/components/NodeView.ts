@@ -11,6 +11,8 @@ import {
 } from "../layout";
 import { Knob } from "./Knob";
 import { Port } from "./Port";
+import { SimpleWave } from "./SimpleWave";
+import { waveShapeForLabel } from "./wave-shapes";
 
 /**
  * One module on the grid: a framed panel with a title, ports down its sides and its performance
@@ -38,6 +40,7 @@ export class NodeView {
   private readonly title: Text;
   private readonly ports = new Map<string, Port>();
   private readonly knobs = new Map<string, Knob>();
+  private readonly wave: SimpleWave | null = null;
   private selected = false;
 
   constructor(
@@ -80,6 +83,19 @@ export class NodeView {
       this.view.addChild(knob.view);
     }
 
+    if (this.layout.display !== null) {
+      const { param, x, y, width, height } = this.layout.display;
+      this.wave = new SimpleWave(width, height, {
+        curve: style.accent,
+        grid: hexToNumber(style.colors.gridLine),
+        background: hexToNumber(style.colors.background),
+        border: hexToNumber(style.colors.nodeStroke),
+      });
+      this.wave.view.position.set(x, y);
+      this.view.addChild(this.wave.view);
+      this.drawWave(this.valueOf(param.id));
+    }
+
     for (const port of [...this.layout.inputs, ...this.layout.outputs]) {
       const socket = new Port(
         4,
@@ -106,6 +122,20 @@ export class NodeView {
     const knob = this.knobs.get(paramId);
     if (param === undefined || knob === undefined) return;
     knob.update(paramFraction(param, value));
+  }
+
+  /**
+   * Shows the wave the display's parameter currently selects.
+   *
+   * The value is an index into the parameter's own labels, so the picture follows whatever the engine
+   * called them; a table with no simple shape leaves the panel empty rather than showing a wrong one.
+   */
+  private drawWave(value: number): void {
+    const display = this.layout.display;
+    if (this.wave === null || display === null) return;
+    const label = display.param.enumLabels?.[Math.round(value)];
+    const samples = label === undefined ? null : waveShapeForLabel(label);
+    this.wave.setSamples(samples ?? []);
   }
 
   private valueOf(paramId: string): number {
@@ -159,6 +189,10 @@ export class NodeView {
       const value = module.params?.[id] ?? param.default;
       knob.update(paramFraction(param, value));
     }
+    if (this.layout.display !== null) {
+      const id = this.layout.display.param.id;
+      this.drawWave(module.params?.[id] ?? this.layout.display.param.default);
+    }
     for (const [id, socket] of this.ports) {
       const connected = connectedPorts.has(id);
       socket.update({ connected, hovered: hoveredPort === id });
@@ -177,6 +211,7 @@ export class NodeView {
   }
 
   destroy(): void {
+    this.wave?.destroy();
     for (const knob of this.knobs.values()) knob.destroy();
     for (const port of this.ports.values()) port.destroy();
     this.view.destroy({ children: true });

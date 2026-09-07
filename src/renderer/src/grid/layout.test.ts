@@ -278,3 +278,74 @@ describe("controls on a node's face", () => {
     expect(paramFraction(p, 99)).toBe(1);
   });
 });
+
+describe("a wave display on a node's face", () => {
+  const table = param("table", {
+    uiWidget: "waveSelect" as const,
+    enumLabels: ["Sine", "Square"],
+    max: 1,
+    default: 0,
+    flags: {
+      modulatable: false,
+      integer: true,
+      enum: true,
+      hidden: false,
+      noSmooth: true,
+      structural: true,
+      primary: false,
+    },
+  });
+  const osc = (params: ModuleDescriptor["params"]): ModuleDescriptor => ({
+    id: "osc.test",
+    name: "Osc",
+    category: "osc",
+    doc: "",
+    flags: { terminal: false, needsTransport: false, writesTelemetry: false },
+    inputs: [port("pitch")],
+    outputs: [port("out")],
+    params,
+  });
+
+  it("gives a display to the module that declares one, and to no other", () => {
+    expect(measureNode(osc([table, param("level")])).display).not.toBeNull();
+    expect(measureNode(osc([param("level")])).display).toBeNull();
+    expect(measureNode(vca).display).toBeNull();
+  });
+
+  it("spends a control slot on the display rather than making the node wider", () => {
+    // The point of the rule. A module that gains a picture shows one fewer knob; it does not grow, and
+    // a patch of them stays the shape it was.
+    const knobs = [param("a"), param("b"), param("c"), param("d")];
+    const plain = measureNode(osc(knobs));
+    const withDisplay = measureNode(osc([table, ...knobs]));
+    expect(withDisplay.cols).toBe(plain.cols);
+    expect(withDisplay.controls).toHaveLength(plain.controls.length - 1);
+  });
+
+  it("puts the display in the first slot and shifts the knobs past it", () => {
+    const plain = measureNode(osc([param("a"), param("b")]));
+    const withDisplay = measureNode(osc([table, param("a"), param("b")]));
+    const display = withDisplay.display;
+    expect(display).not.toBeNull();
+    if (display === null) return;
+    // The display sits where the first knob would have been, and the knobs start one slot later.
+    expect(display.x).toBeLessThan(withDisplay.controls[0].x);
+    expect(withDisplay.controls[0].x).toBeCloseTo(plain.controls[1].x, 5);
+  });
+
+  it("centres the display on the same line as the knobs beside it", () => {
+    const layout = measureNode(osc([table, param("a")]));
+    const display = layout.display;
+    expect(display).not.toBeNull();
+    if (display === null) return;
+    expect(display.y + display.height / 2).toBeCloseTo(layout.controls[0].y, 5);
+  });
+
+  it("stands the node up on its own when the display is all it has", () => {
+    const layout = measureNode(osc([table]));
+    expect(layout.controls).toHaveLength(0);
+    expect(layout.display).not.toBeNull();
+    // Still two cells of body: a node holding only a picture must not collapse to a title bar.
+    expect(layout.height).toBe(HEADER_HEIGHT + KNOB_CELL_HEIGHT);
+  });
+});
