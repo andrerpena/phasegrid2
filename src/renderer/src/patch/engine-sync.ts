@@ -81,6 +81,16 @@ function enqueue(task: () => Promise<void>): void {
   queue = queue.then(task, task);
 }
 
+/**
+ * Runs `task` once every document edit made so far has been sent.
+ *
+ * For anything that asks the engine about the document: a question sent before the edit it concerns
+ * would be answered about the wrong document, or about a module the engine has not been told exists.
+ */
+export function afterSync(task: () => Promise<void>): void {
+  enqueue(task);
+}
+
 async function sendBatch(ops: PatchOp[]): Promise<void> {
   try {
     await useEngineStore.getState().call("patch.batch", { ops });

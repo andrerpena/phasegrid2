@@ -58,7 +58,12 @@ const vca: ModuleDescriptor = {
   name: "VCA",
   category: "amp",
   doc: "",
-  flags: { terminal: false, needsTransport: false, writesTelemetry: false },
+  flags: {
+    terminal: false,
+    needsTransport: false,
+    writesTelemetry: false,
+    previewsWave: false,
+  },
   inputs: [port("in"), port("gain"), port("param:gain", true)],
   outputs: [port("out")],
   params: [param("gain")],
@@ -280,35 +285,28 @@ describe("controls on a node's face", () => {
 });
 
 describe("a wave display on a node's face", () => {
-  const table = param("table", {
-    uiWidget: "waveSelect" as const,
-    enumLabels: ["Sine", "Square"],
-    max: 1,
-    default: 0,
-    flags: {
-      modulatable: false,
-      integer: true,
-      enum: true,
-      hidden: false,
-      noSmooth: true,
-      structural: true,
-      primary: false,
-    },
-  });
-  const osc = (params: ModuleDescriptor["params"]): ModuleDescriptor => ({
+  const osc = (
+    params: ModuleDescriptor["params"],
+    previewsWave = true,
+  ): ModuleDescriptor => ({
     id: "osc.test",
     name: "Osc",
     category: "osc",
     doc: "",
-    flags: { terminal: false, needsTransport: false, writesTelemetry: false },
+    flags: {
+      terminal: false,
+      needsTransport: false,
+      writesTelemetry: false,
+      previewsWave,
+    },
     inputs: [port("pitch")],
     outputs: [port("out")],
     params,
   });
 
-  it("gives a display to the module that declares one, and to no other", () => {
-    expect(measureNode(osc([table, param("level")])).display).not.toBeNull();
-    expect(measureNode(osc([param("level")])).display).toBeNull();
+  it("gives a display to the module that says it can draw itself, and to no other", () => {
+    expect(measureNode(osc([param("level")])).display).not.toBeNull();
+    expect(measureNode(osc([param("level")], false)).display).toBeNull();
     expect(measureNode(vca).display).toBeNull();
   });
 
@@ -316,15 +314,15 @@ describe("a wave display on a node's face", () => {
     // The point of the rule. A module that gains a picture shows one fewer knob; it does not grow, and
     // a patch of them stays the shape it was.
     const knobs = [param("a"), param("b"), param("c"), param("d")];
-    const plain = measureNode(osc(knobs));
-    const withDisplay = measureNode(osc([table, ...knobs]));
+    const plain = measureNode(osc(knobs, false));
+    const withDisplay = measureNode(osc(knobs));
     expect(withDisplay.cols).toBe(plain.cols);
     expect(withDisplay.controls).toHaveLength(plain.controls.length - 1);
   });
 
   it("puts the display in the first slot and shifts the knobs past it", () => {
-    const plain = measureNode(osc([param("a"), param("b")]));
-    const withDisplay = measureNode(osc([table, param("a"), param("b")]));
+    const plain = measureNode(osc([param("a"), param("b")], false));
+    const withDisplay = measureNode(osc([param("a"), param("b")]));
     const display = withDisplay.display;
     expect(display).not.toBeNull();
     if (display === null) return;
@@ -334,7 +332,7 @@ describe("a wave display on a node's face", () => {
   });
 
   it("centres the display on the same line as the knobs beside it", () => {
-    const layout = measureNode(osc([table, param("a")]));
+    const layout = measureNode(osc([param("a")]));
     const display = layout.display;
     expect(display).not.toBeNull();
     if (display === null) return;
@@ -342,7 +340,7 @@ describe("a wave display on a node's face", () => {
   });
 
   it("stands the node up on its own when the display is all it has", () => {
-    const layout = measureNode(osc([table]));
+    const layout = measureNode(osc([]));
     expect(layout.controls).toHaveLength(0);
     expect(layout.display).not.toBeNull();
     // Still two cells of body: a node holding only a picture must not collapse to a title bar.

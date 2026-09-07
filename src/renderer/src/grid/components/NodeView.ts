@@ -12,7 +12,6 @@ import {
 import { Knob } from "./Knob";
 import { Port } from "./Port";
 import { SimpleWave } from "./SimpleWave";
-import { waveShapeForLabel } from "./wave-shapes";
 
 /**
  * One module on the grid: a framed panel with a title, ports down its sides and its performance
@@ -84,7 +83,7 @@ export class NodeView {
     }
 
     if (this.layout.display !== null) {
-      const { param, x, y, width, height } = this.layout.display;
+      const { x, y, width, height } = this.layout.display;
       this.wave = new SimpleWave(width, height, {
         curve: style.accent,
         grid: hexToNumber(style.colors.gridLine),
@@ -93,7 +92,6 @@ export class NodeView {
       });
       this.wave.view.position.set(x, y);
       this.view.addChild(this.wave.view);
-      this.drawWave(this.valueOf(param.id));
     }
 
     for (const port of [...this.layout.inputs, ...this.layout.outputs]) {
@@ -125,17 +123,14 @@ export class NodeView {
   }
 
   /**
-   * Shows the wave the display's parameter currently selects.
+   * The wave to show on the panel: one cycle, -1..1, as the engine drew it.
    *
-   * The value is an index into the parameter's own labels, so the picture follows whatever the engine
-   * called them; a table with no simple shape leaves the panel empty rather than showing a wrong one.
+   * The node never works this out for itself. The picture comes from the module that makes the sound,
+   * through `module.preview`, and is handed in here by whoever asked for it; a node with no panel
+   * ignores it.
    */
-  private drawWave(value: number): void {
-    const display = this.layout.display;
-    if (this.wave === null || display === null) return;
-    const label = display.param.enumLabels?.[Math.round(value)];
-    const samples = label === undefined ? null : waveShapeForLabel(label);
-    this.wave.setSamples(samples ?? []);
+  setWave(samples: ArrayLike<number>): void {
+    this.wave?.setSamples(samples);
   }
 
   private valueOf(paramId: string): number {
@@ -188,10 +183,6 @@ export class NodeView {
       if (param === undefined) continue;
       const value = module.params?.[id] ?? param.default;
       knob.update(paramFraction(param, value));
-    }
-    if (this.layout.display !== null) {
-      const id = this.layout.display.param.id;
-      this.drawWave(module.params?.[id] ?? this.layout.display.param.default);
     }
     for (const [id, socket] of this.ports) {
       const connected = connectedPorts.has(id);

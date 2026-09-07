@@ -80,14 +80,13 @@ export interface ControlLayout {
 }
 
 /**
- * A wave picture on the face, and the parameter that chooses which wave.
+ * A wave picture on the face, for a module that can draw itself (`flags.previewsWave`).
  *
  * It takes one of the face's control slots rather than being added beside them, so a module that gains
  * a display does not get wider; it shows one fewer knob. A node's width is how a patch stays legible,
  * and a picture earns its place against a knob rather than for free.
  */
 export interface DisplayLayout {
-  param: ParamDesc;
   /** Top-left of the panel. */
   x: number;
   y: number;
@@ -129,21 +128,6 @@ export function faceParams(
   return chosen.slice(0, max);
 }
 
-/**
- * The parameter that chooses a waveform, if the module has one.
- *
- * The engine says so, with the `waveSelect` widget. The alternative is for the editor to read the enum
- * labels and decide for itself what looks like a waveform, which puts an oscilloscope on the first
- * unrelated parameter that happens to offer a "Square".
- */
-export function waveParam(descriptor: ModuleDescriptor): ParamDesc | null {
-  return (
-    descriptor.params.find(
-      (p) => p.uiWidget === "waveSelect" && !p.flags.hidden,
-    ) ?? null
-  );
-}
-
 /** The panel's own size inside its 2x2 slot: shorter than a knob, leaving the label row clear. */
 export const DISPLAY_WIDTH = KNOB_CELL_WIDTH - 6;
 export const DISPLAY_HEIGHT = 32;
@@ -162,19 +146,19 @@ export function measureNode(
 ): NodeLayout {
   const inputs = descriptor.inputs.filter((p) => !p.implicit);
   const outputs = descriptor.outputs;
-  const wave = waveParam(descriptor);
+  const wave = descriptor.flags.previewsWave;
   const slots = options.maxControls ?? MAX_FACE_CONTROLS;
-  const controls = faceParams(descriptor, wave === null ? slots : slots - 1);
+  const controls = faceParams(descriptor, wave ? slots - 1 : slots);
 
   // Rows: the header, then whichever column needs more. A module with six ports and one knob is six
   // rows of ports tall; one with two ports and four knobs is a knob tall.
   const portRows = Math.max(inputs.length, outputs.length) * PORT_ROWS_PER_PORT;
-  const controlRows = controls.length > 0 || wave !== null ? KNOB_ROWS : 0;
+  const controlRows = controls.length > 0 || wave ? KNOB_ROWS : 0;
   const bodyRows = Math.max(portRows, controlRows, 1);
   const rows = HEADER_ROWS + bodyRows;
 
   // Columns: the face slots, plus a cell of margin either side so a knob never touches a port.
-  const faceSlots = controls.length + (wave === null ? 0 : 1);
+  const faceSlots = controls.length + (wave ? 1 : 0);
   const controlCols = faceSlots * KNOB_COLS;
   const cols = Math.max(MIN_COLS, controlCols + 2);
 
@@ -202,22 +186,20 @@ export function measureNode(
     height,
     inputs: place(inputs, "input"),
     outputs: place(outputs, "output"),
-    display:
-      wave === null
-        ? null
-        : {
-            param: wave,
-            x: controlsLeft + (KNOB_CELL_WIDTH - DISPLAY_WIDTH) / 2,
-            // Centred on the same line as the knob faces beside it, so the row reads as one row.
-            y: controlsTop + CELL * 0.5 + 2 - DISPLAY_HEIGHT / 2,
-            width: DISPLAY_WIDTH,
-            height: DISPLAY_HEIGHT,
-          },
+    display: !wave
+      ? null
+      : {
+          x: controlsLeft + (KNOB_CELL_WIDTH - DISPLAY_WIDTH) / 2,
+          // Centred on the same line as the knob faces beside it, so the row reads as one row.
+          y: controlsTop + CELL * 0.5 + 2 - DISPLAY_HEIGHT / 2,
+          width: DISPLAY_WIDTH,
+          height: DISPLAY_HEIGHT,
+        },
     controls: controls.map((param, i) => ({
       param,
       modulationPort: param.flags.modulatable ? `param:${param.id}` : null,
       // Shifted one slot right when a display holds the first one.
-      x: controlsLeft + (i + (wave === null ? 0 : 1) + 0.5) * KNOB_CELL_WIDTH,
+      x: controlsLeft + (i + (wave ? 1 : 0) + 0.5) * KNOB_CELL_WIDTH,
       // In the upper of its two cells, leaving the lower one for the label.
       y: controlsTop + CELL * 0.5 + 2,
       radius: KNOB_RADIUS,

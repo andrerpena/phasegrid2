@@ -5,13 +5,13 @@ import { Container } from "pixi.js";
 import { useCallback } from "react";
 import { PixiStage } from "../stories/PixiStage";
 import { SimpleWave } from "./SimpleWave";
-import { pulseWave, type WaveShape, waveShape } from "./wave-shapes";
 
 /**
  * The wave panel a module wears next to its knobs.
  *
- * Four oscillators sitting side by side on a patch are the same box with the same two knobs, and the
- * title is what people stop reading first. The picture is what tells them apart.
+ * In the application the curve comes from the engine (`module.preview`): the module that makes the
+ * sound draws it. The panel itself knows nothing about waveforms, which is why it can be shown here
+ * with a few cycles made up on the spot.
  */
 const meta: Meta = {
   title: "Grid/SimpleWave",
@@ -19,8 +19,20 @@ const meta: Meta = {
 };
 export default meta;
 
+const N = 512;
+const cycle = (f: (phase: number) => number) =>
+  Float32Array.from({ length: N }, (_, i) => f(i / N));
+const SHAPES = {
+  sine: cycle((p) => Math.sin(2 * Math.PI * p)),
+  saw: cycle((p) => 2 * p - 1),
+  square: cycle((p) => (p < 0.5 ? 1 : -1)),
+  /** A saw synced fifteen semitones up: the shape `osc.sawtooth` draws at that setting. */
+  synced: cycle((p) => 2 * ((p * 2 ** (15 / 12)) % 1) - 1),
+} as const;
+type Shape = keyof typeof SHAPES;
+
 interface Args {
-  shape: WaveShape;
+  shape: Shape;
   width: number;
   height: number;
 }
@@ -40,7 +52,7 @@ const WaveStage = ({ shape, width, height }: Args) => {
   const build = useCallback(() => {
     const view = new Container();
     const wave = new SimpleWave(width, height, style);
-    wave.setSamples(waveShape(shape));
+    wave.setSamples(SHAPES[shape]);
     wave.view.position.set((260 - width) / 2, (160 - height) / 2);
     view.addChild(wave.view);
     return { view, destroy: () => wave.destroy() };
@@ -49,12 +61,9 @@ const WaveStage = ({ shape, width, height }: Args) => {
 };
 
 export const Default: StoryObj<Args> = {
-  args: { shape: "sine", width: 96, height: 56 },
+  args: { shape: "synced", width: 96, height: 56 },
   argTypes: {
-    shape: {
-      control: { type: "select" },
-      options: ["sine", "triangle", "square", "saw", "pulse"],
-    },
+    shape: { control: { type: "select" }, options: Object.keys(SHAPES) },
     width: { control: { type: "range", min: 32, max: 220, step: 4 } },
     height: { control: { type: "range", min: 24, max: 140, step: 4 } },
   },
@@ -62,21 +71,19 @@ export const Default: StoryObj<Args> = {
 };
 
 /**
- * The four basic shapes together, at the size a module face actually gives them: two grid cells by two.
- * This is the story to look at when judging whether the drawing survives being small, which is the only
- * size that matters in a patch.
+ * At the size a module face actually gives the panel. This is the story to look at when judging
+ * whether the drawing survives being small, which is the only size that matters in a patch.
  */
-export const BasicShapes: StoryObj = {
+export const OnAFace: StoryObj = {
   render: () => {
     const Row = () => {
       const style = useStyle();
       const build = useCallback(() => {
         const view = new Container();
-        const shapes: WaveShape[] = ["sine", "triangle", "square", "saw"];
-        for (const [i, shape] of shapes.entries()) {
-          const wave = new SimpleWave(48, 48, style);
-          wave.setSamples(waveShape(shape));
-          wave.view.position.set(16 + i * 64, 56);
+        for (const [i, shape] of (Object.keys(SHAPES) as Shape[]).entries()) {
+          const wave = new SimpleWave(42, 32, style);
+          wave.setSamples(SHAPES[shape]);
+          wave.view.position.set(24 + i * 60, 64);
           view.addChild(wave.view);
         }
         return { view };
@@ -84,56 +91,5 @@ export const BasicShapes: StoryObj = {
       return <PixiStage build={build} width={280} height={160} />;
     };
     return <Row />;
-  },
-};
-
-/**
- * Pulse widths from narrow to square. A width the panel cannot resolve should still read as a pulse
- * rather than as a flat line, which is what the nearest-sample resampling is there to guarantee.
- */
-export const PulseWidths: StoryObj = {
-  render: () => {
-    const Row = () => {
-      const style = useStyle();
-      const build = useCallback(() => {
-        const view = new Container();
-        for (const [i, width] of [0.05, 0.15, 0.25, 0.5].entries()) {
-          const wave = new SimpleWave(48, 48, style);
-          wave.setSamples(pulseWave(width));
-          wave.view.position.set(16 + i * 64, 56);
-          view.addChild(wave.view);
-        }
-        return { view };
-      }, [style]);
-      return <PixiStage build={build} width={280} height={160} />;
-    };
-    return <Row />;
-  },
-};
-
-/**
- * A wave pushed past full scale, as a wavefolder does. It is clamped to the panel rather than rescaled
- * to fit: rescaling would draw a folded wave as though nothing had been done to it.
- */
-export const OverDriven: StoryObj = {
-  render: () => {
-    const Panel = () => {
-      const style = useStyle();
-      const build = useCallback(() => {
-        const view = new Container();
-        const wave = new SimpleWave(160, 80, style);
-        wave.setSamples(
-          Array.from(
-            { length: 512 },
-            (_, i) => Math.sin((2 * Math.PI * i) / 512) * 2.2,
-          ),
-        );
-        wave.view.position.set(50, 40);
-        view.addChild(wave.view);
-        return { view, destroy: () => wave.destroy() };
-      }, [style]);
-      return <PixiStage build={build} width={260} height={160} />;
-    };
-    return <Panel />;
   },
 };

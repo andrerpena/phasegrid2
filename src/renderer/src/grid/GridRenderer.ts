@@ -298,6 +298,18 @@ export class GridRenderer {
     return this.nodes;
   }
 
+  /** The modules drawn right now that have a wave panel to fill. */
+  previewing(): string[] {
+    return [...this.nodes]
+      .filter(([, node]) => node.descriptor.flags.previewsWave)
+      .map(([id]) => id);
+  }
+
+  /** Puts a cycle the engine drew onto a module's panel. Ignored for a module not drawn. */
+  setPreview(moduleId: string, samples: ArrayLike<number>): void {
+    this.nodes.get(moduleId)?.setWave(samples);
+  }
+
   destroy(): void {
     for (const node of this.nodes.values()) node.destroy();
     for (const cable of this.cables.values()) cable.destroy();

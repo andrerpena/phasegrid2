@@ -75,9 +75,14 @@ describe("catalog schema", () => {
     expect(table?.flags.structural).toBe(true);
     expect(table?.flags.modulatable).toBe(false);
     expect(table?.enumLabels?.length).toBeGreaterThan(1);
-    // A select whose entries are waveforms: still a dropdown to edit, but the module is also telling
-    // the editor it may draw the chosen wave on the node's face.
-    expect(table?.uiWidget).toBe("waveSelect");
+    expect(table?.uiWidget).toBe("select");
+  });
+
+  it("says which modules can draw themselves", () => {
+    const catalog = CatalogSchema.parse(golden);
+    expect(findModule(catalog, "osc.sawtooth")?.flags.previewsWave).toBe(true);
+    expect(findModule(catalog, "osc.wavetable")?.flags.previewsWave).toBe(true);
+    expect(findModule(catalog, "amp.vca")?.flags.previewsWave).toBe(false);
   });
 
   it("carries only names the UI can show", () => {

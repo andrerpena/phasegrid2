@@ -13,6 +13,7 @@ import { useEffect, useRef } from "react";
 import { GridInteraction } from "./GridInteraction";
 import { GridRenderer } from "./GridRenderer";
 import styles from "./GridView.module.css";
+import { startPreviewSync } from "./preview-sync";
 
 /**
  * React's entire involvement with the canvas: create it, hand it to the renderer, destroy it.
@@ -62,15 +63,25 @@ export const GridView = () => {
       renderer = view;
       view.sync(usePatchStore.getState().doc);
 
+      // The wave panels: filled by the engine, asked for whenever they may have gone stale.
+      const preview = startPreviewSync({
+        previewing: () => view.previewing(),
+        setPreview: (id, samples) => view.setPreview(id, samples),
+      });
+      stop.push(preview.stop);
+      preview.refreshAll();
+
       stop.push(usePatchStore.subscribe((state) => view.sync(state.doc)));
       stop.push(useThemeStore.subscribe((state) => view.setTheme(state.theme)));
       // The catalogue arrives after the engine handshake, which is after this runs. Without this the
       // renderer keeps the empty map it was built with and silently draws nothing: every module in the
-      // patch looks like a type it has never heard of.
+      // patch looks like a type it has never heard of. The panels are asked for again for the same
+      // reason: until the catalogue is here there are no nodes to put a picture on.
       stop.push(
         useCatalogStore.subscribe((state) => {
           view.setCatalog(state.byId);
           view.sync(usePatchStore.getState().doc);
+          preview.refreshAll();
         }),
       );
 
@@ -106,6 +117,7 @@ export const GridView = () => {
             // gesture, and undo returns to where the knob was before it started, not to the last frame.
             if (!done) {
               sendTransientParam(module, param, value);
+              preview.refresh(module);
               return;
             }
             usePatchStore

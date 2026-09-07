@@ -32,6 +32,9 @@ shapes; this is the map, not the territory.
 
 - **Session:** `hello`, `engine.ping`, `engine.shutdown`.
 - **Catalog:** `catalog.get`, which returns every module descriptor including each port's signal role.
+- **Pictures:** `module.preview`, one cycle of a module's waveform at its current values, for the module's
+  face to draw. Only modules whose descriptor has `previewsWave` answer; the rest return `E_UNSUPPORTED`.
+  The picture is computed by the module from the same parameters the sound is, on the message thread.
 - **Patch:** `patch.load`, `patch.clear`, `patch.batch`, `module.add`, `module.remove`, `edge.add`,
   `edge.remove`, `param.set`, `patch.setVoiceCount`, `patch.setFeedbackMode`.
 - **Transport:** `transport.play`, `transport.stop`, `transport.setTempo`, `transport.seek`,

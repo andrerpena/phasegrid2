@@ -118,6 +118,18 @@ export const COMMANDS = {
     result: z.object({ slots: z.record(z.number().int().nonnegative()) }),
   },
   "telemetry.unsubscribe": { args: NoArgs, result: z.object({}) },
+  /**
+   * One cycle of a module's waveform at its current parameter values, for its face to draw. Only for
+   * modules whose catalogue entry has `previewsWave`; anything else answers `E_UNSUPPORTED`. Read on
+   * the message thread from the model and the instance, so asking never touches the audio.
+   */
+  "module.preview": {
+    args: z.object({
+      module: z.string().min(1),
+      count: z.number().int().min(16).max(2048).optional(),
+    }),
+    result: z.object({ samples: z.array(z.number()) }),
+  },
 
   "patch.load": {
     args: z.object({ patch: PatchDocSchema }),

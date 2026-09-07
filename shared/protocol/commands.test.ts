@@ -46,6 +46,10 @@ const cases: Record<CommandName, { valid: unknown; invalid: unknown }> = {
     invalid: { modules: [1, 2] },
   },
   "telemetry.unsubscribe": { valid: {}, invalid: "all" },
+  "module.preview": {
+    valid: { module: "osc1", count: 128 },
+    invalid: { module: "osc1", count: 4 },
+  },
   "patch.load": {
     valid: { patch: { schemaVersion: 1, modules: [], edges: [] } },
     invalid: { patch: { schemaVersion: 1, modules: {}, edges: [] } },
@@ -104,6 +108,7 @@ describe("command table", () => {
       "catalog.get",
       "telemetry.subscribe",
       "telemetry.unsubscribe",
+      "module.preview",
       "patch.load",
       "patch.clear",
       "patch.batch",

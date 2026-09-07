@@ -42,22 +42,7 @@ export const ParamUnitSchema = z.enum([
 
 export const ParamCurveSchema = z.enum(["linear", "log", "exp"]);
 
-/**
- * How a parameter wants to be edited.
- *
- * `waveSelect` is a `select` that happens to choose a waveform, and is the module telling the editor it
- * may draw the chosen wave on the node's face. Whether a list of names is a list of waveforms is the
- * module's knowledge, not the editor's: an editor left to guess would have to match label text, and
- * would then put an oscilloscope on any unrelated parameter that offered a "Square". Anywhere a control
- * is only being edited rather than pictured, `waveSelect` is a `select`.
- */
-export const UiWidgetSchema = z.enum([
-  "slider",
-  "knob",
-  "toggle",
-  "select",
-  "waveSelect",
-]);
+export const UiWidgetSchema = z.enum(["slider", "knob", "toggle", "select"]);
 
 /**
  * One port. `implicit` marks the port the engine adds for a modulatable param (`param:<id>`): the editor
@@ -133,6 +118,12 @@ export const ModuleFlagsSchema = z
     terminal: z.boolean(),
     needsTransport: z.boolean(),
     writesTelemetry: z.boolean(),
+    /**
+     * Can draw one cycle of itself: `module.preview` returns it. The editor gives such a module a wave
+     * panel on its face and asks the engine what to put in it, so the picture is computed from the
+     * same parameters the sound is, by the module that makes the sound.
+     */
+    previewsWave: z.boolean(),
   })
   .strict();
 

@@ -111,6 +111,46 @@ register({
   },
 });
 
+/**
+ * The sawtooth on its own. The one knob is Sync: at 0 st a plain saw; turned up, the wave on its face
+ * changes as the sound does, because both come from the same formula in the module.
+ */
+register({
+  moduleId: "osc.sawtooth",
+  name: "Sawtooth",
+  description:
+    "A sawtooth at middle C. Turn Sync up and watch the wave on its face change as you hear the " +
+    "sync harmonics come in.",
+  patch: {
+    schemaVersion: 1,
+    voiceCount: 1,
+    feedbackMode: "sample",
+    modules: [
+      {
+        id: "osc",
+        type: "osc.sawtooth",
+        x: col(2),
+        y: col(2),
+        params: { sync: 0 },
+      },
+      {
+        id: "out",
+        type: "io.audioOut",
+        x: col(12),
+        y: col(3),
+        params: { gain: 0.4 },
+      },
+    ],
+    edges: [
+      {
+        id: "e1",
+        from: { module: "osc", port: "out" },
+        to: { module: "out", port: "inL" },
+      },
+    ],
+  },
+});
+
 /** An oscillator, used as the sound source in most of these. Middle C unless told otherwise. */
 function source(id = "osc", params: Record<string, number> = {}) {
   return {
