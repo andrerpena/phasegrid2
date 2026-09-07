@@ -49,7 +49,7 @@ void WrappedModule::prepare(const PrepareInfo& info) {
     inputs_.push_back(std::move(b));
   }
 
-  if (spec_.onConfigure) spec_.onConfigure(*module_, configured_);
+  if (spec_.onConfigure) spec_.onConfigure(*module_, ctx_, configured_);
   module_->init();
   if (spec_.postInit) spec_.postInit(*module_);
   module_->setSampleRate(static_cast<int>(info.sampleRate));

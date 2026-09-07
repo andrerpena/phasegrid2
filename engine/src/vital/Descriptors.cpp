@@ -75,7 +75,7 @@ const ModuleDescriptor& buildDescriptor(const ModuleSpec& specIn) {
   std::unique_ptr<vital::SynthModule> probe(b->spec.create(probeCtx));
   if (!probe) throw std::runtime_error(std::string(b->spec.id) + ": create() returned null");
   if (b->spec.configure) b->spec.configure(*probe);
-  if (b->spec.onConfigure) b->spec.onConfigure(*probe, ParamValues{});
+  if (b->spec.onConfigure) b->spec.onConfigure(*probe, probeCtx, ParamValues{});
   probe->init();
   if (b->spec.postInit) b->spec.postInit(*probe);
   const vital::control_map controls = probe->getControls();
@@ -126,8 +126,13 @@ const ModuleDescriptor& buildDescriptor(const ModuleSpec& specIn) {
         p.flags = kParamInteger | kParamNoSmooth;
         const bool suppressed = over && over->suppressLabels;
         if (over && over->labels && over->labelCount > 0) attachLabels(*b, p, over->labels, over->labelCount);
-        else if (d.string_lookup && !suppressed)
-          attachLabels(*b, p, d.string_lookup, static_cast<uint32_t>(d.max - d.min) + 1);
+        else if (d.string_lookup && !suppressed) {
+          // The vendored lookup is indexed by the control's raw value, not by its offset from `min`, so a
+          // control whose range starts above zero (the delay's `tempo` is 4..12) has to skip that many names.
+          // Reading from index 0 there labels every step with the name of a different one.
+          const int first = d.min > 0.f ? static_cast<int>(d.min) : 0;
+          attachLabels(*b, p, d.string_lookup + first, static_cast<uint32_t>(d.max - d.min) + 1);
+        }
       } else if (probe->getPolyModulationDestination(full) != nullptr ||
                  probe->getMonoModulationDestination(full) != nullptr) {
         p.flags = kParamModulatable;

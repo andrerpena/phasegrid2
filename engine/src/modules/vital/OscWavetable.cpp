@@ -55,7 +55,7 @@ const ModuleDescriptor& oscWavetable() {
                 tableNames().data(), static_cast<uint32_t>(tableNames().size()), "select", nullptr,
                 "Built-in wavetable this oscillator plays"},
     };
-    spec.onConfigure = [](vital::SynthModule& m, const ParamValues& values) {
+    spec.onConfigure = [](vital::SynthModule& m, vendor::ModuleContext&, const ParamValues& values) {
       auto it = values.find("table");
       const uint32_t index = it == values.end() ? 0u : static_cast<uint32_t>(it->second);
       vendor::WavetableBank::renderBuiltin(index, *static_cast<vital::OscillatorModule&>(m).getWavetable());

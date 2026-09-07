@@ -3,6 +3,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 #include "core/Descriptor.hpp"
@@ -73,7 +74,12 @@ template <class Vendored>
 class Sorted final : public Vendored {
 public:
   using Vendored::Vendored;
-  vital::Processor* clone() const override { return new Sorted(*this); }
+  /// Some vendored modules hold `Output`s by value (the chorus keeps one per delay pair), which deletes their
+  /// copy constructor; those declare `clone()` as an assertion. Match that instead of failing to compile.
+  vital::Processor* clone() const override {
+    if constexpr (std::is_copy_constructible_v<Vendored>) return new Sorted(*this);
+    else return nullptr;
+  }
   void init() override {
     Vendored::init();
     ++(*this->global_changes_);
@@ -141,7 +147,9 @@ struct ModuleSpec {
   std::string prefix;                                                    // "filter_1"; "" for fixed-id modules
   std::function<vital::SynthModule*(ModuleContext&)> create;             // construct (not init)
   std::function<void(vital::SynthModule&)> configure;                    // optional, before init(): setMono, ...
-  std::function<void(vital::SynthModule&, const ParamValues&)> onConfigure;   // optional, before init(): structural params
+  /// Optional, before init(): applies structural params. Takes the context too, because a structural choice may
+  /// belong to something the context owns rather than to the module (the LFO's shape lives in its line source).
+  std::function<void(vital::SynthModule&, ModuleContext&, const ParamValues&)> onConfigure;
   std::function<void(vital::SynthModule&)> postInit;                     // optional, after init()
   std::vector<InputMap> inputs;
   std::vector<OutputMap> outputs;
