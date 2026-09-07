@@ -38,8 +38,14 @@ That has one consequence every module has to honour:
   meaningful. Per-*voice* state is indexed by the pair instead: `VoicedModule<State>` sizes its vector to
   `voicePairs` and `st(ctx)` picks `ctx.voice`.
 
-Parallelising pairs later would break both halves of this -- the ordering and the shared buffers -- so it
-would have to revisit this contract, not just the loop.
+A **terminal module masks its own contribution**: `io.audioOut` (and the test suite's `test.sink`) applies
+`ctx.voiceMask` as it adds into the bus. That is the last point at which the pair the lanes belong to is
+known -- by the time `Engine::renderBlock` folds the bus, every pair has added into it and no single mask
+describes the sum, so the fold applies none. Masking there with pair 0's mask let the empty lane of an odd
+count's last pair through as a phantom voice.
+
+Parallelising pairs later would break both halves of the per-block rule -- the ordering and the shared
+buffers -- so it would have to revisit this contract, not just the loop.
 
 ## Vendored Vital DSP
 

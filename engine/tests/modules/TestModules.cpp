@@ -67,7 +67,8 @@ class Sink : public VoicedModule<int> {
   void process(ProcessContext& c) override {
     if (!c.outputBus) return;
     const Sample* in = c.in(0).readOr();
-    for (uint32_t i = 0; i < c.numFrames; ++i) c.outputBus->data[i] += in[i];
+    // A terminal masks its own contribution: the fold in Engine::renderBlock sees every pair at once.
+    for (uint32_t i = 0; i < c.numFrames; ++i) c.outputBus->data[i] += in[i] & c.voiceMask;
   }
 };
 const ModuleDescriptor kSink{kModuleAbiVersion, "test.sink", "Sink", "test", "", kSinkIn, 1, nullptr, 0, nullptr, 0, kModuleTerminal, 0, [] () -> Module* { return new Sink(); }};

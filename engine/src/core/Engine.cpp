@@ -92,11 +92,12 @@ void Engine::renderBlock(float* const* out, uint32_t channels, uint32_t numFrame
   for (uint32_t i = 0; i < numFrames; ++i) bus_.data[i] = Sample(0.f);
   AudioBus bus{bus_.data.data(), numFrames};
   scheduler_.run(*current_, numFrames, t, &bus);
-  // Fold voice pairs: L = v0.L + v1.L, R = v0.R + v1.R, masked by the active voices (M1: one pair).
-  const Mask mask = current_->activeVoiceMask.empty() ? Mask(-1) : current_->activeVoiceMask[0];
+  // Fold voice pairs: L = v0.L + v1.L, R = v0.R + v1.R. No mask here: the bus already holds the sum of
+  // every pair, so there is no one mask that fits it. Terminal modules apply `ctx.voiceMask` as they add,
+  // which is the only point at which the pair the lanes belong to is still known.
   for (uint32_t i = 0; i < numFrames; ++i) {
-    const Sample masked = bus_.data[i] & mask;
-    const Sample folded = masked + vital::utils::swapVoices(masked);   // lanes 0,1 now hold L,R sums
+    const Sample& summed = bus_.data[i];
+    const Sample folded = summed + vital::utils::swapVoices(summed);   // lanes 0,1 now hold L,R sums
     if (channels > 0) out[0][i] = folded[0];
     if (channels > 1) out[1][i] = folded[1];
     for (uint32_t c = 2; c < channels; ++c) out[c][i] = folded[1];

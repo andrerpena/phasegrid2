@@ -23,7 +23,10 @@ class AudioOut final : public VoicedModule<int> {
       Sample right;
       if (r.empty()) right = vital::utils::swapStereo(left);                      // mirror L into R lanes
       else right = r.data[i] & rightMask;
-      c.outputBus->data[i] += (left + right) * g.at(i);
+      // Mask HERE, not at the fold: the bus has every voice pair's contribution in it by the time
+      // Engine::renderBlock folds it, and no single mask describes that sum. This is the one place
+      // the pair whose lanes these are is still known.
+      c.outputBus->data[i] += ((left + right) * g.at(i)) & c.voiceMask;
     }
   }
 };

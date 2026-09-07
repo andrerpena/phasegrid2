@@ -107,30 +107,46 @@ TEST_CASE("left and right stay distinct through renderInterleaved", "[render]") 
 // more than once per block. Voice allocation does not exist yet (it arrives with note.toPoly), so every
 // voice carries the same signal and the output scales with the voice count -- which is exactly what a
 // pair silently dropped, or a pair counted twice, would break.
-TEST_CASE("a four-voice program renders every voice", "[render]") {
-  auto render = [](uint32_t voices) {
-    pg::Registry reg;
-    pg::registerBuiltinModules(reg);
-    pg::test::registerTestModules(reg);
-    pg::Engine engine{reg, pg::EngineConfig{48000.0, 64}};
-    REQUIRE(engine.model().setVoiceCount(voices));
-    REQUIRE(engine.model().addNode(reg, {"s", "test.stereo", {{"l", 0.25f}, {"r", -0.5f}}}));
-    REQUIRE(engine.model().addNode(reg, {"out", "io.audioOut", {{"gain", 1.f}}}));
-    REQUIRE(engine.model().addEdge(reg, {"eL", "s", "out", "out", "inL"}));
-    REQUIRE(engine.model().addEdge(reg, {"eR", "s", "out", "out", "inR"}));
-    REQUIRE(engine.commit());
-    std::vector<float> l(64, 99.f), r(64, 99.f); float* planar[2] = {l.data(), r.data()};
-    engine.renderBlock(planar, 2, 64, pg::TransportSnapshot{});
-    return std::pair{l, r};
-  };
+// One asymmetric constant into io.audioOut at `voices` voices. Every voice carries the same signal
+// (voice allocation arrives with note.toPoly), so the output is exactly `voices` copies of it.
+static std::pair<std::vector<float>, std::vector<float>> renderVoices(uint32_t voices) {
+  pg::Registry reg;
+  pg::registerBuiltinModules(reg);
+  pg::test::registerTestModules(reg);
+  pg::Engine engine{reg, pg::EngineConfig{48000.0, 64}};
+  REQUIRE(engine.model().setVoiceCount(voices));
+  REQUIRE(engine.model().addNode(reg, {"s", "test.stereo", {{"l", 0.25f}, {"r", -0.5f}}}));
+  REQUIRE(engine.model().addNode(reg, {"out", "io.audioOut", {{"gain", 1.f}}}));
+  REQUIRE(engine.model().addEdge(reg, {"eL", "s", "out", "out", "inL"}));
+  REQUIRE(engine.model().addEdge(reg, {"eR", "s", "out", "out", "inR"}));
+  REQUIRE(engine.commit());
+  std::vector<float> l(64, 99.f), r(64, 99.f); float* planar[2] = {l.data(), r.data()};
+  engine.renderBlock(planar, 2, 64, pg::TransportSnapshot{});
+  return {l, r};
+}
 
-  const auto [l2, r2] = render(2);
-  const auto [l4, r4] = render(4);
+TEST_CASE("a four-voice program renders every voice", "[render]") {
+  const auto [l2, r2] = renderVoices(2);
+  const auto [l4, r4] = renderVoices(4);
   for (uint32_t i = 0; i < 64; ++i) {
     REQUIRE(l2[i] == Catch::Approx(2 * 0.25f));    // one pair: two voices
     REQUIRE(r2[i] == Catch::Approx(2 * -0.5f));
     REQUIRE(l4[i] == Catch::Approx(4 * 0.25f));    // two pairs: four voices, none lost
     REQUIRE(r4[i] == Catch::Approx(4 * -0.5f));
+  }
+}
+
+// An odd voice count leaves the top pair holding one real voice and one empty lane. Masking that lane is
+// the terminal's job, because by the time renderBlock folds the bus every pair has already added into it
+// and there is no single mask that describes the sum -- masking the fold with pair 0's mask lets the empty
+// lane of the last pair through as a phantom voice.
+TEST_CASE("an odd voice count produces no phantom voice", "[render]") {
+  for (uint32_t voices : {1u, 3u, 5u, 7u}) {
+    const auto [l, r] = renderVoices(voices);
+    for (uint32_t i = 0; i < 64; ++i) {
+      REQUIRE(l[i] == Catch::Approx(static_cast<float>(voices) * 0.25f));
+      REQUIRE(r[i] == Catch::Approx(static_cast<float>(voices) * -0.5f));
+    }
   }
 }
 
