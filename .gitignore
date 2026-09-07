@@ -12,3 +12,4 @@ build-*/
 *.wav
 !engine/tests/golden/*.wav
 .cache/
+compile_commands.json
