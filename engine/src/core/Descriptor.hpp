@@ -23,6 +23,18 @@ inline constexpr uint32_t kParamNoSmooth    = 1u << 4;
 /// Changing this param cannot be done on a live instance: `InstanceTable::acquire` builds a new one.
 /// Implies kParamNoSmooth in spirit and may never be kParamModulatable (Registry::add rejects that).
 inline constexpr uint32_t kParamStructural  = 1u << 5;
+/**
+ * A control that belongs on the module's face.
+ *
+ * A patching interface draws a module the size of a business card and a wavetable oscillator has
+ * twenty-odd parameters, so it can only show a few. Which few is the module's own knowledge, not the
+ * interface's: the interface has no way to tell that a filter's cutoff matters more than its formant
+ * spread. So each module says, and an interface that shows none of them is free to ignore it.
+ *
+ * Ordinary parameters are not lesser; they are simply reached through the inspector rather than by
+ * being always on screen.
+ */
+inline constexpr uint32_t kParamPrimary    = 1u << 6;
 
 inline constexpr uint32_t kModuleTerminal        = 1u << 0;
 inline constexpr uint32_t kModuleNeedsTransport  = 1u << 1;

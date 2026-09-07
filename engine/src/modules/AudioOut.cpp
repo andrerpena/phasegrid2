@@ -8,7 +8,7 @@ const PortDesc kIn[] = {
   {"inR", "In R", PortKind::Continuous, 1, SignalRole::Audio, "Right channel (R lanes)"},
 };
 const ParamDesc kParams[] = {
-  {"gain", "Gain", 0.f, 2.f, 1.f, ParamUnit::Ratio, ParamCurve::Linear, kParamModulatable, nullptr, 0, "slider", nullptr, "Output gain"},
+  {"gain", "Gain", 0.f, 2.f, 1.f, ParamUnit::Ratio, ParamCurve::Linear, kParamPrimary | kParamModulatable, nullptr, 0, "slider", nullptr, "Output gain"},
 };
 
 class AudioOut final : public VoicedModule<int> {

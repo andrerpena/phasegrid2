@@ -16,6 +16,7 @@ const ModuleDescriptor& envDahdsr() {
     spec.doc = "Delay/attack/hold/decay/sustain/release envelope. The gate holds it at the sustain level; "
                "a falling edge starts the release. Times are in seconds after the stage curve is applied.";
     spec.prefix = "env_1";
+  spec.face = {"attack", "decay", "sustain", "release"};
     // The second argument forces audio rate: without it the envelope would follow whatever rate its parent
     // router runs at, and there is no parent router here.
     spec.create = [](vendor::ModuleContext&) { return vendor::makeModule<vital::EnvelopeModule>(std::string("env_1"), true); };

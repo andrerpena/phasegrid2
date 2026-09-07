@@ -10,9 +10,9 @@ const PortDesc kOut[] = {
   {"out", "Out", PortKind::Continuous, 1, SignalRole::Any, "in * Scale + Offset"},
 };
 const ParamDesc kParams[] = {
-  {"scale", "Scale", -4.f, 4.f, 1.f, ParamUnit::Ratio, ParamCurve::Linear, kParamModulatable, nullptr, 0,
+  {"scale", "Scale", -4.f, 4.f, 1.f, ParamUnit::Ratio, ParamCurve::Linear, kParamPrimary | kParamModulatable, nullptr, 0,
    "slider", nullptr, "What the input is multiplied by. Negative values invert it"},
-  {"offset", "Offset", -1.f, 1.f, 0.f, ParamUnit::None, ParamCurve::Linear, kParamModulatable, nullptr, 0,
+  {"offset", "Offset", -1.f, 1.f, 0.f, ParamUnit::None, ParamCurve::Linear, kParamPrimary | kParamModulatable, nullptr, 0,
    "slider", nullptr, "Added after the scale"},
 };
 

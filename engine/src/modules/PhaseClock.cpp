@@ -21,7 +21,7 @@ const ParamDesc kParams[] = {
   {"division", "Division", 0.f, static_cast<float>(std::size(kDivisionLabels) - 1), 2.f, ParamUnit::None,
    ParamCurve::Linear, kParamEnum | kParamInteger | kParamNoSmooth, kDivisionLabels, countOf(kDivisionLabels),
    "select", nullptr, "How long one cycle lasts, in musical time"},
-  {"swing", "Swing", 0.f, 0.5f, 0.f, ParamUnit::Ratio, ParamCurve::Linear, kParamModulatable, nullptr, 0,
+  {"swing", "Swing", 0.f, 0.5f, 0.f, ParamUnit::Ratio, ParamCurve::Linear, kParamPrimary | kParamModulatable, nullptr, 0,
    "slider", nullptr, "Delays the start of every second cycle by this fraction of a cycle"},
 };
 

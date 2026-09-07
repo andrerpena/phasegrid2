@@ -19,6 +19,7 @@ const ModuleDescriptor& modRandom() {
     spec.doc = "Random modulator: perlin, sample & hold, sine interpolation or a Lorenz attractor. Output is "
                "0..1. Frequency is a power of two in hertz (2 = 4 Hz) while Sync is Seconds.";
     spec.prefix = "random_1";
+  spec.face = {"frequency", "keytrack_tune"};
     spec.create = [](vendor::ModuleContext& ctx) {
       return vendor::makeModule<vital::RandomLfoModule>(std::string("random_1"), ctx.beatsPerSecond());
     };

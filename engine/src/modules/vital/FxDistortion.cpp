@@ -12,6 +12,7 @@ const ModuleDescriptor& fxDistortion() {
       "before it, after it, or not at all. Drive is in decibels, Filter Cutoff a MIDI note number.",
       "distortion", "Dry/wet distorted output");
     spec.create = [](vendor::ModuleContext&) { return vendor::makeModule<vital::DistortionModule>(); };
+    spec.face = {"mix", "drive", "filter_cutoff", "filter_resonance"};
     return vendor::buildDescriptor(spec);
   }();
   return desc;

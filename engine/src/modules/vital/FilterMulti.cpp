@@ -29,6 +29,7 @@ const ModuleDescriptor& filterMulti() {
     };
     spec.outputs = {{"out", "Out", 0, SignalRole::Audio, "Filtered audio"}};
     spec.hidden = {"on"};
+  spec.face = {"cutoff", "resonance", "drive", "mix"};
     spec.overrides = {
       // `style` means something different in every model (12dB/24dB for the analog and digital models, a
       // shelf choice for the diode model, a comb topology for the comb model, ...) and the vendored name

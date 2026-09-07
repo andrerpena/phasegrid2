@@ -35,6 +35,7 @@ const ModuleDescriptor& modLfo() {
                "power of two in hertz (2 = 4 Hz) while Sync is Seconds; the other Sync modes divide the "
                "transport tempo or track the pitch input.";
     spec.prefix = "lfo_1";
+  spec.face = {"frequency", "phase", "fade_time", "delay_time"};
     spec.create = [](vendor::ModuleContext& ctx) {
       return vendor::makeModule<vital::LfoModule>(std::string("lfo_1"), &ctx.lineGenerator(), ctx.beatsPerSecond());
     };

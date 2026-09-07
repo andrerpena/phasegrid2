@@ -49,6 +49,7 @@ const ModuleDescriptor& oscWavetable() {
     // also has to go: its range is 0..2 while its name table holds two entries, so exposing it would generate
     // a label off the end of that table.
     spec.hidden = {"on", "view_2d"};
+  spec.face = {"level", "tune", "pan", "phase"};
     spec.extraParams = {
       ParamDesc{"table", "Wavetable", 0.f, static_cast<float>(tableNames().size() - 1), 0.f, ParamUnit::None,
                 ParamCurve::Linear, kParamEnum | kParamInteger | kParamNoSmooth | kParamStructural,

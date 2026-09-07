@@ -16,6 +16,7 @@ const ModuleDescriptor& fxChorus() {
       return vendor::makeModule<vital::ChorusModule>(ctx.beatsPerSecond());
     };
     spec.needsBeatsPerSecond = true;
+    spec.face = {"dry_wet", "frequency", "mod_depth", "feedback"};
     return vendor::buildDescriptor(spec);
   }();
   return desc;

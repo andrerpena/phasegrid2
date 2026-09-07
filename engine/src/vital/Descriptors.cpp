@@ -152,6 +152,11 @@ const ModuleDescriptor& buildDescriptor(const ModuleSpec& specIn) {
       p.flags |= over->addFlags;
       if (over->doc) p.doc = over->doc;
     }
+    // The handful of controls this module wears on its face. Named by the spec rather than guessed at
+    // here, because which controls matter is the module's knowledge and nothing about the vendored
+    // parameter table says so.
+    if (std::find(b->spec.face.begin(), b->spec.face.end(), suffix) != b->spec.face.end())
+      p.flags |= kParamPrimary;
     b->params.push_back(p);
   }
   if (b->params.size() > kMaxParamsPerModule) throw std::runtime_error(std::string(b->spec.id) + ": too many params");

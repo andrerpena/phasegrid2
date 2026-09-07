@@ -13,6 +13,7 @@ const ModuleDescriptor& fxEq() {
       "band: shelf or notch, high: shelf or low-pass). Cutoffs are MIDI note numbers, gains are decibels.",
       "eq", "Equalised audio");
     spec.create = [](vendor::ModuleContext&) { return vendor::makeModule<vital::EqualizerModule>(); };
+    spec.face = {"low_gain", "band_gain", "high_gain", "band_cutoff"};
     return vendor::buildDescriptor(spec);
   }();
   return desc;

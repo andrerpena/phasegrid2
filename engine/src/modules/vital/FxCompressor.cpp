@@ -25,6 +25,7 @@ const ModuleDescriptor& fxCompressor() {
     };
     for (const auto& m : kMeters)
       spec.outputs.push_back({m.id, m.name, m.index, SignalRole::Cv, m.doc, /*firstFrameOnly=*/true});
+    spec.face = {"mix", "attack", "release", "low_gain"};
     return vendor::buildDescriptor(spec);
   }();
   return desc;

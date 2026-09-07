@@ -78,6 +78,9 @@ nlohmann::json paramJson(const ParamDesc& p) {
     {"hidden", (p.flags & kParamHidden) != 0},
     {"noSmooth", (p.flags & kParamNoSmooth) != 0},
     {"structural", (p.flags & kParamStructural) != 0},
+    // Whether the module wants this control on its face. The interface shows these without being
+    // asked; everything else is reached through the inspector.
+    {"primary", (p.flags & kParamPrimary) != 0},
   };
   if (p.enumLabels != nullptr && p.enumCount > 0) {
     std::vector<std::string> labels;

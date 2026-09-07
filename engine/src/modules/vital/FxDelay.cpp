@@ -17,6 +17,7 @@ const ModuleDescriptor& fxDelay() {
       return vendor::makeModule<vital::DelayModule>(ctx.beatsPerSecond());
     };
     spec.needsBeatsPerSecond = true;
+    spec.face = {"dry_wet", "frequency", "feedback", "filter_cutoff"};
     return vendor::buildDescriptor(spec);
   }();
   return desc;

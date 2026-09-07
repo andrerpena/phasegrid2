@@ -157,6 +157,9 @@ struct ModuleSpec {
   std::vector<OutputMap> outputs;
   std::vector<ParamDesc> extraParams;                                    // emitted BEFORE generated params; no vendored control
   std::vector<std::string> hidden;                                       // control suffixes not exposed
+  /// Control suffixes that belong on the module's face: the handful an interface shows without being
+  /// asked. Everything else stays reachable through the inspector. See `kParamPrimary`.
+  std::vector<std::string> face;
   std::vector<ControlOverride> overrides;
   bool processWithInput = false;   // effects: audio via processWithInput(buffer, n); input 0 must be Audio with vendorInput -1
   bool needsBeatsPerSecond = false;

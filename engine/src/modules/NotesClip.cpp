@@ -33,7 +33,8 @@ const ParamDesc kParams[] = {
   {"loop", "Loop", 0.f, 1.f, 1.f, ParamUnit::None, ParamCurve::Linear, kParamInteger | kParamNoSmooth, nullptr, 0,
    "toggle", nullptr, "Repeat from the start at the end of the clip, rather than playing it once"},
   {"transpose", "Transpose", -48.f, 48.f, 0.f, ParamUnit::Semitones, ParamCurve::Linear,
-   kParamInteger | kParamNoSmooth, nullptr, 0, "slider", nullptr, "Semitones added to each note as it starts"},
+   kParamPrimary | kParamInteger | kParamNoSmooth, nullptr, 0, "slider", nullptr,
+   "Semitones added to each note as it starts"},
 };
 
 /// One note of the clip, in beats from the clip's start. Built once, on the message thread.

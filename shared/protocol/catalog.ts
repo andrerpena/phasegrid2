@@ -74,6 +74,14 @@ export const ParamFlagsSchema = z
     noSmooth: z.boolean(),
     /** Cannot be changed on a live node: the engine rebuilds the node instead. Never modulatable. */
     structural: z.boolean(),
+    /**
+     * The module wants this control on its face.
+     *
+     * Which handful of a module's parameters matter is the module's knowledge: nothing about a
+     * parameter table says a filter's cutoff is reached for more often than its formant spread. So the
+     * engine says, and the interface shows these without being asked.
+     */
+    primary: z.boolean(),
   })
   .strict();
 

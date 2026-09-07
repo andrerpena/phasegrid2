@@ -47,6 +47,7 @@ function param(
       hidden: false,
       noSmooth: false,
       structural: false,
+      primary: true,
     },
     ...over,
   };
@@ -186,24 +187,40 @@ describe("grid helpers", () => {
 });
 
 describe("controls on a node's face", () => {
-  it("shows the parameters meant to be moved while the patch runs", () => {
-    // Modulatable means "designed to be driven", which is the same set a hardware module puts on its
-    // panel. Trim parameters and enums belong in the inspector.
+  it("shows the controls the module declared, and nothing else", () => {
+    // The engine says which parameters belong on a face, because it is the only side that knows. The
+    // interface has no way to tell that a cutoff is reached for more often than a formant spread.
+    const plain = param("x").flags;
     const descriptor: ModuleDescriptor = {
       ...vca,
       params: [
         param("cutoff"),
+        param("formant_spread", { flags: { ...plain, primary: false } }),
         param("resonance"),
-        param("model", {
-          flags: { ...param("x").flags, modulatable: false, enum: true },
-        }),
-        param("trim", { flags: { ...param("x").flags, modulatable: false } }),
+        param("model", { flags: { ...plain, primary: false, enum: true } }),
       ],
     };
     expect(faceParams(descriptor).map((p) => p.id)).toEqual([
       "cutoff",
       "resonance",
     ]);
+  });
+
+  it("falls back to a guess for a module that declares no face at all", () => {
+    // Better a plausible face than an empty one. This is what the interface did for every module
+    // before the engine could say, and it is why an oscillator wore its detune controls.
+    const plain = param("x").flags;
+    const descriptor: ModuleDescriptor = {
+      ...vca,
+      params: [
+        param("a", { flags: { ...plain, primary: false } }),
+        param("b", { flags: { ...plain, primary: false } }),
+        param("trim", {
+          flags: { ...plain, primary: false, modulatable: false },
+        }),
+      ],
+    };
+    expect(faceParams(descriptor).map((p) => p.id)).toEqual(["a", "b"]);
   });
 
   it("caps how many it shows, because a face is small and a module may have twenty", () => {

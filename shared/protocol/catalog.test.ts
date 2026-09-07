@@ -119,6 +119,7 @@ describe("catalog schema rejections", () => {
       hidden: false,
       noSmooth: false,
       structural: false,
+      primary: false,
     },
     uiWidget: "slider",
     doc: "",

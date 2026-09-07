@@ -44,6 +44,7 @@ const ModuleDescriptor& samplerPlayer() {
     // A grid module is always on: on the grid you bypass a sampler by unplugging it. The vendored switch
     // still has to be turned on, because it defaults to off and gates the whole `process()`.
     spec.hidden = {"on"};
+  spec.face = {"level", "tune", "pan"};
     spec.postInit = [](vital::SynthModule& m) { m.getControls()["sample_on"]->set(1.0f); };
     spec.overrides = {
       // 0..8191 is a bit field of the twelve pitch classes plus a global/local flag, not a step count, so it

@@ -19,6 +19,7 @@ const ModuleDescriptor& fxFlanger() {
     // block and writes it at buffer[0] only, so it has to be broadcast rather than copied.
     spec.outputs.push_back({"frequency", "Frequency", vital::FlangerModule::kFrequencyOutput, SignalRole::Cv,
                             "The delay rate the sweep landed on this block, in hertz", /*firstFrameOnly=*/true});
+    spec.face = {"dry_wet", "frequency", "mod_depth", "feedback"};
     return vendor::buildDescriptor(spec);
   }();
   return desc;

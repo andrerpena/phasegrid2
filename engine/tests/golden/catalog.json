@@ -1,5 +1,5 @@
 {
-  "catalogHash": "94e870fb57b7d4bb",
+  "catalogHash": "b5160b706fcea45e",
   "conventions": {
     "blockSize": 128,
     "gateThreshold": 0,
@@ -71,6 +71,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "gain",
@@ -94,6 +95,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "curve",
@@ -254,6 +256,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "attack",
@@ -273,6 +276,7 @@
             "integer": false,
             "modulatable": false,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "attack_power",
@@ -292,6 +296,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "decay",
@@ -311,6 +316,7 @@
             "integer": false,
             "modulatable": false,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "decay_power",
@@ -330,6 +336,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "delay",
@@ -349,6 +356,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "hold",
@@ -368,6 +376,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "release",
@@ -387,6 +396,7 @@
             "integer": false,
             "modulatable": false,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "release_power",
@@ -406,6 +416,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "sustain",
@@ -590,6 +601,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "blend",
@@ -609,6 +621,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "blend_transpose",
@@ -628,6 +641,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "cutoff",
@@ -647,6 +661,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "drive",
@@ -666,6 +681,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "formant_resonance",
@@ -685,6 +701,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "formant_spread",
@@ -704,6 +721,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "formant_transpose",
@@ -723,6 +741,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "formant_x",
@@ -742,6 +761,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "formant_y",
@@ -761,6 +781,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "keytrack",
@@ -780,6 +801,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "mix",
@@ -809,6 +831,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "model",
@@ -828,6 +851,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "resonance",
@@ -847,6 +871,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "style",
@@ -971,6 +996,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "cutoff",
@@ -990,6 +1016,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "delay_1",
@@ -1009,6 +1036,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "delay_2",
@@ -1028,6 +1056,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "dry_wet",
@@ -1047,6 +1076,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "feedback",
@@ -1066,6 +1096,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "frequency",
@@ -1085,6 +1116,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "mod_depth",
@@ -1104,6 +1136,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "spread",
@@ -1129,6 +1162,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "sync",
@@ -1161,6 +1195,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "tempo",
@@ -1180,6 +1215,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "voices",
@@ -1334,6 +1370,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "attack",
@@ -1353,6 +1390,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "band_gain",
@@ -1372,6 +1410,7 @@
             "integer": false,
             "modulatable": false,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "band_lower_ratio",
@@ -1391,6 +1430,7 @@
             "integer": false,
             "modulatable": false,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "band_lower_threshold",
@@ -1410,6 +1450,7 @@
             "integer": false,
             "modulatable": false,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "band_upper_ratio",
@@ -1429,6 +1470,7 @@
             "integer": false,
             "modulatable": false,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "band_upper_threshold",
@@ -1454,6 +1496,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "enabled_bands",
@@ -1473,6 +1516,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "high_gain",
@@ -1492,6 +1536,7 @@
             "integer": false,
             "modulatable": false,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "high_lower_ratio",
@@ -1511,6 +1556,7 @@
             "integer": false,
             "modulatable": false,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "high_lower_threshold",
@@ -1530,6 +1576,7 @@
             "integer": false,
             "modulatable": false,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "high_upper_ratio",
@@ -1549,6 +1596,7 @@
             "integer": false,
             "modulatable": false,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "high_upper_threshold",
@@ -1568,6 +1616,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "low_gain",
@@ -1587,6 +1636,7 @@
             "integer": false,
             "modulatable": false,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "low_lower_ratio",
@@ -1606,6 +1656,7 @@
             "integer": false,
             "modulatable": false,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "low_lower_threshold",
@@ -1625,6 +1676,7 @@
             "integer": false,
             "modulatable": false,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "low_upper_ratio",
@@ -1644,6 +1696,7 @@
             "integer": false,
             "modulatable": false,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "low_upper_threshold",
@@ -1663,6 +1716,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "mix",
@@ -1682,6 +1736,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "release",
@@ -1788,6 +1843,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "aux_frequency",
@@ -1813,6 +1869,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "aux_sync",
@@ -1843,6 +1900,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "aux_tempo",
@@ -1862,6 +1920,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "dry_wet",
@@ -1881,6 +1940,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "feedback",
@@ -1900,6 +1960,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "filter_cutoff",
@@ -1919,6 +1980,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "filter_spread",
@@ -1938,6 +2000,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "frequency",
@@ -1963,6 +2026,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "style",
@@ -1988,6 +2052,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "sync",
@@ -2018,6 +2083,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "tempo",
@@ -2115,6 +2181,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "drive",
@@ -2134,6 +2201,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "filter_blend",
@@ -2153,6 +2221,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "filter_cutoff",
@@ -2177,6 +2246,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "filter_order",
@@ -2196,6 +2266,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "filter_resonance",
@@ -2215,6 +2286,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "mix",
@@ -2242,6 +2314,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "type",
@@ -2375,6 +2448,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "band_cutoff",
@@ -2394,6 +2468,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "band_gain",
@@ -2417,6 +2492,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "band_mode",
@@ -2436,6 +2512,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "band_resonance",
@@ -2455,6 +2532,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "high_cutoff",
@@ -2474,6 +2552,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "high_gain",
@@ -2497,6 +2576,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "high_mode",
@@ -2516,6 +2596,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "high_resonance",
@@ -2535,6 +2616,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "low_cutoff",
@@ -2554,6 +2636,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "low_gain",
@@ -2577,6 +2660,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "low_mode",
@@ -2596,6 +2680,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "low_resonance",
@@ -2710,6 +2795,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "center",
@@ -2729,6 +2815,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "dry_wet",
@@ -2748,6 +2835,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "feedback",
@@ -2767,6 +2855,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "frequency",
@@ -2786,6 +2875,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "mod_depth",
@@ -2805,6 +2895,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "phase_offset",
@@ -2830,6 +2921,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "sync",
@@ -2862,6 +2954,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "tempo",
@@ -2985,6 +3078,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "blend",
@@ -3004,6 +3098,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "center",
@@ -3023,6 +3118,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "dry_wet",
@@ -3042,6 +3138,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "feedback",
@@ -3061,6 +3158,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "frequency",
@@ -3080,6 +3178,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "mod_depth",
@@ -3099,6 +3198,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "phase_offset",
@@ -3124,6 +3224,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "sync",
@@ -3156,6 +3257,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "tempo",
@@ -3316,6 +3418,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "chorus_amount",
@@ -3335,6 +3438,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "chorus_frequency",
@@ -3354,6 +3458,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "decay_time",
@@ -3373,6 +3478,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "delay",
@@ -3392,6 +3498,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "dry_wet",
@@ -3411,6 +3518,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "high_shelf_cutoff",
@@ -3430,6 +3538,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "high_shelf_gain",
@@ -3449,6 +3558,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "low_shelf_cutoff",
@@ -3468,6 +3578,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "low_shelf_gain",
@@ -3487,6 +3598,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "pre_high_cutoff",
@@ -3506,6 +3618,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "pre_low_cutoff",
@@ -3525,6 +3638,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "size",
@@ -3585,6 +3699,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "gain",
@@ -3655,6 +3770,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "scale",
@@ -3674,6 +3790,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "offset",
@@ -3786,6 +3903,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "level1",
@@ -3805,6 +3923,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "level2",
@@ -3824,6 +3943,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "level3",
@@ -3843,6 +3963,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "level4",
@@ -3997,6 +4118,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": true
           },
           "id": "shape",
@@ -4016,6 +4138,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "delay_time",
@@ -4035,6 +4158,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "fade_time",
@@ -4054,6 +4178,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "frequency",
@@ -4073,6 +4198,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "keytrack_transpose",
@@ -4092,6 +4218,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "keytrack_tune",
@@ -4111,6 +4238,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "phase",
@@ -4134,6 +4262,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "smooth_mode",
@@ -4153,6 +4282,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "smooth_time",
@@ -4172,6 +4302,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "stereo",
@@ -4198,6 +4329,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "sync",
@@ -4225,6 +4357,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "sync_type",
@@ -4259,6 +4392,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "tempo",
@@ -4337,6 +4471,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "frequency",
@@ -4356,6 +4491,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "keytrack_transpose",
@@ -4375,6 +4511,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "keytrack_tune",
@@ -4398,6 +4535,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "stereo",
@@ -4423,6 +4561,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "style",
@@ -4449,6 +4588,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "sync",
@@ -4472,6 +4612,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "sync_type",
@@ -4506,6 +4647,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "tempo",
@@ -4588,6 +4730,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "mode",
@@ -4607,6 +4750,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "glide",
@@ -4715,6 +4859,7 @@
             "integer": false,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "length",
@@ -4734,6 +4879,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "loop",
@@ -4753,6 +4899,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": true,
             "structural": false
           },
           "id": "transpose",
@@ -4999,6 +5146,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": true
           },
           "id": "table",
@@ -5018,6 +5166,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "detune_power",
@@ -5037,6 +5186,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "detune_range",
@@ -5056,6 +5206,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "distortion_amount",
@@ -5075,6 +5226,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "distortion_phase",
@@ -5094,6 +5246,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "distortion_spread",
@@ -5128,6 +5281,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "distortion_type",
@@ -5147,6 +5301,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "frame_spread",
@@ -5166,6 +5321,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "level",
@@ -5189,6 +5345,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "midi_track",
@@ -5208,6 +5365,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "pan",
@@ -5227,6 +5385,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "phase",
@@ -5246,6 +5405,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "random_phase",
@@ -5269,6 +5429,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "smooth_interpolation",
@@ -5288,6 +5449,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "spectral_morph_amount",
@@ -5307,6 +5469,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "spectral_morph_spread",
@@ -5340,6 +5503,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "spectral_morph_type",
@@ -5363,6 +5527,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "spectral_unison",
@@ -5395,6 +5560,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "stack_style",
@@ -5414,6 +5580,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "stereo_spread",
@@ -5433,6 +5600,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "transpose",
@@ -5452,6 +5620,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "transpose_quantize",
@@ -5471,6 +5640,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "tune",
@@ -5490,6 +5660,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "unison_blend",
@@ -5509,6 +5680,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "unison_detune",
@@ -5528,6 +5700,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "unison_voices",
@@ -5547,6 +5720,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": false,
             "structural": false
           },
           "id": "wave_frame",
@@ -5617,6 +5791,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "division",
@@ -5636,6 +5811,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "swing",
@@ -5743,6 +5919,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "bounce",
@@ -5766,6 +5943,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "keytrack",
@@ -5785,6 +5963,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "level",
@@ -5808,6 +5987,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "loop",
@@ -5827,6 +6007,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "pan",
@@ -5850,6 +6031,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "random_phase",
@@ -5869,6 +6051,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "transpose",
@@ -5888,6 +6071,7 @@
             "integer": true,
             "modulatable": false,
             "noSmooth": true,
+            "primary": false,
             "structural": false
           },
           "id": "transpose_quantize",
@@ -5907,6 +6091,7 @@
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
+            "primary": true,
             "structural": false
           },
           "id": "tune",

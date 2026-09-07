@@ -50,11 +50,9 @@ export const MIN_COLS = 3;
 /**
  * How many controls a node shows on its face.
  *
- * A wavetable oscillator has twenty-odd parameters and a face the size of a business card. Bitwig's
- * answer is that a module shows its performance controls and nothing else, so this shows the
- * modulatable ones — the parameters meant to be moved while the patch runs — up to this many, and the
- * inspector holds the full set. Which parameters those are is the module's decision, expressed by the
- * order it declares them in.
+ * A wavetable oscillator has twenty-odd parameters and a face the size of a business card, so it can
+ * only show a few. Which few the engine declares with the `primary` flag; this is the ceiling on how
+ * many of them fit.
  */
 export const MAX_FACE_CONTROLS = 4;
 
@@ -101,9 +99,16 @@ export function faceParams(
   descriptor: ModuleDescriptor,
   max = MAX_FACE_CONTROLS,
 ): ParamDesc[] {
-  return descriptor.params
-    .filter((p) => !p.flags.hidden && p.flags.modulatable && !p.flags.enum)
-    .slice(0, max);
+  const visible = descriptor.params.filter(
+    (p) => !p.flags.hidden && !p.flags.enum,
+  );
+  const declared = visible.filter((p) => p.flags.primary);
+  // The fallback is the guess this used to make for every module: better a plausible face than an
+  // empty one. It is also why an oscillator used to wear its detune and distortion controls while its
+  // level and tuning sat in the inspector, which is the whole reason the engine now says.
+  const chosen =
+    declared.length > 0 ? declared : visible.filter((p) => p.flags.modulatable);
+  return chosen.slice(0, max);
 }
 
 /**

@@ -15,10 +15,10 @@ const PortDesc kOut[] = {
   {"out", "Out", PortKind::Continuous, 1, SignalRole::Audio, "Sum of the four channels after their levels"},
 };
 const ParamDesc kParams[] = {
-  {"level1", "Level 1", 0.f, 2.f, 1.f, ParamUnit::Ratio, ParamCurve::Linear, kParamModulatable, nullptr, 0, "slider", nullptr, "Gain of channel 1"},
-  {"level2", "Level 2", 0.f, 2.f, 1.f, ParamUnit::Ratio, ParamCurve::Linear, kParamModulatable, nullptr, 0, "slider", nullptr, "Gain of channel 2"},
-  {"level3", "Level 3", 0.f, 2.f, 1.f, ParamUnit::Ratio, ParamCurve::Linear, kParamModulatable, nullptr, 0, "slider", nullptr, "Gain of channel 3"},
-  {"level4", "Level 4", 0.f, 2.f, 1.f, ParamUnit::Ratio, ParamCurve::Linear, kParamModulatable, nullptr, 0, "slider", nullptr, "Gain of channel 4"},
+  {"level1", "Level 1", 0.f, 2.f, 1.f, ParamUnit::Ratio, ParamCurve::Linear, kParamPrimary | kParamModulatable, nullptr, 0, "slider", nullptr, "Gain of channel 1"},
+  {"level2", "Level 2", 0.f, 2.f, 1.f, ParamUnit::Ratio, ParamCurve::Linear, kParamPrimary | kParamModulatable, nullptr, 0, "slider", nullptr, "Gain of channel 2"},
+  {"level3", "Level 3", 0.f, 2.f, 1.f, ParamUnit::Ratio, ParamCurve::Linear, kParamPrimary | kParamModulatable, nullptr, 0, "slider", nullptr, "Gain of channel 3"},
+  {"level4", "Level 4", 0.f, 2.f, 1.f, ParamUnit::Ratio, ParamCurve::Linear, kParamPrimary | kParamModulatable, nullptr, 0, "slider", nullptr, "Gain of channel 4"},
 };
 
 class Mixer final : public VoicedModule<int> {

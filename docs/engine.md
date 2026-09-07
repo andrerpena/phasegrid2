@@ -196,6 +196,15 @@ Modules read `ctx.param(i).at(frame)` as a `Sample`. `ParamView::knob` carries t
 so a module that has to hand the knob and the modulation to a downstream engine separately recovers the modulation
 as `at(i) - knob`.
 
+**`kParamPrimary` marks a control that belongs on the module's face.** A patching interface draws a
+module the size of a business card, and a wavetable oscillator has twenty-odd parameters, so it can
+only show a few. Which few is the module's own knowledge: nothing in a parameter table says that a
+filter's cutoff is reached for more often than its formant spread, and an interface guessing "the
+first few modulatable ones" put an oscillator's detune and distortion on its face while its level and
+tuning sat in the inspector. So each module says. Vendored modules name theirs with `ModuleSpec::face`
+(control suffixes); our own set the flag directly. Unflagged parameters are not lesser, they are just
+reached through the inspector.
+
 `kParamStructural` marks a param that cannot be applied to a live instance (an LFO shape, a wavetable choice):
 `InstanceTable::acquire` builds a fresh instance instead of reusing the old one. A structural param may never be
 `kParamModulatable` -- `Registry::add` rejects that -- because it is read once, on the message thread, by

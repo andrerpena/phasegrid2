@@ -19,6 +19,7 @@ const ModuleDescriptor& fxPhaser() {
     spec.outputs.push_back({"cutoff", "Cutoff", vital::PhaserModule::kCutoffOutput, SignalRole::Cv,
                             "Where the sweep left the all-pass cutoff at the end of the block, as a MIDI note",
                             /*firstFrameOnly=*/true});
+    spec.face = {"dry_wet", "frequency", "mod_depth", "feedback"};
     return vendor::buildDescriptor(spec);
   }();
   return desc;

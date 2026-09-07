@@ -23,7 +23,7 @@ const ParamDesc kParams[] = {
   {"mode", "Priority", 0.f, 2.f, 0.f, ParamUnit::None, ParamCurve::Linear,
    kParamEnum | kParamInteger | kParamNoSmooth, kModeLabels, countOf(kModeLabels), "select", nullptr,
    "Which of the held notes sounds: the newest, the lowest or the highest"},
-  {"glide", "Glide", 0.f, 1.f, 0.f, ParamUnit::Seconds, ParamCurve::Linear, kParamModulatable, nullptr, 0,
+  {"glide", "Glide", 0.f, 1.f, 0.f, ParamUnit::Seconds, ParamCurve::Linear, kParamPrimary | kParamModulatable, nullptr, 0,
    "slider", nullptr, "Time constant of the slide from one note to the next; 0 jumps"},
 };
 

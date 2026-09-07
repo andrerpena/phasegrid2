@@ -13,6 +13,7 @@ const ModuleDescriptor& fxReverb() {
       "seconds; the cutoffs are MIDI note numbers.",
       "reverb", "Dry/wet reverb output");
     spec.create = [](vendor::ModuleContext&) { return vendor::makeModule<vital::ReverbModule>(); };
+    spec.face = {"dry_wet", "decay_time", "size", "delay"};
     return vendor::buildDescriptor(spec);
   }();
   return desc;

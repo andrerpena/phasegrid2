@@ -13,7 +13,7 @@ const PortDesc kOut[] = {
 };
 const char* const kCurveLabels[] = {"Linear", "Exponential"};
 const ParamDesc kParams[] = {
-  {"gain", "Gain", 0.f, 2.f, 1.f, ParamUnit::Ratio, ParamCurve::Linear, kParamModulatable, nullptr, 0,
+  {"gain", "Gain", 0.f, 2.f, 1.f, ParamUnit::Ratio, ParamCurve::Linear, kParamPrimary | kParamModulatable, nullptr, 0,
    "slider", nullptr, "Gain with nothing plugged into the gain input; the input adds to it"},
   {"curve", "Curve", 0.f, 1.f, 0.f, ParamUnit::None, ParamCurve::Linear,
    kParamEnum | kParamInteger | kParamNoSmooth, kCurveLabels, countOf(kCurveLabels), "select", nullptr,
