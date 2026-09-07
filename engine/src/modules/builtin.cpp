@@ -11,6 +11,8 @@ extern const ModuleDescriptor kPhaseClock;
 extern const ModuleDescriptor kScaleOffset;
 extern const ModuleDescriptor kMixer;
 extern const ModuleDescriptor kVca;
+extern const ModuleDescriptor kMeter;
+extern const ModuleDescriptor kScope;
 const ModuleDescriptor& filterMulti();   // generated at first call; process lifetime
 const ModuleDescriptor& oscWavetable();
 const ModuleDescriptor& envDahdsr();
@@ -31,6 +33,7 @@ void registerBuiltinModules(Registry& r) {
   const ModuleDescriptor* all[] = {
     &modules::kAudioOut, &modules::kNoteToCv, &modules::kNoteToPoly, &modules::kNotesClip,
     &modules::kPhaseClock, &modules::kScaleOffset, &modules::kMixer, &modules::kVca,
+    &modules::kMeter, &modules::kScope,
     &modules::filterMulti(), &modules::oscWavetable(), &modules::envDahdsr(),
     &modules::modLfo(), &modules::modRandom(),
     &modules::fxReverb(), &modules::fxDelay(), &modules::fxChorus(), &modules::fxFlanger(),

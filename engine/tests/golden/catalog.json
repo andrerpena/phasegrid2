@@ -1,5 +1,5 @@
 {
-  "catalogHash": "a2342e52fb3c1624",
+  "catalogHash": "94e870fb57b7d4bb",
   "conventions": {
     "blockSize": 128,
     "gateThreshold": 0,
@@ -104,6 +104,52 @@
           "unit": "none"
         }
       ]
+    },
+    {
+      "category": "display",
+      "doc": "Publishes peak, RMS and clip count for the interface to draw. Produces no audio and changes nothing.",
+      "flags": {
+        "needsTransport": false,
+        "terminal": false,
+        "writesTelemetry": true
+      },
+      "id": "display.meter",
+      "inputs": [
+        {
+          "doc": "Signal to display; voices are summed as at the output",
+          "id": "in",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "In",
+          "role": "any"
+        }
+      ],
+      "name": "Meter",
+      "outputs": [],
+      "params": []
+    },
+    {
+      "category": "display",
+      "doc": "Publishes the waveform for the interface to draw. Produces no audio and changes nothing.",
+      "flags": {
+        "needsTransport": false,
+        "terminal": false,
+        "writesTelemetry": true
+      },
+      "id": "display.scope",
+      "inputs": [
+        {
+          "doc": "Signal to display; voices are summed as at the output",
+          "id": "in",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "In",
+          "role": "any"
+        }
+      ],
+      "name": "Scope",
+      "outputs": [],
+      "params": []
     },
     {
       "category": "mod",

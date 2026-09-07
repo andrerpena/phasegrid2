@@ -45,6 +45,14 @@ Result Engine::commit() {
   return {};
 }
 
+/// Subscribing must not recompile: the assignment lives on the instance, which outlives every program.
+bool Engine::setTelemetrySlot(const std::string& node, uint32_t slot) {
+  const ModuleInstance* inst = instances_.find(node);
+  if (inst == nullptr) return false;
+  const_cast<ModuleInstance*>(inst)->telemetrySlot.store(slot, std::memory_order_relaxed);
+  return true;
+}
+
 Result Engine::setParam(const std::string& node, const std::string& param, float value) {
   Result r = model_.setParam(registry_, node, param, value);
   if (!r) return r;
@@ -91,7 +99,7 @@ void Engine::renderBlock(float* const* out, uint32_t channels, uint32_t numFrame
   drainParams();
   for (uint32_t i = 0; i < numFrames; ++i) bus_.data[i] = Sample(0.f);
   AudioBus bus{bus_.data.data(), numFrames};
-  scheduler_.run(*current_, numFrames, t, &bus);
+  scheduler_.run(*current_, numFrames, t, &bus, telemetry_);
   // Fold voice pairs: L = v0.L + v1.L, R = v0.R + v1.R. No mask here: the bus already holds the sum of
   // every pair, so there is no one mask that fits it. Terminal modules apply `ctx.voiceMask` as they add,
   // which is the only point at which the pair the lanes belong to is still known.

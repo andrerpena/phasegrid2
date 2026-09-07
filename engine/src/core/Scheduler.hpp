@@ -8,10 +8,13 @@ namespace pg {
 /// Executes a Program's op list once per voice pair. Audio-thread safe after construction.
 class Scheduler {
 public:
-  void run(Program& p, uint32_t numFrames, const TransportSnapshot& t, AudioBus* bus) noexcept PG_RT_NONBLOCKING;
+  void run(Program& p, uint32_t numFrames, const TransportSnapshot& t, AudioBus* bus,
+           TelemetryWriter* telemetry = nullptr) noexcept PG_RT_NONBLOCKING;
 private:
-  void exec(Program& p, const Op& op, uint32_t offset, uint32_t n, uint32_t pair, const TransportSnapshot& t, AudioBus* bus);
-  void runCluster(Program& p, size_t first, uint32_t count, uint32_t numFrames, uint32_t pair, const TransportSnapshot& t, AudioBus* bus);
+  void exec(Program& p, const Op& op, uint32_t offset, uint32_t n, uint32_t pair, const TransportSnapshot& t, AudioBus* bus,
+            TelemetryWriter* telemetry);
+  void runCluster(Program& p, size_t first, uint32_t count, uint32_t numFrames, uint32_t pair, const TransportSnapshot& t, AudioBus* bus,
+                  TelemetryWriter* telemetry);
   static SignalView view(Program& p, uint32_t buf, uint32_t offset, uint32_t n) { return SignalView{p.buffers[buf].data.data() + offset, n}; }
 
   std::array<SignalView, kMaxPortsPerModule> in_{}, out_{};

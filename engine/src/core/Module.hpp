@@ -57,13 +57,20 @@ struct AudioBus {
   uint32_t frames = 0;
 };
 
-struct TelemetrySlot;  // phase 5
+class TelemetryWriter;
+inline constexpr uint32_t kNoTelemetrySlotCtx = 0xFFFFFFFFu;
 
 /// Built by the scheduler per Process op. Port indices are the descriptor's declared indices.
 struct ProcessContext {
   uint32_t numFrames = 0;
   uint32_t voice = 0;                 // voice PAIR index
+  uint32_t voicePairs = 1;            // how many pairs this program runs, so a module can tell it is last
   Mask voiceMask = Mask(static_cast<uint32_t>(-1));   // lanes of voices that exist in this pair
+  /// Where a `kModuleWritesTelemetry` module publishes, or null and `kNoTelemetrySlot` when nobody is
+  /// watching. Assigned by `telemetry.subscribe` rather than by the compiler, so subscribing does not
+  /// recompile the graph and cannot glitch the audio.
+  TelemetryWriter* telemetry = nullptr;
+  uint32_t telemetrySlot = kNoTelemetrySlotCtx;
   double sampleRate = 48000.0;
   const TransportSnapshot* transport = nullptr;
   AudioBus* outputBus = nullptr;

@@ -1,8 +1,11 @@
 #include "core/Scheduler.hpp"
 
+#include "services/Telemetry.hpp"
+
 namespace pg {
 
-void Scheduler::run(Program& p, uint32_t numFrames, const TransportSnapshot& t, AudioBus* bus) noexcept {
+void Scheduler::run(Program& p, uint32_t numFrames, const TransportSnapshot& t, AudioBus* bus,
+                    TelemetryWriter* telemetry) noexcept {
   p.buffers[kSilentBuffer].clear();
   p.eventBufs[kEmptyEvents].clear();
   for (NodeSlot& slot : p.nodes)
@@ -11,22 +14,24 @@ void Scheduler::run(Program& p, uint32_t numFrames, const TransportSnapshot& t, 
   for (uint32_t pair = 0; pair < p.voicePairs; ++pair) {
     for (size_t i = 0; i < p.ops.size(); ++i) {
       const Op& op = p.ops[i];
-      if (op.kind == Op::ClusterBegin) { runCluster(p, i + 1, op.a, numFrames, pair, t, bus); i += op.a + 1; continue; }
-      exec(p, op, 0, numFrames, pair, t, bus);
+      if (op.kind == Op::ClusterBegin) { runCluster(p, i + 1, op.a, numFrames, pair, t, bus, telemetry); i += op.a + 1; continue; }
+      exec(p, op, 0, numFrames, pair, t, bus, telemetry);
     }
   }
 }
 
-void Scheduler::runCluster(Program& p, size_t first, uint32_t count, uint32_t numFrames, uint32_t pair, const TransportSnapshot& t, AudioBus* bus) {
+void Scheduler::runCluster(Program& p, size_t first, uint32_t count, uint32_t numFrames, uint32_t pair, const TransportSnapshot& t, AudioBus* bus,
+                           TelemetryWriter* telemetry) {
   if (p.feedbackMode == FeedbackMode::Block) {
-    for (uint32_t k = 0; k < count; ++k) exec(p, p.ops[first + k], 0, numFrames, pair, t, bus);
+    for (uint32_t k = 0; k < count; ++k) exec(p, p.ops[first + k], 0, numFrames, pair, t, bus, telemetry);
     return;
   }
   for (uint32_t s = 0; s < numFrames; ++s)
-    for (uint32_t k = 0; k < count; ++k) exec(p, p.ops[first + k], s, 1, pair, t, bus);
+    for (uint32_t k = 0; k < count; ++k) exec(p, p.ops[first + k], s, 1, pair, t, bus, telemetry);
 }
 
-void Scheduler::exec(Program& p, const Op& op, uint32_t offset, uint32_t n, uint32_t pair, const TransportSnapshot& t, AudioBus* bus) {
+void Scheduler::exec(Program& p, const Op& op, uint32_t offset, uint32_t n, uint32_t pair, const TransportSnapshot& t, AudioBus* bus,
+                     TelemetryWriter* telemetry) {
   switch (op.kind) {
     case Op::Sum: {
       Sample* dst = p.buffers[op.a].data.data() + offset;
@@ -91,7 +96,9 @@ void Scheduler::exec(Program& p, const Op& op, uint32_t offset, uint32_t n, uint
       AudioBus busSlice;
       if (bus) { busSlice.data = bus->data + offset; busSlice.frames = n; }
       ProcessContext ctx;
-      ctx.numFrames = n; ctx.voice = pair; ctx.sampleRate = p.sampleRate; ctx.transport = &t;
+      ctx.numFrames = n; ctx.voice = pair; ctx.voicePairs = p.voicePairs; ctx.sampleRate = p.sampleRate; ctx.transport = &t;
+      ctx.telemetry = telemetry;
+      ctx.telemetrySlot = slot.inst->telemetrySlot.load(std::memory_order_relaxed);
       ctx.voiceMask = pair < p.activeVoiceMask.size() ? p.activeVoiceMask[pair] : Mask(static_cast<uint32_t>(-1));
       ctx.outputBus = bus ? &busSlice : nullptr;
       ctx.inputs = in_.data(); ctx.outputs = out_.data(); ctx.eventInputs = evIn_.data(); ctx.eventOutputs = evOut_.data();

@@ -12,6 +12,8 @@
 
 namespace pg {
 
+class TelemetryWriter;
+
 inline constexpr uint32_t kMaxChannelsOut = 2;
 
 struct EngineConfig {
@@ -37,6 +39,11 @@ public:
   size_t retiredCount() const { return retired_.size_approx(); }
 
   // ---- audio thread
+  void setTelemetry(TelemetryWriter* t) { telemetry_ = t; }
+  TelemetryWriter* telemetry() const { return telemetry_; }
+  /// Message thread. Points a module at a slot, or `kNoTelemetrySlot` to stop it publishing.
+  bool setTelemetrySlot(const std::string& node, uint32_t slot);
+
   void renderBlock(float* const* out, uint32_t channels, uint32_t numFrames, const TransportSnapshot& t) noexcept PG_RT_NONBLOCKING;
   void renderInterleaved(float* out, uint32_t frames, uint32_t channels, const TransportSnapshot& t) noexcept PG_RT_NONBLOCKING;
 
@@ -49,6 +56,9 @@ private:
   GraphModel model_;
   InstanceTable instances_;
   Scheduler scheduler_;
+  /// Not owned. Set once by whoever built the segment, before rendering starts, and read by the audio
+  /// thread thereafter; a null writer simply means telemetry is off and every display module is a no-op.
+  TelemetryWriter* telemetry_ = nullptr;
   uint64_t revision_ = 0;
 
   std::unique_ptr<Program> initial_;

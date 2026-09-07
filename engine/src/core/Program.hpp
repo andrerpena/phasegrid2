@@ -1,5 +1,6 @@
 #pragma once
 #include <algorithm>
+#include <atomic>
 #include <array>
 #include <cstdint>
 #include <memory>
@@ -22,6 +23,10 @@ inline constexpr uint32_t kEmptyEvents = 0;    // eventBufs[0] is never written
 /// One per module id in the patch. Owned by InstanceTable, shared with every Program that uses it.
 struct ModuleInstance {
   std::string id;
+  /// Which telemetry slot this module publishes into, or `kNoTelemetrySlot`. Written by the message
+  /// thread on subscribe, read by the audio thread every block, so it is atomic; it lives here rather
+  /// than in `Program` because a subscription must outlive a recompile and must not cause one.
+  std::atomic<uint32_t> telemetrySlot{0xFFFFFFFFu};
   uint64_t serial = 0;
   const RegisteredModule* type = nullptr;
   std::unique_ptr<Module> module;

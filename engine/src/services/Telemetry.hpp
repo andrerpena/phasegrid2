@@ -33,6 +33,9 @@ inline constexpr uint32_t kTelemetryMaxSlots = 64;
 
 enum class TelemetryKind : uint32_t { None = 0, Meter = 1, Scope = 2 };
 
+/// "nobody is watching this module". Not a valid slot index, and the default for every instance.
+inline constexpr uint32_t kNoTelemetrySlot = 0xFFFFFFFFu;
+
 /**
  * One slot's fixed header, followed by its payload inside the same 8 KiB.
  *
