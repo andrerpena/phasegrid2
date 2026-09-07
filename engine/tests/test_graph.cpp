@@ -90,3 +90,27 @@ TEST_CASE("compile: cycles are rejected until Task 13", "[compiler]") {
   REQUIRE(o.program == nullptr);
   REQUIRE(o.error.find("E_FEEDBACK_UNSUPPORTED") != std::string::npos);
 }
+
+TEST_CASE("compile: rejects fan-in above kMaxPortsPerModule", "[compiler]") {
+  GraphFixture f;
+  f.node("t", "test.eventTrace");
+  for (uint32_t i = 0; i < pg::kMaxPortsPerModule + 1; ++i) {
+    f.node("g" + std::to_string(i), "test.eventGen", {{"frame", 3.f}, {"tag", 1.f}});
+    f.edge("e" + std::to_string(i), "g" + std::to_string(i) + ".events", "t.events");
+  }
+  pg::CompileOutput o = pg::compileGraph(f.model, f.reg, f.table, 1, 48000.0, 64);
+  REQUIRE(o.program == nullptr);
+  REQUIRE(o.error.find("E_FAN_IN") != std::string::npos);
+}
+
+TEST_CASE("compile: exactly kMaxPortsPerModule fan-in still compiles", "[compiler]") {
+  GraphFixture f;
+  f.node("t", "test.eventTrace");
+  for (uint32_t i = 0; i < pg::kMaxPortsPerModule; ++i) {
+    f.node("g" + std::to_string(i), "test.eventGen", {{"frame", 3.f}, {"tag", 1.f}});
+    f.edge("e" + std::to_string(i), "g" + std::to_string(i) + ".events", "t.events");
+  }
+  auto p = f.compile();
+  f.run(*p, 64);
+  REQUIRE(f.out(*p, "t", "out", 3) == Catch::Approx(static_cast<float>(pg::kMaxPortsPerModule)));
+}

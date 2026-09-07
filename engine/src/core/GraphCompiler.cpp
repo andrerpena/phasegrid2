@@ -118,6 +118,8 @@ CompileOutput compileGraph(const GraphModel& model, const Registry& registry, In
         srcs.push_back(t.inputs[ip].kind == PortKind::Continuous ? src.outBuf[e.fromPort] : src.outEvt[e.fromPort]);
       }
       if (srcs.empty()) continue;
+      if (srcs.size() > kMaxPortsPerModule)
+        return fail("E_FAN_IN", nodes[ni]->id + ": more than " + std::to_string(kMaxPortsPerModule) + " connections into one port");
       const bool continuous = t.inputs[ip].kind == PortKind::Continuous;
       uint32_t result;
       if (srcs.size() == 1) {
