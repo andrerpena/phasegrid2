@@ -83,6 +83,25 @@ frames the module never wrote. Set `OutputMap::firstFrameOnly` for them.
 control surface needs a longer `hidden` list or a wider cap; decide deliberately rather than discovering it as an
 `E_FAN_IN`-style failure.
 
+**A control-rate *Processor* still allocates full-size Outputs**, so `Output::isControlRate()` is false for them and
+`firstFrameOnly` is needed far more often than the task text says: the LFO's phase and frequency readouts, the
+flanger's frequency, the phaser's cutoff and all six compressor meters. Check the vendored `process()` for each
+output you expose; do not infer from the processor's rate.
+
+**Enum labels are indexed by the control's raw value, so generated labels must be offset by the control's `min`.**
+The delay's tempo controls run 4..12, and without the offset every step carried the wrong name. Fixed in
+`buildDescriptor`; it is mentioned here because it changes what correct label output looks like.
+
+**`_sync` controls are ordinary parameters.** `createTempoSyncSwitch(name, …)` registers `name + "_sync"`, and
+every one of them is in `synth_parameters.cpp`. They generate like any other control, so
+`ControlOverride::exposeNonParameter` is unnecessary for them and none of the effects needed overrides. Likewise
+no effect creates its own `_on` control — that switch lives in the host synth, not the effect module.
+
+**An impulse fired into block 0 measures almost nothing.** Every effect ramps its wet/dry mix up from zero across
+its first block, and the state-variable filter ramps its coefficients the same way, so an impulse test reads exact
+zero for the equaliser and about one percent for the delay and chorus. Drive a settled oscillator or a DC step,
+and let a delay-time test settle on silence before stepping.
+
 **Unconnected inputs** are bound to the instance's own zero block, never to the shared `kSilentBlock`, because
 the adapter drops const on that pointer.
 
