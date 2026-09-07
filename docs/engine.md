@@ -26,7 +26,7 @@ never use the names "Vital"/"Tytel" in ids, UI or binaries. `npm run lint:tradem
 `engine/src/vital/` adapts that library to the Grid. `pg::vendor::WrappedModule` is a single `Module` implementation
 that wraps any `vital::SynthModule`; a module type is a `pg::vendor::ModuleSpec` value (see
 `engine/src/modules/vital/`), and `buildDescriptor` generates its `ModuleDescriptor` at registry time from the
-vendored parameter table, so param ranges and units are the DSP's own. Four traps the vendored framework sets:
+vendored parameter table, so param ranges and units are the DSP's own. Six traps the vendored framework sets:
 
 - Every `vital::Output` needs a non-null `owner` Processor: `ModulationSum::process` dereferences it to ask whether
   the signal is control rate. The adapter's own Outputs get the `AdapterSource` stub for that.
@@ -40,8 +40,16 @@ vendored parameter table, so param ranges and units are the DSP's own. Four trap
   vendored module through `pg::vendor::makeModule<T>(...)`, which wraps it in `pg::vendor::Sorted<T>` and asks for the
   rebuild once, after `init()`.
 - Some modules write only `buffer[0]` of a full-size output (`Envelope::processAudioRate` fills its value buffer per
-  sample but sets the phase once, at the end). `OutputMap::firstFrameOnly` makes the adapter broadcast frame 0 across
-  the block rather than copy samples the module never wrote.
+  sample but sets the phase once, at the end; so do the LFO's phase and frequency readouts, the flanger's and phaser's
+  sweep readouts and all six compressor meters). `OutputMap::firstFrameOnly` makes the adapter broadcast frame 0 across
+  the block rather than copy samples the module never wrote. `Output::isControlRate()` does not catch these: it tests
+  `buffer_size == 1`, and a control-rate *Processor* still allocates full-size Outputs.
+- A `string_lookup` is indexed by the control's raw value, not by its offset from `min`. A control whose range starts
+  above zero (the delay's `tempo` is 4..12, i.e. "4/1".."1/64") must have its labels read from that offset;
+  `buildDescriptor` does. Check both ends against the table's real length.
+- A few vendored modules hold `vital::Output`s by value (the chorus keeps one status output per delay pair), which
+  deletes their copy constructor; those declare `clone()` as an assertion. `pg::vendor::Sorted<T>::clone()` returns
+  null for such a type instead of failing to compile.
 
 The JUCE shim (`engine/vendor/vital/shim/JuceHeader.h`) reaches **every** engine translation unit, via
 `core/Conventions.hpp` → `common.h`, and it declares `String`, `MemoryOutputStream`, `Base64`, `ProjectInfo` and the
@@ -55,7 +63,19 @@ attributed to our sources.
 
 Built-ins are registered in `engine/src/modules/builtin.cpp`, one line each. Own modules are a single `.cpp` under
 `engine/src/modules`; vendored-backed ones a single `ModuleSpec` under `engine/src/modules/vital`. Today:
-`io.audioOut`, `note.toCv`, `filter.multi`, `osc.wavetable`, `env.dahdsr`.
+`io.audioOut`, `note.toCv`, `filter.multi`, `osc.wavetable`, `env.dahdsr`, `mod.lfo`, `mod.random`, and the eight
+effects `fx.reverb`, `fx.delay`, `fx.chorus`, `fx.flanger`, `fx.phaser`, `fx.distortion`, `fx.compressor`, `fx.eq`.
+
+The effects all share one shape, built by `effectSpec` in `engine/src/modules/vital/Effect.hpp`: the audio goes in
+through `processWithInput` rather than a plugged input, so the `in` port carries vendored input index -1. None of them
+creates the `<name>_on` control the host synth uses to bypass it -- that switch lives in the host -- so there is no
+`on` param to hide: on the grid an effect is bypassed by unplugging it. Their tempo-synced `sync`/`tempo` controls ARE
+in the vendored parameter table (`createTempoSyncSwitch` creates the `cr::Value` behind a name the table describes), so
+they are generated like any other param.
+
+Testing an effect with a one-sample impulse in block 0 measures nothing: every one of them ramps its wet/dry mix, and
+the filters ramp their coefficients, from zero across the first block they see, so the impulse is multiplied by ~0.
+Drive them with a steady source (`osc.wavetable`, or a DC `test.const`) and let them settle first.
 
 `pg::vendor::WavetableBank` (`engine/src/vital/WavetableBank.*`) renders the built-in wavetables and reads the
 vendored authoring format from JSON. Message thread only: a render resizes the table's frame storage and the
@@ -117,7 +137,7 @@ Event inputs are always valid buffers (empty when unconnected).
 
 ## Tests
 
-`npm run engine:test` runs 82 Catch2 tests. `PG_WERROR=ON npm run engine:test` additionally builds with `-Werror`
+`npm run engine:test` runs 97 Catch2 tests. `PG_WERROR=ON npm run engine:test` additionally builds with `-Werror`
 (CI does this; it is off by default because `postinstall` builds the engine on end-user machines).
 
 Headless render, using a patch built from builtin modules only:

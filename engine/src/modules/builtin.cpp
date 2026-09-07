@@ -10,6 +10,14 @@ const ModuleDescriptor& oscWavetable();
 const ModuleDescriptor& envDahdsr();
 const ModuleDescriptor& modLfo();
 const ModuleDescriptor& modRandom();
+const ModuleDescriptor& fxReverb();
+const ModuleDescriptor& fxDelay();
+const ModuleDescriptor& fxChorus();
+const ModuleDescriptor& fxFlanger();
+const ModuleDescriptor& fxPhaser();
+const ModuleDescriptor& fxDistortion();
+const ModuleDescriptor& fxCompressor();
+const ModuleDescriptor& fxEq();
 }  // namespace modules
 
 void registerBuiltinModules(Registry& r) {
@@ -17,6 +25,8 @@ void registerBuiltinModules(Registry& r) {
     &modules::kAudioOut, &modules::kNoteToCv,
     &modules::filterMulti(), &modules::oscWavetable(), &modules::envDahdsr(),
     &modules::modLfo(), &modules::modRandom(),
+    &modules::fxReverb(), &modules::fxDelay(), &modules::fxChorus(), &modules::fxFlanger(),
+    &modules::fxPhaser(), &modules::fxDistortion(), &modules::fxCompressor(), &modules::fxEq(),
   };
   for (const ModuleDescriptor* d : all)
     if (auto err = r.add(*d)) throw std::runtime_error("registerBuiltinModules: " + *err);
