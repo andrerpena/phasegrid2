@@ -79,11 +79,18 @@ TEST_CASE("engine commit failure keeps the old program", "[engine]") {
   rig.edge("e", "c", "out", "s", "in");
   REQUIRE(rig.engine.commit());
   const uint64_t rev = rig.engine.revision();
-  pg::Engine bad{rig.reg, pg::EngineConfig{48000.0, 1000}};   // block > kMaxBlockSize -> E_BLOCK
-  pg::Result r = bad.commit();
+  rig.render();
+  rig.add("tr", "test.eventTrace");
+  for (uint32_t i = 0; i < pg::kMaxPortsPerModule + 1; ++i) {
+    const std::string gid = "g" + std::to_string(i);
+    rig.add(gid, "test.eventGen", {{"frame", 3.f}, {"tag", 1.f}});
+    rig.edge("eg" + std::to_string(i), gid, "events", "tr", "events");
+  }
+  pg::Result r = rig.engine.commit();
   REQUIRE_FALSE(r);
-  REQUIRE(r.code == "E_BLOCK");
+  REQUIRE(r.code == "E_FAN_IN");
   REQUIRE(rig.engine.revision() == rev);
+  REQUIRE(rig.engine.retiredCount() == 0);
   rig.render();
   REQUIRE(rig.l[0] == Catch::Approx(0.5f));
 }

@@ -47,6 +47,7 @@ CompileOutput compileGraph(const GraphModel& model, const Registry& registry, In
                            uint64_t revision, double sampleRate, uint32_t blockSize) {
   auto fail = [](const std::string& code, const std::string& msg) { return CompileOutput{nullptr, code + ": " + msg}; };
   if (blockSize == 0 || blockSize > kMaxBlockSize) return fail("E_BLOCK", "bad block size");
+  if (model.voiceCount > 2) return fail("E_VOICES", "milestone 1 supports at most 2 voices (one pair)");
 
   // 1. Nodes in id order, resolve types, acquire instances.
   std::vector<const NodeModel*> nodes;

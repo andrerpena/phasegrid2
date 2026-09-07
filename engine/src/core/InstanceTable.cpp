@@ -5,10 +5,7 @@ namespace pg {
 std::shared_ptr<ModuleInstance> InstanceTable::acquire(const std::string& id, const RegisteredModule& type,
                                                        const PrepareInfo& info, const std::map<std::string, float>& params) {
   if (!(info == lastInfo_)) {
-    for (auto& [k, inst] : byId_) {
-      inst->module->prepare(info);
-      for (auto& p : inst->params) p.prepare(p.desc, info.sampleRate, p.target);
-    }
+    byId_.clear();   // old instances stay alive through the retired program's shared_ptrs; feedback states may stay
     lastInfo_ = info;
   }
   auto it = byId_.find(id);

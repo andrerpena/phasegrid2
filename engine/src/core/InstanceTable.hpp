@@ -11,6 +11,8 @@ namespace pg {
 class InstanceTable {
 public:
   /// Reuses the instance when the type is unchanged; otherwise creates and prepares a new one.
+  /// A change of sample rate, block size or voice count creates fresh instances (DSP state resets);
+  /// reuse only happens while PrepareInfo is unchanged.
   /// Params are applied only to newly created instances (live ones change through the param queue).
   std::shared_ptr<ModuleInstance> acquire(const std::string& id, const RegisteredModule& type,
                                           const PrepareInfo& info, const std::map<std::string, float>& params);

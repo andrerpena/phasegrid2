@@ -53,6 +53,7 @@ private:
 
   std::unique_ptr<Program> initial_;
   Program* current_ = nullptr;
+  Program* deferred_ = nullptr;   // audio thread only: a swap taken from pending_ but not yet retired
   std::atomic<Program*> pending_{nullptr};
   moodycamel::ReaderWriterQueue<Program*> retired_{256};
   moodycamel::ReaderWriterQueue<ParamChange> params_{4096};

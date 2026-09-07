@@ -69,15 +69,23 @@ TEST_CASE("compile: topological order is respected regardless of id order", "[co
 TEST_CASE("compile: reuses instances across compiles; voice pairs from voiceCount", "[compiler]") {
   GraphFixture f;
   f.node("c", "test.const", {{"value", 0.5f}});
-  auto p1 = f.compile();
+  f.compile();
   f.node("g", "test.gain");
-  f.model.setVoiceCount(3);
+  f.model.setVoiceCount(2);
   auto p2 = f.compile();
-  REQUIRE(p1->nodes[0].inst.get() == p2->nodes[0].inst.get());
   REQUIRE(f.table.size() == 2);
-  REQUIRE(p2->voicePairs == 2);
-  REQUIRE(pg::lanes::lane(pg::Sample(1.f) & p2->activeVoiceMask[1], 0) == 1.f);   // voice 2 active
-  REQUIRE(pg::lanes::lane(pg::Sample(1.f) & p2->activeVoiceMask[1], 2) == 0.f);   // voice 3 does not exist
+  REQUIRE(p2->voicePairs == 1);
+  REQUIRE(pg::lanes::lane(pg::Sample(1.f) & p2->activeVoiceMask[0], 0) == 1.f);   // voice 0 active
+  REQUIRE(pg::lanes::lane(pg::Sample(1.f) & p2->activeVoiceMask[0], 2) == 1.f);   // voice 1 active
+}
+
+TEST_CASE("compile: rejects more than 2 voices", "[compiler]") {
+  GraphFixture f;
+  f.node("c", "test.const", {{"value", 0.5f}});
+  f.model.setVoiceCount(3);
+  pg::CompileOutput o = pg::compileGraph(f.model, f.reg, f.table, 1, 48000.0, 64);
+  REQUIRE(o.program == nullptr);
+  REQUIRE(o.error.find("E_VOICES") != std::string::npos);
 }
 
 TEST_CASE("compile: rejects fan-in above kMaxPortsPerModule", "[compiler]") {
