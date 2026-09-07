@@ -1,4 +1,9 @@
 import type { BrowserWindow, IpcMain } from "electron";
+import {
+  ENGINE_CALL_CHANNEL,
+  ENGINE_EVENT_CHANNEL,
+  type EngineCallResult,
+} from "../../../shared/protocol/bridge";
 import type {
   CommandArgs,
   CommandName,
@@ -7,23 +12,6 @@ import type {
 import { isCommandName } from "../../../shared/protocol/commands";
 import type { EventEnvelope } from "../../../shared/protocol/envelope";
 import type { EngineSupervisor } from "./supervisor";
-
-/** `ipcRenderer.invoke` on one side, `ipcMain.handle` on the other. */
-export const ENGINE_CALL_CHANNEL = "engine:call";
-/** Main to renderer, one message per engine event. */
-export const ENGINE_EVENT_CHANNEL = "engine:event";
-
-/**
- * What crosses the IPC boundary in place of a rejected promise.
- *
- * Electron serializes a thrown error by its message alone, so an `EngineError` arrives in the renderer
- * as a plain `Error` whose `code` is gone and whose message has been prefixed with Electron's own
- * wrapper text. The code is the part callers branch on, so the result travels as data and the preload
- * turns it back into an error on the far side.
- */
-export type EngineCallResult<C extends CommandName> =
-  | { ok: true; result: CommandResult<C> }
-  | { ok: false; error: { code: string; message: string } };
 
 function describe(error: unknown): { code: string; message: string } {
   if (error instanceof Error) {
@@ -99,3 +87,5 @@ export function forwardEngineEvents(
 
 /** Narrower than `EngineSupervisor` on purpose; this is the only place the two are tied together. */
 export type SupervisorLike = EngineSupervisor & EngineCaller;
+
+export { ENGINE_CALL_CHANNEL, ENGINE_EVENT_CHANNEL, type EngineCallResult };

@@ -1,3 +1,11 @@
+/*
+  Static design tokens only: sizes, spacing, radii, durations.
+
+  Colours are deliberately NOT here. They live in `theming/themes/*.ts` and are written onto the
+  document at runtime by `applyTheme`, because the Pixi surfaces need them as data and a stylesheet
+  cannot be read by a canvas. Keeping a second copy here is what let the two drift apart in the project
+  this shell is copied from.
+*/
 :root {
   --font-size-caption: 12px;
   --font-size-body: 14px;
@@ -11,17 +19,6 @@
   --radius-md: 4px;
   --radius-lg: 8px;
 
-  /*
-   * Signal colors: one per `SignalRole` in the engine catalog, used for ports and cables.
-   * The role is a hint only -- any output may plug into any input -- so these colors read a
-   * patch, they never gate it. Keyed by the catalog's role string, so a new role added to
-   * `shared/protocol/catalog.ts` needs a token here with the same name.
-   */
-  --color-signal-any: #8a8f98; /* grey: unspecified range, the default */
-  --color-signal-audio: #e5484d; /* red: audio rate, nominal +/-1 */
-  --color-signal-cv: #f76b15; /* coral: control values, any range */
-  --color-signal-gate: #ffd230; /* yellow: bistate; high at >= 0.5, a rise is a trigger */
-  --color-signal-pitch: #f5a524; /* orange: 0 is middle C, 0.1 per octave */
-  --color-signal-phase: #a276f2; /* purple: 0 to just under 1, wraps */
-  --color-signal-note: #46b17b; /* green: event stream carrying pitch and velocity */
+  --duration-fast: 90ms;
+  --duration-base: 160ms;
 }

@@ -1,8 +1,12 @@
 .root {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
   padding: var(--space-4);
+  min-height: 100vh;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-size: var(--font-size-body);
 }
 
 .title {
@@ -11,6 +15,54 @@
 }
 
 .status {
-  color: var(--color-muted);
+  margin: 0;
+  color: var(--color-muted-foreground);
   font-size: var(--font-size-caption);
+}
+
+.themes {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.themeButton {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-secondary);
+  color: var(--color-secondary-foreground);
+  font-size: var(--font-size-caption);
+  cursor: pointer;
+  transition: background var(--duration-fast) ease;
+}
+
+.themeButton:hover {
+  background: var(--color-accent);
+}
+
+.themeButton[aria-pressed="true"] {
+  border-color: var(--color-ring);
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--font-size-caption);
+  color: var(--color-muted-foreground);
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.swatch {
+  width: var(--space-3);
+  height: var(--space-3);
+  border-radius: var(--radius-sm);
 }

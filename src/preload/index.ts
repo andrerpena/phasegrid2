@@ -1,5 +1,12 @@
 import { electronAPI } from "@electron-toolkit/preload";
 import { contextBridge, ipcRenderer } from "electron";
+import {
+  ENGINE_CALL_CHANNEL,
+  ENGINE_EVENT_CHANNEL,
+  type EngineBridge,
+  type EngineCallResult,
+  type TelemetryBridge,
+} from "../../shared/protocol/bridge";
 import type {
   CommandArgs,
   CommandName,
@@ -15,11 +22,6 @@ import {
   TELEMETRY_SLOT_BYTES,
   type TelemetryHeader,
 } from "../../shared/protocol/telemetry";
-import {
-  ENGINE_CALL_CHANNEL,
-  ENGINE_EVENT_CHANNEL,
-  type EngineCallResult,
-} from "../main/engine/ipc";
 
 /**
  * An engine error, rebuilt on this side of IPC.
@@ -68,7 +70,7 @@ function onEvent(listener: (event: EventEnvelope) => void): () => void {
   };
 }
 
-const engine = { call, onEvent };
+const engine: EngineBridge = { call, onEvent };
 
 /**
  * The telemetry segment, read straight from the renderer.
@@ -132,7 +134,11 @@ function closeSegment(): void {
   segment = null;
 }
 
-const telemetry = { open: openSegment, read: readSlot, close: closeSegment };
+const telemetry: TelemetryBridge = {
+  open: openSegment,
+  read: readSlot,
+  close: closeSegment,
+};
 
 if (process.contextIsolated) {
   contextBridge.exposeInMainWorld("electron", electronAPI);
@@ -144,6 +150,3 @@ if (process.contextIsolated) {
   win.engine = engine;
   win.telemetry = telemetry;
 }
-
-export type EngineBridge = typeof engine;
-export type TelemetryBridge = typeof telemetry;
