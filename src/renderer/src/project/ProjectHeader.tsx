@@ -17,7 +17,6 @@ export const ProjectHeader = () => {
   const setScale = useProjectStore((s) => s.setScale);
   const call = useEngineStore((s) => s.call);
   const [playing, setPlaying] = useState(false);
-  const [muted, setMuted] = useState(false);
   const [position, setPosition] = useState({ bar: 0, beat: 0 });
 
   // The engine owns the playhead, so the header follows it rather than counting time itself. Two
@@ -35,6 +34,20 @@ export const ProjectHeader = () => {
       if (typeof data.playing === "boolean") setPlaying(data.playing);
     });
   }, []);
+
+  /**
+   * The engine follows the button, including the moment a project opens.
+   *
+   * Without the initial pass the engine starts with its output open while the button says Play, so a
+   * project makes sound before anyone asks it to and the control that is supposed to start it appears
+   * to do nothing. Running on mount as well as on every change keeps the two in step from the start.
+   */
+  useEffect(() => {
+    void call(playing ? "transport.play" : "transport.stop", {}).catch(
+      () => {},
+    );
+    void call("audio.setOutputGain", { gain: playing ? 1 : 0 }).catch(() => {});
+  }, [playing, call]);
 
   // Tempo and meter are pushed to the engine when they change here, because the engine is what plays.
   useEffect(() => {
@@ -54,43 +67,31 @@ export const ProjectHeader = () => {
 
   return (
     <div className={styles.root}>
+      {/*
+        One control, not two.
+
+        The transport is the clock and the output is the output, and for a while these were separate
+        buttons on the honest grounds that a modular patch is not gated by its clock. That was true and
+        useless: a person presses stop to make it stop, and a stop button that leaves an oscillator
+        droning is a stop button that does not work. So this does both — it starts the clock and opens
+        the output, or stops the clock and silences the output.
+
+        The click only moves the state. The effect above is what talks to the engine, so opening a
+        project and pressing the button take the same path and cannot disagree.
+      */}
       <button
         type="button"
         className={styles.transport}
         aria-pressed={playing}
-        aria-label={playing ? "Stop the transport" : "Start the transport"}
-        title="Starts and stops the clock. A patch nothing gates keeps sounding: use the output control for that."
-        onClick={() => {
-          void call(playing ? "transport.stop" : "transport.play", {}).catch(
-            () => {},
-          );
-          setPlaying(!playing);
-        }}
+        aria-label={playing ? "Stop" : "Play"}
+        title={
+          playing
+            ? "Stops the clock and silences the output"
+            : "Starts the clock and opens the output"
+        }
+        onClick={() => setPlaying(!playing)}
       >
         {playing ? "■" : "▶"}
-      </button>
-
-      {/*
-        Separate from the transport on purpose, because they do different things and conflating them
-        would teach the wrong model. The transport is the clock; this is the output. A patch is a
-        modular, so an oscillator wired to the output drones whether or not the clock is running:
-        stopping the transport does not stop the sound, and something has to.
-      */}
-      <button
-        type="button"
-        className={styles.silence}
-        aria-pressed={muted}
-        aria-label={muted ? "Unsilence the output" : "Silence the output"}
-        title="Silences everything the engine plays, whatever the patch is doing"
-        onClick={() => {
-          const next = !muted;
-          setMuted(next);
-          void call("audio.setOutputGain", { gain: next ? 0 : 1 }).catch(
-            () => {},
-          );
-        }}
-      >
-        {muted ? "muted" : "sound"}
       </button>
 
       <label className={styles.field}>

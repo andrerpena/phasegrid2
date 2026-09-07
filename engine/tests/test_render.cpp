@@ -194,3 +194,33 @@ TEST_CASE("loadPatchJson surfaces GraphModel errors for bad edges", "[render]") 
                    "edges": [{"id": "e1", "from": {"module": "ghost", "port": "out"}, "to": {"module": "o", "port": "inL"}}]})")
               .code == "E_NODE_NOT_FOUND");
 }
+
+TEST_CASE("the master output level silences both render paths", "[render]") {
+  // The device path is `renderInterleaved`, not `renderBlock`, and a control that only worked on the
+  // one the tests happened to use would look right in every test and do nothing in the application.
+  pg::Registry reg;
+  pg::registerBuiltinModules(reg);
+  pg::Engine engine{reg, pg::EngineConfig{48000.0, 64}};
+  REQUIRE(engine.model().addNode(reg, {"src", "math.scaleOffset", {{"offset", 0.5f}}}));
+  REQUIRE(engine.model().addNode(reg, {"out", "io.audioOut", {}}));
+  REQUIRE(engine.model().addEdge(reg, {"e1", "src", "out", "out", "inL"}));
+  REQUIRE(engine.commit());
+
+  std::vector<float> l(64), r(64);
+  float* planar[2] = {l.data(), r.data()};
+  std::vector<float> interleaved(128);
+  pg::TransportSnapshot t;
+
+  engine.renderBlock(planar, 2, 64, t);
+  REQUIRE(l[0] != 0.f);
+  engine.renderInterleaved(interleaved.data(), 64, 2, t);
+  REQUIRE(interleaved[0] != 0.f);
+
+  engine.setOutputGain(0.f);
+  engine.renderBlock(planar, 2, 64, t);
+  REQUIRE(l[0] == 0.f);
+  std::fill(interleaved.begin(), interleaved.end(), 1.f);
+  engine.renderInterleaved(interleaved.data(), 64, 2, t);
+  REQUIRE(interleaved[0] == 0.f);
+  REQUIRE(interleaved[63] == 0.f);
+}
