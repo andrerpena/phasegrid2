@@ -183,12 +183,46 @@ Do not copy: `components/schema-form/` (read-only duplicate), `data-grid/`, `wor
 
 ### New domains
 - `catalog/catalog-store.ts`: `{ modules, byCategory, hash, status }` loaded on `engine.connected`, validated by `ModuleDescriptorSchema`. Fixture for Storybook/tests.
-- `patch/patch-store.ts`: `{ id, name, voiceCount, feedbackMode, modules: Record<id,{id,type,x,y,label?,params}>, edges }` + `applyOps(ops, {record, source})`. `patch/ops.ts`: `invert(ops, doc)`, `applyToDoc`. History entries are OSMC closures built from ops (`apply = applyOps(ops)`, `revert = applyOps(invert)`), so they are also serializable. Param drags: `beginGesture / setParamTransient / endGesture` → one entry.
+- `patch/patch-store.ts`: `{ id, name, voiceCount, feedbackMode, modules: Record<id,{id,type,x,y,label?,params,data?}>, edges }` + `applyOps(ops, {record, source})`. `patch/ops.ts`: `invert(ops, doc)`, `applyToDoc`. History entries are OSMC closures built from ops (`apply = applyOps(ops)`, `revert = applyOps(invert)`), so they are also serializable. Param drags: `beginGesture / setParamTransient / endGesture` → one entry.
 - `patch/engine-sync.ts`: listens to the store's `opsApplied` emitter, drops UI-only ops, sends `patch.batch`; reconciler resends `patch.load` + telemetry subs + transport on `engine.connected {restarted:true}`. `EngineClient` interface with `MockEngineClient`.
 - `grid/`: `GridView.tsx` (World.tsx clone: single effect, `cancelled` flag, ResizeObserver + ticker flush), copied `SimpleViewport`, renderer classes `{container, update(), destroy()}` subscribing to stores imperatively: `BackgroundRenderer`, `ModuleNodeRenderer` (from descriptors; inputs + implicit param jacks left, outputs right; implicit jacks shown on hover/connected), `CableRenderer` (cubic bezier, color by port kind, hit test by 24-segment sampling ≤ 6 px/zoom), `SelectionRenderer`, `DragCableRenderer`. `grid/layout.ts` pure `measureNode` (unit-tested). `grid/interaction.ts` state machine `idle → dragNodes | marquee | dragCable | pan`. `grid/snap.ts` (8 px). `selection/selection-store.ts` (module + edge ids).
 - `inspector/descriptor-to-schema.ts`: params → `ObjectSchema` (`schema.number().withMetadata({label, unit, description, renderer:"slider", min, max, step, curve})`, enums → `enumValues`). Extend `SchemaMetadata` with `min/max/step/curve`; add `SliderFieldRenderer` to `components/form/field-renderers/renderer-factory.tsx` emitting gesture begin/end. Form re-keyed on selected module id.
 - `telemetry/telemetry-store.ts`: `{ shmName, slotsByModule }`; opens reader on connect; subscribes for all `display.*` modules (debounced on patch change).
 - `project/`: `project-store.ts` `{ rootPath, name, dirty, patches[] }`; `project-fs.ts` writes `project.json`, `patches/<id>.json` (`schemaVersion` + migration table), `.phasegrid/ui-state.json`. `services/storage/electron-config-storage.ts` implements OSMC's `ConfigStorageProvider` over `window.appStorage` (keybindings/layout/theme are app-level).
+
+### Pixi surfaces and the piano roll (new)
+
+**Pixi Applications are a budgeted resource.** Each one owns a WebGL context and browsers cap how many
+may be live at once, so only full-view editors get one: the grid, and the piano roll. Small per-module
+visualisations (`display.scope`, `display.meter`) draw with a 2D canvas, because a patch may hold dozens
+and one Application each would exhaust the context budget. OSMC's `hooks/usePixiApp.ts` already creates
+and destroys an Application per component, with a guard against the async-init race, so a second surface
+needs no change to it.
+
+**The piano roll is its own Pixi surface inside a modal**, not part of the grid. A `notes.clip` node opens
+it, through the existing `widget.openInModal` command. `pianoRoll/` mirrors `grid/`: a `PianoRollView.tsx`
+owning the Application, its own `SimpleViewport`, and renderer classes `{container, update(), destroy()}`
+subscribing to stores imperatively — a background and beat grid, notes, a selection layer, a playhead fed
+by transport telemetry, and a velocity lane.
+
+**View state lives in a store, never in the Application.** The modal unmounts its children when it closes
+(Headless UI's default) and `usePixiApp` destroys the Application with it, so scroll, zoom, grid division,
+snap and note selection belong to `pianoRoll/piano-roll-store.ts`. Reopening the modal restores the view
+the user left.
+
+**Note edits are patch ops.** A clip's notes live in the owning node's `data`, so editing them goes through
+`patch-store.applyOps` like every other change, and undo, redo and engine sync work unchanged. The engine
+treats note data as structural and rebuilds the clip instance, which is free because the clip derives its
+playhead from the transport.
+
+**Input arbitration already exists.** `keybindings/context.ts` carries `modalOpen`, and OSMC's
+`components/floating/modal/modalState.ts` exposes a subscribable store precisely so non-React code can stop
+handling input while a modal is open. The grid's interaction state machine must observe it, so dragging in
+the piano roll never moves a node behind it.
+
+**Porting note.** OSMC's `Modal.tsx` is the most Tailwind-dependent component on the copy whitelist: size and
+alignment maps plus `data-[closed]:` variants. Those become CSS Module classes with attribute selectors on
+the same Headless UI state attributes. `@headlessui/react` is a new dependency introduced by this phase.
 
 ### Widgets and commands (M1)
 Widgets: `grid` (center, pinned, wide, unscrollable), `inspector` (right-top), `catalog` (left-top, searchable tree, double-click adds), `scope` (right-bottom, scope + meters), `logs` (center-bottom), `settings` (left-bottom, Monaco JSON config), `history` (left-bottom). `transport` control bar in the Dock `top` slot (play/stop, tempo, device, engine status).
