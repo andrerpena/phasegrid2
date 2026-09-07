@@ -23,6 +23,14 @@ effects, modulators and the wavetable authoring layer. JUCE is replaced by `engi
 never use the names "Vital"/"Tytel" in ids, UI or binaries. `npm run lint:trademark` enforces the naming rule over
 `engine/src`, `shared` and `src`.
 
+`engine/src/vital/` adapts that library to the Grid. `pg::vendor::WrappedModule` is a single `Module` implementation
+that wraps any `vital::SynthModule`; a module type is a `pg::vendor::ModuleSpec` value (see
+`engine/src/modules/vital/`), and `buildDescriptor` generates its `ModuleDescriptor` at registry time from the
+vendored parameter table, so param ranges and units are the DSP's own. Two traps the vendored framework sets:
+every `vital::Output` needs a non-null `owner` Processor (`ModulationSum::process` dereferences it to ask whether
+the signal is control rate), and a control's `string_lookup` may be shorter than its own min..max range when the
+names depend on another control -- `ControlOverride::suppressLabels` covers that case.
+
 The JUCE shim (`engine/vendor/vital/shim/JuceHeader.h`) reaches **every** engine translation unit, via
 `core/Conventions.hpp` → `common.h`, and it declares `String`, `MemoryOutputStream`, `Base64`, `ProjectInfo` and the
 `JUCE_*` macros at **global** scope. Those names are therefore effectively taken engine-wide: do not introduce a
@@ -35,14 +43,22 @@ attributed to our sources.
 
 `ParamDesc` has min/max/default in display units and a curve. `ParamState` stores the normalized target and a 5 ms smoother.
 Modulatable params get an implicit input port `param:<id>`; effective value = `denormalize(clamp(knobNorm + signal))`, lane-wise.
-Modules read `ctx.param(i).at(frame)` as a `Sample`.
+Modules read `ctx.param(i).at(frame)` as a `Sample`. `ParamView::knob` carries the *unmodulated* value for the block,
+so a module that has to hand the knob and the modulation to a downstream engine separately recovers the modulation
+as `at(i) - knob`.
+
+`kParamStructural` marks a param that cannot be applied to a live instance (an LFO shape, a wavetable choice):
+`InstanceTable::acquire` builds a fresh instance instead of reusing the old one. A structural param may never be
+`kParamModulatable` -- `Registry::add` rejects that -- because it is read once, on the message thread, by
+`Module::configure(const ParamValues&)`, which runs before `prepare()`.
 
 ## Program and hot-swap
 
 `GraphModel` → `compileGraph` → `Program` (Block buffers, event buffers, ops, feedback states) on the message thread.
 `Engine::commit` publishes with one atomic exchange; the audio thread adopts it at the next block and retires the old one.
 When the retire queue fills, `Engine` keeps a `deferred_` program and adopts it on a later block; `commit()` runs `collectGarbage()` at entry.
-`InstanceTable` reuses a `ModuleInstance` when `(id, type)` is unchanged; a change of sample rate or voice count makes it create fresh instances (DSP state resets).
+`InstanceTable` reuses a `ModuleInstance` when `(id, type)` and every `kParamStructural` param value are unchanged;
+a change of sample rate or voice count makes it create fresh instances (DSP state resets).
 Feedback memory is reused by edge id. Param changes never compile: `Engine::setParam` enqueues `{serial, param, norm}`; the audio thread applies it by binary search.
 
 **Model params are applied at instance creation only.** `InstanceTable::acquire` copies `NodeModel::params` into a
@@ -77,7 +93,7 @@ Event inputs are always valid buffers (empty when unconnected).
 
 ## Tests
 
-`npm run engine:test` runs 55 Catch2 tests. `PG_WERROR=ON npm run engine:test` additionally builds with `-Werror`
+`npm run engine:test` runs 65 Catch2 tests. `PG_WERROR=ON npm run engine:test` additionally builds with `-Werror`
 (CI does this; it is off by default because `postinstall` builds the engine on end-user machines).
 
 Headless render, using a patch built from builtin modules only:
