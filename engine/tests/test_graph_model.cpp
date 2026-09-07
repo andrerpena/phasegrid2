@@ -35,3 +35,13 @@ TEST_CASE("GraphModel validates nodes, edges and params", "[model]") {
   REQUIRE(m.edges().count("e1") == 0);
   REQUIRE(m.removeNode("c").code == "E_NODE_NOT_FOUND");
 }
+
+TEST_CASE("GraphModel detects unknown types with empty registry", "[model]") {
+  pg::GraphModel m;
+  REQUIRE(m.addNode(reg(), {"c", "test.const", {{"value", 0.5f}}}));
+  REQUIRE(m.addNode(reg(), {"g", "test.gain", {}}));
+
+  pg::Registry emptyReg;
+  REQUIRE(m.addEdge(emptyReg, {"e1", "c", "out", "g", "in"}).code == "E_UNKNOWN_TYPE");
+  REQUIRE(m.setParam(emptyReg, "g", "gain", 0.25f).code == "E_UNKNOWN_TYPE");
+}
