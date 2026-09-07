@@ -95,6 +95,19 @@ export class NodeView {
     this.view.position.set(module.x ?? 0, module.y ?? 0);
   }
 
+  /** The value a parameter currently shows: the module's own, or the descriptor's default. */
+  valueFor(paramId: string): number {
+    return this.valueOf(paramId);
+  }
+
+  /** Moves one knob without going through the document, so a drag is smooth before it is committed. */
+  setParamValue(paramId: string, value: number): void {
+    const param = this.descriptor.params.find((p) => p.id === paramId);
+    const knob = this.knobs.get(paramId);
+    if (param === undefined || knob === undefined) return;
+    knob.update(paramFraction(param, value));
+  }
+
   private valueOf(paramId: string): number {
     const explicit = this.module.params?.[paramId];
     if (explicit !== undefined) return explicit;

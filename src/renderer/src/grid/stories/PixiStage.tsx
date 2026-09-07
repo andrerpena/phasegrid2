@@ -44,6 +44,10 @@ export const PixiStage = ({
       await created.init({
         width,
         height,
+        // WebGL rather than letting Pixi choose. Its WebGPU path fails to acquire a context in some
+        // Electron configurations and the only symptom is a canvas that never appears; WebGL is
+        // available everywhere this runs and is more than enough for two dimensions of flat shapes.
+        preference: "webgl",
         antialias: true,
         autoDensity: true,
         resolution: window.devicePixelRatio,

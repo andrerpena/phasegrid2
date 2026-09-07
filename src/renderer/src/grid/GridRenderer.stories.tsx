@@ -4,6 +4,7 @@ import { Container } from "pixi.js";
 import { useCallback } from "react";
 import { GridRenderer } from "./GridRenderer";
 import { DEMO_PATCH, DESCRIPTORS } from "./stories/fixtures";
+import { InteractivePatch } from "./stories/InteractivePatch";
 import { PixiStage } from "./stories/PixiStage";
 
 /**
@@ -47,3 +48,26 @@ export const ZoomedOut: StoryObj = { render: () => <PatchStage zoom={0.3} /> };
 
 /** Close in, where the knob arcs and port rings are meant to hold up. */
 export const ZoomedIn: StoryObj = { render: () => <PatchStage zoom={1.6} /> };
+
+/**
+ * The working grid: drag a module, drag a knob.
+ *
+ * There is no engine behind this. The story holds the document in ordinary state and applies the same
+ * operations the application applies, through the same code, so anything that works here works there
+ * and anything broken here is broken there.
+ *
+ * Modules snap to grid cells. Knobs are dragged vertically, and holding shift stretches the same
+ * gesture over five times the distance for setting a value by ear.
+ */
+export const Interactive: StoryObj = {
+  parameters: { layout: "padded" },
+  render: () => <InteractivePatch initial={DEMO_PATCH} />,
+};
+
+/** The same, without the document panel, for looking at rather than poking. */
+export const InteractiveBare: StoryObj = {
+  parameters: { layout: "padded" },
+  render: () => (
+    <InteractivePatch initial={DEMO_PATCH} showDocument={false} width={1100} />
+  ),
+};

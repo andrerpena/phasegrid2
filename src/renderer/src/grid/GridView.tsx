@@ -1,44 +1,34 @@
 import { useCatalogStore } from "@renderer/catalog/catalog-store";
 import { usePatchStore } from "@renderer/patch/patch-store";
 import { useThemeStore } from "@renderer/theming/theme-store";
+import type { PatchOp } from "@shared/protocol/patch";
 import { Application } from "pixi.js";
 // Pixi compiles its shaders with `Function` by default, which the renderer's content policy forbids.
 // This module swaps in an interpreted path. Without it the application never initialises and the only
 // symptom is a canvas that never appears.
 import "pixi.js/unsafe-eval";
 import { useEffect, useRef } from "react";
+import { GridInteraction } from "./GridInteraction";
 import { GridRenderer } from "./GridRenderer";
 import styles from "./GridView.module.css";
-import {
-  beginDragNodes,
-  beginMarquee,
-  beginPan,
-  IDLE,
-  type Interaction,
-  pointerMove,
-  pointerUp,
-} from "./interaction";
-import { CELL, snap } from "./layout";
 
 /**
  * React's entire involvement with the canvas: create it, hand it to the renderer, destroy it.
  *
- * Everything inside is imperative. Subscribing to the stores directly rather than re-rendering means a
- * drag moves nodes without React seeing a single one of the frames.
+ * The drawing and the pointer handling live outside React, subscribing to the stores directly, so a
+ * drag moves nodes without React seeing a single one of the frames. What is left here is the part React
+ * is actually good at: owning an element's lifetime.
  */
 export const GridView = () => {
   const host = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Guards against the async gap: React can unmount before `init` resolves, and without this the
-    // canvas is appended to an element that is no longer in the document and never destroyed.
+    // Guards the async gap: React can unmount before `init` resolves, and without this the canvas is
+    // appended to an element no longer in the document and never destroyed.
     let cancelled = false;
     let app: Application | null = null;
     let renderer: GridRenderer | null = null;
-    let stopPatch: (() => void) | null = null;
-    let stopTheme: (() => void) | null = null;
-    let stopCatalog: (() => void) | null = null;
-    let observer: ResizeObserver | null = null;
+    const stop: (() => void)[] = [];
 
     const setup = async () => {
       const element = host.current;
@@ -47,6 +37,10 @@ export const GridView = () => {
       await created.init({
         resizeTo: element,
         backgroundAlpha: 0,
+        // WebGL rather than letting Pixi choose. Its WebGPU path fails to acquire a context in some
+        // Electron configurations and the only symptom is a canvas that never appears; WebGL is
+        // available everywhere this runs and is more than enough for two dimensions of flat shapes.
+        preference: "webgl",
         antialias: true,
         autoDensity: true,
         resolution: window.devicePixelRatio,
@@ -58,158 +52,63 @@ export const GridView = () => {
       app = created;
       element.appendChild(created.canvas);
 
-      const theme = useThemeStore.getState().theme;
-      // A local const as well as the outer binding: the handlers below all run while this renderer is
-      // alive, so capturing it here is what lets them use it without asserting it is not null at every
-      // single call.
       const view = new GridRenderer(
         created,
-        theme,
+        useThemeStore.getState().theme,
         useCatalogStore.getState().byId,
       );
       renderer = view;
       view.sync(usePatchStore.getState().doc);
 
-      stopPatch = usePatchStore.subscribe((state) => renderer?.sync(state.doc));
-      stopTheme = useThemeStore.subscribe((state) =>
-        renderer?.setTheme(state.theme),
-      );
+      stop.push(usePatchStore.subscribe((state) => view.sync(state.doc)));
+      stop.push(useThemeStore.subscribe((state) => view.setTheme(state.theme)));
       // The catalogue arrives after the engine handshake, which is after this runs. Without this the
       // renderer keeps the empty map it was built with and silently draws nothing: every module in the
       // patch looks like a type it has never heard of.
-      stopCatalog = useCatalogStore.subscribe((state) => {
-        renderer?.setCatalog(state.byId);
-        renderer?.sync(usePatchStore.getState().doc);
-      });
+      stop.push(
+        useCatalogStore.subscribe((state) => {
+          view.setCatalog(state.byId);
+          view.sync(usePatchStore.getState().doc);
+        }),
+      );
 
-      observer = new ResizeObserver(() => renderer?.drawBackground());
+      const observer = new ResizeObserver(() => view.drawBackground());
       observer.observe(element);
+      stop.push(() => observer.disconnect());
 
-      let interaction: Interaction = IDLE;
-      const dragStart = new Map<string, { x: number; y: number }>();
-
-      const worldPoint = (event: PointerEvent) => {
-        const box = created.canvas.getBoundingClientRect();
-        return view.viewport.toWorld({
-          x: event.clientX - box.left,
-          y: event.clientY - box.top,
-        });
-      };
-
-      created.canvas.addEventListener("pointerdown", (event) => {
-        const point = worldPoint(event);
-        // Middle button or space-drag pans; that is the convention everywhere and muscle memory is
-        // worth more than any argument for a different one.
-        if (event.button === 1) {
-          interaction = beginPan({ x: event.clientX, y: event.clientY });
-          return;
-        }
-        const hit = view.nodeAt(point);
-        if (hit !== null) {
-          interaction = beginDragNodes([hit.id], point);
-          dragStart.clear();
-          const doc = usePatchStore.getState().doc;
-          for (const module of doc.modules)
-            if (module.id === hit.id)
-              dragStart.set(module.id, { x: module.x ?? 0, y: module.y ?? 0 });
-          view.setSelection(new Set([hit.id]));
-          return;
-        }
-        interaction = beginMarquee(point, event.shiftKey);
-        view.setSelection(new Set());
-      });
-
-      window.addEventListener("pointermove", (event) => {
-        if (interaction.kind === "idle") return;
-        if (interaction.kind === "panning") {
-          const result = pointerMove(interaction, {
-            x: event.clientX,
-            y: event.clientY,
-          });
-          interaction = result.next;
-          if (result.pan !== undefined)
-            view.viewport.panBy(result.pan.x, result.pan.y);
-          view.drawBackground();
-          return;
-        }
-        const point = worldPoint(event);
-        const result = pointerMove(interaction, point);
-        interaction = result.next;
-        if (interaction.kind === "dragNodes" && interaction.moved) {
-          const dx = interaction.last.x - interaction.start.x;
-          const dy = interaction.last.y - interaction.start.y;
-          // Moved live without recording anything: the undo entry is written once, on release.
+      const interaction = new GridInteraction(view, created.canvas, {
+        onNodesMoved: (moves) => {
           usePatchStore.getState().apply(
-            interaction.ids.flatMap((id) => {
-              const from = dragStart.get(id);
-              return from === undefined
-                ? []
-                : [
-                    {
-                      op: "moduleMove" as const,
-                      id,
-                      x: snap(from.x + dx, CELL),
-                      y: snap(from.y + dy, CELL),
-                    },
-                  ];
-            }),
-          );
-        }
-        if (interaction.kind === "marquee") {
-          view.drawOverlay(
+            moves.map(
+              (m): PatchOp => ({ op: "moduleMove", id: m.id, x: m.x, y: m.y }),
+            ),
             {
-              x: Math.min(interaction.start.x, interaction.current.x),
-              y: Math.min(interaction.start.y, interaction.current.y),
-              width: Math.abs(interaction.start.x - interaction.current.x),
-              height: Math.abs(interaction.start.y - interaction.current.y),
+              label:
+                moves.length > 1
+                  ? `Move ${moves.length} modules`
+                  : "Move module",
             },
-            null,
           );
-        }
+        },
+        onParamChange: (module, param, value, done) => {
+          // Every intermediate value reaches the engine, so the sound follows the knob; only the
+          // release is labelled, so the whole gesture is one step back rather than a hundred.
+          usePatchStore
+            .getState()
+            .apply(
+              [{ op: "paramSet", module, param, value, transient: !done }],
+              done ? { label: "Set parameter" } : {},
+            );
+        },
       });
-
-      window.addEventListener("pointerup", (event) => {
-        if (interaction.kind === "idle") return;
-        const end = pointerUp(interaction, worldPoint(event));
-        interaction = end.next;
-        view.drawOverlay(null, null);
-        if (end.marquee !== undefined) {
-          const selected = new Set<string>();
-          for (const [id, node] of view.allNodes()) {
-            const r = end.marquee.rect;
-            const nx = node.view.position.x;
-            const ny = node.view.position.y;
-            if (
-              nx < r.x + r.width &&
-              nx + node.layout.width > r.x &&
-              ny < r.y + r.height &&
-              ny + node.layout.height > r.y
-            )
-              selected.add(id);
-          }
-          view.setSelection(selected);
-        }
-      });
-
-      created.canvas.addEventListener("wheel", (event) => {
-        event.preventDefault();
-        const box = created.canvas.getBoundingClientRect();
-        view.viewport.zoomAt(
-          { x: event.clientX - box.left, y: event.clientY - box.top },
-          event.deltaY < 0 ? 1.1 : 1 / 1.1,
-        );
-        view.drawBackground();
-      });
+      stop.push(interaction.attach());
     };
 
     void setup();
 
     return () => {
       cancelled = true;
-      stopPatch?.();
-      stopTheme?.();
-      stopCatalog?.();
-      observer?.disconnect();
+      for (const off of stop) off();
       renderer?.destroy();
       app?.destroy(true, { children: true });
     };

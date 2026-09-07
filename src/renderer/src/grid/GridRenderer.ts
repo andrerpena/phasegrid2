@@ -48,6 +48,8 @@ export class GridRenderer {
   private readonly cables = new Map<string, Cable>();
   private selection = new Set<string>();
   private hoveredNode: string | null = null;
+  /** The last document drawn, so cables can be redrawn without one being passed in again. */
+  private doc: PatchDoc | null = null;
 
   constructor(
     private readonly app: Application,
@@ -89,6 +91,7 @@ export class GridRenderer {
 
   /** Reconciles what is drawn with the document. Called when the patch changes, not every frame. */
   sync(doc: PatchDoc): void {
+    this.doc = doc;
     const seen = new Set<string>();
     for (const module of doc.modules) {
       seen.add(module.id);
@@ -141,6 +144,28 @@ export class GridRenderer {
       if (seenEdges.has(id)) continue;
       cable.destroy();
       this.cables.delete(id);
+    }
+  }
+
+  /**
+   * Redraws the cables against where the nodes are now.
+   *
+   * Dragging moves nodes on the canvas without touching the document, so the cables have to be told.
+   * Without this they stay pinned to where the modules used to be and the patch appears to come apart
+   * while a drag is in progress.
+   */
+  refreshCables(): void {
+    if (this.doc === null) return;
+    for (const edge of this.doc.edges) {
+      const cable = this.cables.get(edge.id);
+      const from = this.portPosition(
+        edge.from.module,
+        edge.from.port,
+        "output",
+      );
+      const to = this.portPosition(edge.to.module, edge.to.port, "input");
+      if (cable === undefined || from === null || to === null) continue;
+      cable.update(from, to);
     }
   }
 

@@ -12,6 +12,17 @@ import type { Point } from "./layout";
 
 export type Interaction =
   | { kind: "idle" }
+  | {
+      kind: "dragParam";
+      module: string;
+      param: string;
+      /** Where the pointer went down, in screen pixels: a knob drag is measured in pixels, not patch
+       * units, so it feels the same at every zoom. */
+      startY: number;
+      /** The value when the drag began, as a fraction of the parameter's range. */
+      startFraction: number;
+      fraction: number;
+    }
   | { kind: "panning"; last: Point }
   | {
       kind: "dragNodes";
@@ -53,6 +64,47 @@ export function beginDragCable(
   return { kind: "dragCable", from, fromSide, current: at };
 }
 
+/** How far the pointer travels, in screen pixels, to sweep a knob's whole range. */
+export const KNOB_DRAG_RANGE = 180;
+/** With a modifier held. Slow enough to set a filter cutoff by ear rather than by luck. */
+export const KNOB_FINE_RANGE = 900;
+
+export function beginDragParam(
+  module: string,
+  param: string,
+  startY: number,
+  startFraction: number,
+): Interaction {
+  return {
+    kind: "dragParam",
+    module,
+    param,
+    startY,
+    startFraction,
+    fraction: startFraction,
+  };
+}
+
+/**
+ * Where a knob drag has got to.
+ *
+ * Upward increases, which is the convention every plug-in uses, and the travel is measured in screen
+ * pixels rather than patch units so a knob feels identical whether the patch is zoomed in or out. The
+ * fine modifier stretches the same gesture over five times the distance.
+ */
+export function dragParamTo(
+  state: Extract<Interaction, { kind: "dragParam" }>,
+  y: number,
+  fine: boolean,
+): Extract<Interaction, { kind: "dragParam" }> {
+  const range = fine ? KNOB_FINE_RANGE : KNOB_DRAG_RANGE;
+  const moved = (state.startY - y) / range;
+  return {
+    ...state,
+    fraction: Math.min(1, Math.max(0, state.startFraction + moved)),
+  };
+}
+
 export interface MoveResult {
   next: Interaction;
   /** How far to move the dragged nodes, in patch units. Zero unless dragging nodes. */
@@ -63,6 +115,10 @@ export interface MoveResult {
 
 export function pointerMove(state: Interaction, at: Point): MoveResult {
   switch (state.kind) {
+    case "dragParam":
+      // Knob drags are driven by screen position, which `pointerMove` does not carry; the caller uses
+      // `dragParamTo` instead. Handled here only so the state machine stays exhaustive.
+      return { next: state };
     case "panning":
       return {
         next: { ...state, last: at },
@@ -100,10 +156,21 @@ export interface EndResult {
   };
   /** Where a cable was released, for the caller to hit test. */
   cableDrop?: { from: PortRef; fromSide: "input" | "output"; at: Point };
+  /** A finished knob drag: the point at which it becomes one undo entry rather than a hundred. */
+  committedParam?: { module: string; param: string; fraction: number };
 }
 
 export function pointerUp(state: Interaction, at: Point): EndResult {
   switch (state.kind) {
+    case "dragParam":
+      return {
+        next: IDLE,
+        committedParam: {
+          module: state.module,
+          param: state.param,
+          fraction: state.fraction,
+        },
+      };
     case "dragNodes":
       return {
         next: IDLE,
