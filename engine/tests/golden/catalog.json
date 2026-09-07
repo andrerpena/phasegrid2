@@ -1,5 +1,5 @@
 {
-  "catalogHash": "b026417ebced6584",
+  "catalogHash": "a2342e52fb3c1624",
   "conventions": {
     "blockSize": 128,
     "gateThreshold": 0,
@@ -4619,6 +4619,104 @@
         }
       ],
       "params": []
+    },
+    {
+      "category": "note",
+      "doc": "Plays a list of notes against the transport and emits them as a note stream. The notes live in the node's data as \"notes\": an array of {start, length, pitch, velocity} objects, start and length in beats from the clip's start, pitch a MIDI note number and velocity 0..1. Anything else in that array is rejected as a whole and the clip plays nothing. The playhead is derived from the transport, so it follows the host when it plays, free-runs at the transport tempo when it does not, and survives an edit to the notes.",
+      "flags": {
+        "needsTransport": true,
+        "terminal": false,
+        "writesTelemetry": false
+      },
+      "id": "notes.clip",
+      "inputs": [
+        {
+          "doc": "High runs the clip; low stops it and releases every note it is holding. Unconnected, the clip runs",
+          "id": "play",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Play",
+          "role": "gate"
+        }
+      ],
+      "name": "Clip",
+      "outputs": [
+        {
+          "doc": "Note on and note off events for the notes the playhead is over",
+          "id": "notes",
+          "implicit": false,
+          "kind": "event",
+          "name": "Notes",
+          "role": "note"
+        },
+        {
+          "doc": "Playhead over the clip: 0 at its start, just under 1 at its end",
+          "id": "phase",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Phase",
+          "role": "phase"
+        }
+      ],
+      "params": [
+        {
+          "curve": "linear",
+          "default": 4.0,
+          "doc": "How long the clip is, in beats. Zero is a clip that never plays",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "length",
+          "max": 256.0,
+          "min": 0.0,
+          "name": "Length",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "Repeat from the start at the end of the clip, rather than playing it once",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "loop",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Loop",
+          "uiWidget": "toggle",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Semitones added to each note as it starts",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "structural": false
+          },
+          "id": "transpose",
+          "max": 48.0,
+          "min": -48.0,
+          "name": "Transpose",
+          "uiWidget": "slider",
+          "unit": "semitones"
+        }
+      ]
     },
     {
       "category": "osc",
