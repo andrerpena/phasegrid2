@@ -121,3 +121,38 @@ TEST_CASE("engine renders interleaved for arbitrary device periods", "[engine]")
   REQUIRE(buf[0] == Catch::Approx(0.25f));
   REQUIRE(buf[199] == Catch::Approx(0.25f));
 }
+
+TEST_CASE("a model param change is heard after a commit, on an instance the compile reused", "[engine]") {
+  // The batch route: `patch.batch` and `patch.load` write the model and commit, and never call
+  // `Engine::setParam`. The instance survives the compile with the values it was created with, so
+  // without a reconcile the model is ahead of the engine and a knob turned this way does nothing.
+  Rig rig;
+  rig.add("c", "test.const", {{"value", 1.f}}); rig.add("g", "test.gain", {{"gain", 1.f}}); rig.add("s", "test.sink");
+  rig.edge("e1", "c", "out", "g", "in"); rig.edge("e2", "g", "out", "s", "in");
+  REQUIRE(rig.engine.commit());
+  rig.render();
+  REQUIRE(rig.l[0] == Catch::Approx(1.f));
+
+  REQUIRE(rig.engine.model().setParam(rig.reg, "g", "gain", 0.f));
+  REQUIRE(rig.engine.commit());
+  for (int i = 0; i < 40; ++i) rig.render();
+  REQUIRE(rig.l[63] == Catch::Approx(0.f).margin(1e-4));
+}
+
+TEST_CASE("loading a patch over a live one applies its values to nodes that kept their id", "[engine]") {
+  // Two example projects both call their oscillator "osc". Opening the second replaces the model
+  // wholesale; the instance is reused because (id, type) match, and must take the new project's value.
+  Rig rig;
+  rig.add("c", "test.const", {{"value", 0.5f}}); rig.add("s", "test.sink");
+  rig.edge("e", "c", "out", "s", "in");
+  REQUIRE(rig.engine.commit());
+  rig.render();
+  REQUIRE(rig.l[0] == Catch::Approx(0.5f));
+
+  rig.engine.model().clear();
+  rig.add("c", "test.const", {{"value", 0.25f}}); rig.add("s", "test.sink");
+  rig.edge("e", "c", "out", "s", "in");
+  REQUIRE(rig.engine.commit());
+  for (int i = 0; i < 40; ++i) rig.render();
+  REQUIRE(rig.l[63] == Catch::Approx(0.25f).margin(1e-4));
+}

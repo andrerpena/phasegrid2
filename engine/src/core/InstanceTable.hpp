@@ -14,17 +14,15 @@ public:
   /// A change of sample rate, block size or voice count creates fresh instances (DSP state resets);
   /// reuse only happens while PrepareInfo is unchanged.
   ///
-  /// `params` is applied at creation ONLY. A reused instance keeps the values it already has, so a
-  /// `NodeModel::params` change that reaches the model by any route other than `Engine::setParam`
-  /// (today: `loadPatchJson`, which writes straight into the `GraphModel`) leaves the model ahead of
-  /// the engine for every node whose `(id, type)` survived the compile.
+  /// `params` is applied here at creation ONLY. A reused instance keeps the values it already has,
+  /// and this is deliberate: `ParamState` is owned by the audio thread once `prepare` has run — the
+  /// param drain calls `setTargetNorm` on it every block — so the message thread must never write it.
+  /// Calling `setTargetNorm` from here would be a data race, not a fix.
   ///
-  /// This is deliberate and must stay that way: `ParamState` is owned by the audio thread once
-  /// `prepare` has run — the param drain calls `setTargetNorm` on it every block — so the message
-  /// thread must never write it. Calling `setTargetNorm` from here would be a data race, not a fix.
-  /// Any future path that loads a patch into a *live* engine has to diff against a message-thread
-  /// "last applied" snapshot and push each changed value through `Engine::setParam` (the queue).
-  /// No such path exists yet: `--render` builds a fresh Engine per patch.
+  /// A `NodeModel::params` change that reaches the model by any route other than `Engine::setParam`
+  /// (`patch.batch`, `patch.load`, `loadPatchJson`) is instead reconciled by `Engine::commit`, which
+  /// diffs the model against `ModuleInstance::appliedValues` after every compile and pushes each
+  /// changed value through the param queue, the same way a knob does.
   ///
   /// `data` is `NodeModel::data`, and unlike `params` it IS diffed: it is structural, so a change to it
   /// builds a fresh instance rather than leaving the model ahead of the engine.
@@ -37,6 +35,7 @@ public:
   std::shared_ptr<FeedbackState> acquireFeedback(const std::string& edgeId, uint32_t voicePairs);
   void prune(const std::set<std::string>& liveNodeIds, const std::set<std::string>& liveEdgeIds);
   const ModuleInstance* find(const std::string& id) const;
+  ModuleInstance* find(const std::string& id);
   /// Stops every module publishing telemetry. Message thread; the audio thread reads these atomically.
   void clearTelemetrySlots();
   size_t size() const { return byId_.size(); }

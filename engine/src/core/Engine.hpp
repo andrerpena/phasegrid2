@@ -61,6 +61,7 @@ public:
   void renderInterleaved(float* out, uint32_t frames, uint32_t channels, const TransportSnapshot& t) noexcept PG_RT_NONBLOCKING;
 
 private:
+  void reconcileParams();
   void swapIfPending();
   void drainParams();
 

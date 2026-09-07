@@ -24,7 +24,7 @@ std::shared_ptr<ModuleInstance> InstanceTable::acquire(const std::string& id, co
     for (uint32_t i = 0; i < type.desc->numParams && structuralSame; ++i) {
       const ParamDesc& d = type.desc->params[i];
       if (!(d.flags & kParamStructural)) continue;
-      structuralSame = modelValue(d) == it->second->structuralValues[i];
+      structuralSame = modelValue(d) == it->second->appliedValues[i];
     }
     if (structuralSame) return it->second;
   }
@@ -38,8 +38,8 @@ std::shared_ptr<ModuleInstance> InstanceTable::acquire(const std::string& id, co
     inst->module.reset(type.desc->create());
   }
   inst->params.resize(type.desc->numParams);
-  inst->structuralValues.reserve(type.desc->numParams);
-  for (uint32_t i = 0; i < type.desc->numParams; ++i) inst->structuralValues.push_back(modelValue(type.desc->params[i]));
+  inst->appliedValues.reserve(type.desc->numParams);
+  for (uint32_t i = 0; i < type.desc->numParams; ++i) inst->appliedValues.push_back(modelValue(type.desc->params[i]));
   inst->nodeData = data;
   inst->module->configure(params, data);   // structural params and node data take effect here; prepare() may allocate around them
   inst->module->prepare(info);
@@ -69,6 +69,11 @@ void InstanceTable::clearTelemetrySlots() {
 }
 
 const ModuleInstance* InstanceTable::find(const std::string& id) const {
+  auto it = byId_.find(id);
+  return it == byId_.end() ? nullptr : it->second.get();
+}
+
+ModuleInstance* InstanceTable::find(const std::string& id) {
   auto it = byId_.find(id);
   return it == byId_.end() ? nullptr : it->second.get();
 }

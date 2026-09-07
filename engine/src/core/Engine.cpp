@@ -42,7 +42,35 @@ Result Engine::commit() {
   }
   ++revision_;
   if (Program* stale = pending_.exchange(out.program.release(), std::memory_order_acq_rel)) delete stale;
+  reconcileParams();
   return {};
+}
+
+/**
+ * Pushes model values that arrived by a route other than `setParam` into the instances that outlived
+ * the compile.
+ *
+ * `patch.batch`, `patch.load` and `loadPatchJson` all write the model and commit, and a compile reuses
+ * an instance whenever (id, type) and its structural values match. That instance still holds whatever
+ * it was created with, so without this a knob turned through a batch changed the document and nothing
+ * else, and opening a project over another one kept the old project's values on every node that shared
+ * a name. Values go through the queue, never into `ParamState` directly: after `prepare` that belongs to
+ * the audio thread. A full queue leaves the snapshot alone so the next commit tries again.
+ */
+void Engine::reconcileParams() {
+  for (const auto& [id, node] : model_.nodes()) {
+    ModuleInstance* inst = instances_.find(id);
+    if (inst == nullptr || inst->type != registry_.find(node.type)) continue;
+    const ModuleDescriptor& desc = *inst->type->desc;
+    for (uint32_t i = 0; i < desc.numParams; ++i) {
+      const ParamDesc& d = desc.params[i];
+      if (d.flags & kParamStructural) continue;   // applied by rebuilding; `acquire` already compared it
+      const auto pv = node.params.find(d.id);
+      const float value = pv == node.params.end() ? d.def : pv->second;
+      if (value == inst->appliedValues[i]) continue;
+      if (params_.try_enqueue(ParamChange{inst->serial, i, paramNormalize(d, value)})) inst->appliedValues[i] = value;
+    }
+  }
 }
 
 /// Subscribing must not recompile: the assignment lives on the instance, which outlives every program.
@@ -67,6 +95,7 @@ Result Engine::setParam(const std::string& node, const std::string& param, float
   // (see InstanceTable::acquire). The caller is expected to retry.
   if (!params_.try_enqueue(ParamChange{inst->serial, static_cast<uint32_t>(idx), paramNormalize(d, value)}))
     return Result::fail("E_QUEUE_FULL", "param queue full");
+  const_cast<ModuleInstance*>(inst)->appliedValues[static_cast<size_t>(idx)] = model_.nodes().at(node).params.at(param);
   return {};
 }
 

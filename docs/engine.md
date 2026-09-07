@@ -254,15 +254,14 @@ When the retire queue fills, `Engine` keeps a `deferred_` program and adopts it 
 a change of sample rate or voice count makes it create fresh instances (DSP state resets).
 Feedback memory is reused by edge id. Param changes never compile: `Engine::setParam` enqueues `{serial, param, norm}`; the audio thread applies it by binary search.
 
-**Model params are applied at instance creation only.** `InstanceTable::acquire` copies `NodeModel::params` into a
-`ModuleInstance` when it creates one; a reused instance keeps the values it already has. After `prepare`, `ParamState`
-belongs to the audio thread (the param drain writes it every block), so the message thread must never touch it — that is
-why `acquire` does not "fix up" a reused instance. The consequence: anything that changes model params without going
-through `Engine::setParam` — today only `loadPatchJson`, which writes straight into the `GraphModel` — leaves the model
-ahead of the engine for every node whose `(id, type)` survived the compile. This is harmless now because `--render`
-builds a fresh `Engine` per patch. Any future path that loads a patch into a live engine must diff against a
-message-thread "last applied" snapshot and push each changed value through the param queue, never through the model
-alone. A dropped `E_QUEUE_FULL` enqueue has the same effect until the caller retries.
+**Model params are applied at instance creation, and reconciled on every commit.** `InstanceTable::acquire` copies
+`NodeModel::params` into a `ModuleInstance` when it creates one and never touches a reused instance: after `prepare`,
+`ParamState` belongs to the audio thread (the param drain writes it every block), so the message thread must not write
+it. Anything that changes model params without going through `Engine::setParam` — `patch.batch`, `patch.load`,
+`loadPatchJson` — is caught by `Engine::reconcileParams` at the end of `commit()`: it diffs the model against
+`ModuleInstance::appliedValues` (the message thread's "last applied" snapshot) for every non-structural param and pushes
+each difference through the param queue, exactly as a knob does. `setParam` keeps the snapshot current on its own path.
+A dropped `E_QUEUE_FULL` enqueue leaves the snapshot unchanged, so the next commit retries it.
 
 ## Feedback
 

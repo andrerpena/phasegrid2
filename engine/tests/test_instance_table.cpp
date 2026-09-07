@@ -53,11 +53,11 @@ TEST_CASE("InstanceTable rebuilds only when a structural param changes", "[insta
   REQUIRE(a.get() == b.get());
   auto c = table.acquire("n", *reg.find("test.structural"), info, {{"gain", 0.1f}, {"shape", 1.f}});   // structural change
   REQUIRE(a.get() != c.get());
-  REQUIRE(c->structuralValues[1] == 1.f);
+  REQUIRE(c->appliedValues[1] == 1.f);
   REQUIRE(c->serial != a->serial);
   auto d = table.acquire("n", *reg.find("test.structural"), info, {{"gain", 0.1f}});   // missing = default 0 -> rebuild again
   REQUIRE(d.get() != c.get());
-  REQUIRE(d->structuralValues[1] == 0.f);
+  REQUIRE(d->appliedValues[1] == 0.f);
 }
 
 TEST_CASE("InstanceTable configures a new instance with the model params before preparing it", "[instance_table]") {

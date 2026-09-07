@@ -31,9 +31,12 @@ struct ModuleInstance {
   const RegisteredModule* type = nullptr;
   std::unique_ptr<Module> module;
   std::vector<ParamState> params;
-  /// Display-unit value of every param at creation time (missing model params recorded as the default).
-  /// `InstanceTable::acquire` compares the kParamStructural entries to decide whether it may reuse this instance.
-  std::vector<float> structuralValues;
+  /// Display-unit value of every param as last handed to this instance, missing model params recorded as
+  /// the default. Message thread only. Two readers: `InstanceTable::acquire` compares the kParamStructural
+  /// entries to decide whether it may reuse the instance, and `Engine::commit` compares the rest against the
+  /// model to find values that arrived by a route other than `Engine::setParam` and push them through the
+  /// param queue. It is what keeps the model from getting ahead of the engine.
+  std::vector<float> appliedValues;
   /// `NodeModel::data` at creation time, compared the same way and for the same reason.
   NodeData nodeData = NodeData::object();
 };
