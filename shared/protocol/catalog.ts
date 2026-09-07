@@ -16,6 +16,9 @@ export const PortKindSchema = z.enum(["continuous", "event"]);
 /**
  * What a port means, for colouring and for the editor's connection hints only -- the engine never rejects a
  * patch over a role mismatch. Extending this list is how a new kind of signal is introduced.
+ *
+ * `note` is a role, not a kind: it marks an event port carrying a stream of pitch and velocity, where an
+ * event port carrying bare triggers stays `gate`. Each role has a `--color-signal-<role>` token.
  */
 export const SignalRoleSchema = z.enum([
   "any",
@@ -24,6 +27,7 @@ export const SignalRoleSchema = z.enum([
   "gate",
   "pitch",
   "phase",
+  "note",
 ]);
 
 export const ParamUnitSchema = z.enum([

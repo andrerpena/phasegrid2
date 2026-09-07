@@ -174,7 +174,26 @@ Do not copy: `components/schema-form/` (read-only duplicate), `data-grid/`, `wor
 
 ### CSS Modules and theme
 - `css/tokens.css`: `--font-size-{caption,body,heading,display}` = 12/14/16/24, `--space-{1..4}` = 4/8/12/16, radii. `docs/design-system.md` rewritten for these vars (no inline static px).
-- **JS theme is the single source.** `theming/theme.ts`: `PhasegridTheme { id, name, type, colors: UIColors (hex), grid: { background, gridLine, nodeFill, nodeStroke, nodeSelected, portContinuous, portEvent, portParam, cableContinuous, cableEvent, marquee } }`. `theming/apply-theme.ts` writes `--color-*` onto `documentElement.style` and sets `data-theme`. Pixi reads the same object via `useThemeStore` (`hexToNumber` from `lib/color.ts`). `css/theme.css` is deleted. User overrides stay in config key `theme`.
+- **JS theme is the single source.** `theming/theme.ts`: `PhasegridTheme { id, name, type, colors: UIColors (hex), grid: { background, gridLine, nodeFill, nodeStroke, nodeSelected, marquee, signal: Record<SignalRole, hex> } }`. `theming/apply-theme.ts` writes `--color-*` onto `documentElement.style` and sets `data-theme`. Pixi reads the same object via `useThemeStore` (`hexToNumber` from `lib/color.ts`). `css/theme.css` is deleted. User overrides stay in config key `theme`.
+- **Ports and cables are colored by signal role, not by port kind.** A port's role comes from the catalog
+  descriptor (`SignalRoleSchema` in `shared/protocol/catalog.ts`), so the editor never holds a table of its
+  own and a new role needs no UI change beyond a token. The seven roles and their colors:
+
+  | Role | Color | Meaning |
+  |---|---|---|
+  | `any` | grey | unspecified range, the default |
+  | `audio` | red | audio rate, nominal ±1 |
+  | `cv` | coral | control values, any range |
+  | `gate` | yellow | bistate; high at ≥ 0.5, a rise is a trigger |
+  | `pitch` | orange | 0 is middle C, 0.1 per octave |
+  | `phase` | purple | 0 to just under 1, wraps |
+  | `note` | green | event stream carrying pitch and velocity |
+
+  The role is a coloring hint only: the compiler accepts any output into any input, and `note` is a role on
+  an event port rather than a port kind of its own (an event port carrying bare triggers stays `gate`).
+  These live today as `--color-signal-{any,audio,cv,gate,pitch,phase,note}` in
+  `src/renderer/src/css/tokens.css`; the theme object above is what will own them once `theming/` is
+  copied over in the frontend phase, and `apply-theme.ts` will then write these same token names.
 - Each component gets `X.module.css`; Tailwind utilities become token-based CSS. `scripts/check-no-tailwind.mjs` runs in `npm run lint`.
 - Widget layout: replace `useWidgetLayoutStore` mirror with selectors over `useConfigStore` + actions calling `config.set`. No reverse subscription, no `JSON.stringify` compare.
 

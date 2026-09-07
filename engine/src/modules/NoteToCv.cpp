@@ -11,7 +11,7 @@ namespace {
 constexpr uint32_t kMaxHeld = 16;
 
 const PortDesc kIn[] = {
-  {"notes", "Notes", PortKind::Event, 0, SignalRole::Any, "Note events to play, monophonically"},
+  {"notes", "Notes", PortKind::Event, 0, SignalRole::Note, "Note events to play, monophonically"},
 };
 const PortDesc kOut[] = {
   {"pitch", "Pitch", PortKind::Continuous, 1, SignalRole::Pitch, "Pitch of the sounding note, 0.1 per octave from middle C"},

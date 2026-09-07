@@ -1,5 +1,5 @@
 {
-  "catalogHash": "8cc576888b6e1d73",
+  "catalogHash": "3ca74be70c0c8c09",
   "conventions": {
     "blockSize": 128,
     "gateThreshold": 0,
@@ -4487,7 +4487,7 @@
           "implicit": false,
           "kind": "event",
           "name": "Notes",
-          "role": "any"
+          "role": "note"
         },
         {
           "doc": "Time constant of the slide from one note to the next; 0 jumps",

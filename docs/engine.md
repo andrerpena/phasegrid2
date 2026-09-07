@@ -9,6 +9,13 @@ The wire signal is `pg::Sample = vital::poly_float`: four float lanes `[voice0.L
 Voices run in pairs: `Program.voicePairs = ceil(voiceCount / 2)`, unused voice lanes are masked at the output fold.
 Helpers in `core/Signal.hpp` (`lanes::voice/left/right/mono/stereo/lane`). `kMaxBlockSize = 128`.
 
+Every port declares a `SignalRole` -- `Any`, `Audio`, `Cv`, `Gate`, `Pitch`, `Phase`, `Note` -- which is a UI
+coloring hint only: the compiler accepts any output into any input, and roles never appear in `process`. `Note`
+is a role on an *event* port (a stream carrying pitch and velocity), not a `PortKind` of its own; an event port
+carrying bare triggers stays `Gate`, so the two read differently in the editor. Roles cross the descriptor ABI
+as `uint8_t`, so new ones are appended. `--catalog` emits the role of every port and
+`src/renderer/src/css/tokens.css` has a `--color-signal-<role>` token for each.
+
 ## Threads and RT rules
 
 Audio-thread code = `Module::process`, `Scheduler::run`, `Engine::renderBlock`, param drain, program swap.

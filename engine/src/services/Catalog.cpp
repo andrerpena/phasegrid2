@@ -18,6 +18,7 @@ const char* roleName(SignalRole r) {
     case SignalRole::Gate:  return "gate";
     case SignalRole::Pitch: return "pitch";
     case SignalRole::Phase: return "phase";
+    case SignalRole::Note:  return "note";
   }
   return "any";
 }

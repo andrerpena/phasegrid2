@@ -7,7 +7,11 @@ namespace pg {
 inline constexpr uint32_t kModuleAbiVersion = 1;
 
 enum class PortKind : uint8_t { Continuous = 0, Event = 1 };
-enum class SignalRole : uint8_t { Any = 0, Audio, Cv, Gate, Pitch, Phase };
+/// UI coloring hint only; the compiler accepts any output into any input.
+/// `Note` is a role on an Event port (a stream carrying pitch and velocity); an Event port that carries
+/// bare triggers stays `Gate`, so the two read differently in the editor. Append new roles at the end:
+/// the value crosses the descriptor ABI.
+enum class SignalRole : uint8_t { Any = 0, Audio, Cv, Gate, Pitch, Phase, Note };
 enum class ParamUnit : uint8_t { None = 0, Hz, Seconds, Db, Semitones, Percent, Ratio };
 enum class ParamCurve : uint8_t { Linear = 0, Log, Exp };
 

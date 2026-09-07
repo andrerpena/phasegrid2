@@ -42,10 +42,12 @@ describe("catalog schema", () => {
     expect(osc?.inputs.find((p) => p.id === "pitch")?.role).toBe("pitch");
     expect(osc?.inputs.find((p) => p.id === "gate")?.role).toBe("gate");
     expect(osc?.outputs.find((p) => p.id === "out")?.role).toBe("audio");
-    expect(
-      findModule(catalog, "note.toCv")?.inputs.find((p) => p.id === "notes")
-        ?.kind,
-    ).toBe("event");
+    // An event port carrying notes is `note`; one carrying bare triggers stays `gate`.
+    const notes = findModule(catalog, "note.toCv")?.inputs.find(
+      (p) => p.id === "notes",
+    );
+    expect(notes?.kind).toBe("event");
+    expect(notes?.role).toBe("note");
   });
 
   it("describes a modulatable param and its implicit port", () => {
@@ -128,7 +130,8 @@ describe("catalog schema rejections", () => {
   });
 
   it("rejects a role or kind it has never heard of", () => {
-    expect(() => PortDescSchema.parse({ ...port, role: "note" })).toThrow();
+    expect(PortDescSchema.parse({ ...port, role: "note" }).role).toBe("note");
+    expect(() => PortDescSchema.parse({ ...port, role: "trigger" })).toThrow();
     expect(() => PortDescSchema.parse({ ...port, kind: "audio" })).toThrow();
   });
 

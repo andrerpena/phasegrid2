@@ -99,6 +99,10 @@ TEST_CASE("the catalog describes a module the UI has never heard of", "[catalog]
   const nlohmann::json* events = findByField(notes["inputs"], "id", "notes");
   REQUIRE(events != nullptr);
   REQUIRE((*events)["kind"] == "event");
+  // The role, not the kind, is what tells the editor this event port carries notes rather than triggers.
+  REQUIRE((*events)["role"] == "note");
+  REQUIRE(findByField(moduleById(catalog, "osc.wavetable")["inputs"], "id", "pitch")->at("role") == "pitch");
+  REQUIRE(findByField(moduleById(catalog, "phase.clock")["outputs"], "id", "phase")->at("role") == "phase");
   REQUIRE(moduleById(catalog, "io.audioOut")["flags"]["terminal"] == true);
   REQUIRE(moduleById(catalog, "phase.clock")["flags"]["needsTransport"] == true);
 }

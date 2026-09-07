@@ -72,7 +72,7 @@ class Sink : public VoicedModule<int> {
 };
 const ModuleDescriptor kSink{kModuleAbiVersion, "test.sink", "Sink", "test", "", kSinkIn, 1, nullptr, 0, nullptr, 0, kModuleTerminal, 0, [] () -> Module* { return new Sink(); }};
 
-const PortDesc kEvGenOut[] = {{"events", "Events", PortKind::Event, 0, SignalRole::Any, ""}};
+const PortDesc kEvGenOut[] = {{"events", "Events", PortKind::Event, 0, SignalRole::Gate, ""}};   // bare triggers, not notes
 const ParamDesc kEvGenParams[] = {
   {"frame", "Frame", 0.f, 127.f, 0.f, ParamUnit::None, ParamCurve::Linear, kParamInteger | kParamNoSmooth, nullptr, 0, "slider", nullptr, ""},
   {"tag", "Tag", 0.f, 100.f, 1.f, ParamUnit::None, ParamCurve::Linear, kParamInteger | kParamNoSmooth, nullptr, 0, "slider", nullptr, ""}};
@@ -86,7 +86,7 @@ class EventGen : public VoicedModule<int> {
 };
 const ModuleDescriptor kEventGen{kModuleAbiVersion, "test.eventGen", "EventGen", "test", "", nullptr, 0, kEvGenOut, 1, kEvGenParams, 2, 0, 0, [] () -> Module* { return new EventGen(); }};
 
-const PortDesc kEvTraceIn[] = {{"events", "Events", PortKind::Event, 0, SignalRole::Any, ""}};
+const PortDesc kEvTraceIn[] = {{"events", "Events", PortKind::Event, 0, SignalRole::Gate, ""}};
 const PortDesc kEvTraceOut[] = {{"out", "Out", PortKind::Continuous, 1, SignalRole::Cv, ""}};
 class EventTrace : public VoicedModule<int> {
   void process(ProcessContext& c) override {
