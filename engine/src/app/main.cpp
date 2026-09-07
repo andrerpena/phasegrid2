@@ -1,3 +1,4 @@
+#include <atomic>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -13,7 +14,10 @@
 #include "render/PatchFile.hpp"
 #include "services/BlockSplitter.hpp"
 #include "services/Catalog.hpp"
+#include "services/CommandServer.hpp"
 #include "services/MiniaudioBackend.hpp"
+#include "services/Protocol.hpp"
+#include "services/Transport.hpp"
 
 static int usage() {
   std::puts(
@@ -21,7 +25,8 @@ static int usage() {
       "  --version\n"
       "  --tone [seconds]      play a 440 Hz test tone on the default device\n"
       "  --render <patch.json> --out <file.wav> [--seconds N] [--sr N] [--block N]\n"
-      "  --catalog             print the module catalog as JSON");
+      "  --catalog             print the module catalog as JSON\n"
+      "  --socket <path>       open the audio device and take commands on a Unix socket");
   return 2;
 }
 
@@ -96,10 +101,126 @@ static int runCatalog() {
   return 0;
 }
 
+/// The audio device, as `device.list` and `device.select` see it. Reopening is a message-thread
+/// operation: the device thread is stopped between `close` and `open`, so the render callback is not
+/// running while the configuration changes underneath it.
+class BackendDeviceHost final : public pg::DeviceHost {
+public:
+  BackendDeviceHost(pg::MiniaudioBackend& backend, pg::DeviceConfig config, pg::RenderFn render, pg::Transport& transport)
+      : backend_(backend), config_(std::move(config)), render_(std::move(render)), transport_(transport) {}
+
+  std::string backendName() const override { return backend_.name(); }
+  std::vector<pg::DeviceInfo> devices() override { return backend_.enumerate(); }
+  std::string currentId() const override { return config_.deviceId; }
+  double sampleRate() const override { return backend_.sampleRate(); }
+  uint32_t channels() const override { return backend_.channels(); }
+
+  pg::Result select(const std::string& id) override {
+    if (id == config_.deviceId) return {};
+    const double previousRate = backend_.sampleRate();
+    pg::DeviceConfig wanted = config_;
+    wanted.deviceId = id;
+
+    backend_.close();
+    std::string error;
+    if (!backend_.open(wanted, render_, error)) return restore("cannot open device '" + id + "': " + error);
+    // The engine was built for one sample rate and its modules were prepared at it. Rebuilding the whole
+    // engine for a new rate is not this phase's job, so a device that will not run at the current rate is
+    // refused rather than played at the wrong speed.
+    if (backend_.sampleRate() != previousRate) {
+      backend_.close();
+      return restore("device '" + id + "' runs at " + std::to_string(static_cast<int>(backend_.sampleRate())) +
+                     " Hz; this engine is running at " + std::to_string(static_cast<int>(previousRate)) + " Hz");
+    }
+    config_ = wanted;
+    transport_.prepare(backend_.sampleRate());
+    return {};
+  }
+
+private:
+  /// Puts the previous device back, so a refused choice leaves the engine playing rather than silent.
+  pg::Result restore(std::string why) {
+    std::string error;
+    if (!backend_.open(config_, render_, error)) return pg::Result::fail("E_IO", why + " (and the previous device did not reopen: " + error + ")");
+    transport_.prepare(backend_.sampleRate());
+    return pg::Result::fail("E_NOT_FOUND", std::move(why));
+  }
+
+  pg::MiniaudioBackend& backend_;
+  pg::DeviceConfig config_;
+  pg::RenderFn render_;
+  pg::Transport& transport_;
+};
+
+/// Opens the audio device, then takes commands on a Unix socket until the client goes away.
+static int runSocket(const std::string& path) {
+  pg::Registry registry;
+  pg::registerBuiltinModules(registry);
+  pg::Transport transport;
+
+  // The engine cannot be built before the device is open, because it has to be built at the rate the
+  // device negotiated; the callback cannot be written after the device is open, because `open` takes it.
+  // So the callback reads the engine through a pointer that is null for the first few milliseconds.
+  std::atomic<pg::Engine*> live{nullptr};
+  pg::MiniaudioBackend backend;
+  pg::RenderFn render = [&live, &transport](float* out, uint32_t frames, uint32_t channels) {
+    const pg::TransportSnapshot moment = transport.advance(frames);
+    pg::Engine* engine = live.load(std::memory_order_acquire);
+    if (engine == nullptr) {
+      std::memset(out, 0, static_cast<size_t>(frames) * channels * sizeof(float));
+      return;
+    }
+    engine->renderInterleaved(out, frames, channels, moment);
+  };
+
+  pg::DeviceConfig config;
+  std::string error;
+  if (!backend.open(config, render, error)) {
+    std::fprintf(stderr, "open failed: %s\n", error.c_str());
+    return 1;
+  }
+  transport.prepare(backend.sampleRate());
+  pg::Engine engine{registry, pg::EngineConfig{backend.sampleRate(), pg::kDefaultBlockSize}};
+  live.store(&engine, std::memory_order_release);
+
+  BackendDeviceHost host{backend, config, render, transport};
+  pg::ProtocolContext ctx{engine, registry, transport, &host, {}, false};
+  pg::CommandServer server{ctx};
+  if (pg::Result r = server.listen(path); !r) {
+    std::fprintf(stderr, "%s: %s\n", r.code.c_str(), r.message.c_str());
+    backend.close();
+    return 1;
+  }
+  // Accept before announcing anything: an engine nobody connects to would sit on the audio device
+  // forever, which is exactly the orphan the supervisor's restart loop must never leave behind.
+  if (pg::Result r = server.acceptClient(30000); !r) {
+    std::fprintf(stderr, "%s: %s\n", r.code.c_str(), r.message.c_str());
+    backend.close();
+    return 1;
+  }
+
+  server.push("engine.ready", nlohmann::json{{"engineVersion", pg::engineVersion()},
+                                             {"sampleRate", backend.sampleRate()},
+                                             {"channels", backend.channels()},
+                                             {"blockSize", engine.config().blockSize}});
+  server.flushEvents();
+  server.run();
+
+  // The client is gone, or asked to stop. Either way this process is finished: the device closes here
+  // rather than at exit, so nothing is still pulling audio while the graph is torn down.
+  live.store(nullptr, std::memory_order_release);
+  backend.close();
+  return 0;
+}
+
 int main(int argc, char** argv) {
   if (argc >= 2 && std::strcmp(argv[1], "--version") == 0) { std::printf("%s\n", pg::engineVersion()); return 0; }
   if (argc >= 2 && std::strcmp(argv[1], "--tone") == 0) return runTone(argc >= 3 ? std::atoi(argv[2]) : 3);
   if (argc >= 2 && std::strcmp(argv[1], "--render") == 0) return runRender(argc, argv);
   if (argc >= 2 && std::strcmp(argv[1], "--catalog") == 0) return runCatalog();
+  if (argc >= 2 && std::strcmp(argv[1], "--socket") == 0) {
+    if (argc < 3) { std::fprintf(stderr, "usage: --socket <path>\n"); return 2; }
+    return runSocket(argv[2]);
+  }
   return usage();
 }

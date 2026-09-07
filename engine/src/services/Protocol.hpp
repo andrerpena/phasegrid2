@@ -63,6 +63,10 @@ nlohmann::json dispatch(const nlohmann::json& request, ProtocolContext& ctx);
 /// the client waiting on a promise that can never settle.
 std::string dispatchLine(std::string_view line, ProtocolContext& ctx);
 
+/// Where the transport is, as `transport.*` answers it and the `transport.position` event carries it.
+/// `bar` and `beat` are derived from `ppq` and the meter rather than stored, so they cannot disagree.
+nlohmann::json transportPositionJson(const Transport& transport);
+
 /// `{event, seq, data}`, ready to write. `seq` is the connection's, not the protocol's.
 nlohmann::json encodeEvent(const ProtocolEvent& event, uint64_t seq);
 

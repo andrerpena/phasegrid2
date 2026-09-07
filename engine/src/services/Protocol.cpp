@@ -223,7 +223,9 @@ json editGraph(ProtocolContext& ctx, const json& id, Edit&& edit) {
   return okResponse(id, json{{"revision", revision}});
 }
 
-json positionJson(const Transport& transport) {
+}  // namespace
+
+nlohmann::json transportPositionJson(const Transport& transport) {
   const TransportSnapshot t = transport.state();
   // `bar` and `beat` are derived rather than stored: `ppq` plus the meter is the whole truth, and two
   // fields that can disagree with it would be two more chances to be wrong.
@@ -238,6 +240,10 @@ json positionJson(const Transport& transport) {
               {"bar", static_cast<uint64_t>(bars < 0.0 ? 0.0 : bars)},
               {"beat", (t.ppq - std::floor(bars) * quartersPerBar) / t.quartersPerBeat()}};
 }
+
+namespace {
+
+json positionJson(const Transport& transport) { return transportPositionJson(transport); }
 
 json deviceListJson(DeviceHost& host) {
   json devices = json::array();
