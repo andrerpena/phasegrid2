@@ -9,6 +9,7 @@ extern const ModuleDescriptor kNoteToPoly;
 extern const ModuleDescriptor kNotesClip;
 extern const ModuleDescriptor kPhaseClock;
 extern const ModuleDescriptor kOscSawtooth;
+extern const ModuleDescriptor kOscPulse;
 extern const ModuleDescriptor kScaleOffset;
 extern const ModuleDescriptor kMixer;
 extern const ModuleDescriptor kVca;
@@ -33,7 +34,7 @@ const ModuleDescriptor& samplerPlayer();
 void registerBuiltinModules(Registry& r) {
   const ModuleDescriptor* all[] = {
     &modules::kAudioOut, &modules::kNoteToCv, &modules::kNoteToPoly, &modules::kNotesClip,
-    &modules::kPhaseClock, &modules::kOscSawtooth, &modules::kScaleOffset, &modules::kMixer, &modules::kVca,
+    &modules::kPhaseClock, &modules::kOscSawtooth, &modules::kOscPulse, &modules::kScaleOffset, &modules::kMixer, &modules::kVca,
     &modules::kMeter, &modules::kScope,
     &modules::filterMulti(), &modules::oscWavetable(), &modules::envDahdsr(),
     &modules::modLfo(), &modules::modRandom(),

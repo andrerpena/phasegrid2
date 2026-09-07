@@ -151,6 +151,46 @@ register({
   },
 });
 
+/**
+ * The pulse on its own. Same one knob as the sawtooth, and the same thing to watch: the face redraws
+ * as you turn it, because the picture and the sound come from the same shape in the same module.
+ */
+register({
+  moduleId: "osc.pulse",
+  name: "Pulse",
+  description:
+    "A square at middle C. Turn Sync up to pack more pulses into each cycle, and watch the wave on " +
+    "its face fill up as you hear the harmonics arrive.",
+  patch: {
+    schemaVersion: 1,
+    voiceCount: 1,
+    feedbackMode: "sample",
+    modules: [
+      {
+        id: "osc",
+        type: "osc.pulse",
+        x: col(2),
+        y: col(2),
+        params: { sync: 0 },
+      },
+      {
+        id: "out",
+        type: "io.audioOut",
+        x: col(12),
+        y: col(3),
+        params: { gain: 0.4 },
+      },
+    ],
+    edges: [
+      {
+        id: "e1",
+        from: { module: "osc", port: "out" },
+        to: { module: "out", port: "inL" },
+      },
+    ],
+  },
+});
+
 /** An oscillator, used as the sound source in most of these. Middle C unless told otherwise. */
 function source(id = "osc", params: Record<string, number> = {}) {
   return {

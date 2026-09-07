@@ -1,5 +1,5 @@
 {
-  "catalogHash": "1d5fa4df4163b38c",
+  "catalogHash": "4f489a2280081e01",
   "conventions": {
     "blockSize": 128,
     "gateThreshold": 0,
@@ -4934,6 +4934,85 @@
     },
     {
       "category": "osc",
+      "doc": "A band-limited pulse with hard sync. Sync, in semitones, runs the wave faster than the pitch and restarts it every cycle, which keeps the pitch and packs more pulses into it. The face shows the resulting shape.",
+      "flags": {
+        "needsTransport": false,
+        "previewsWave": true,
+        "terminal": false,
+        "writesTelemetry": false
+      },
+      "id": "osc.pulse",
+      "inputs": [
+        {
+          "doc": "A rising edge restarts the cycle from phase 0",
+          "id": "reset",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Reset",
+          "role": "gate"
+        },
+        {
+          "doc": "When connected, drives the cycle in place of the internal ramp: 0 to just under 1, wrapping",
+          "id": "phase",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Phase",
+          "role": "phase"
+        },
+        {
+          "doc": "Pitch to play, 0.1 per octave from middle C",
+          "id": "pitch",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Pitch",
+          "role": "pitch"
+        },
+        {
+          "doc": "How far above the pitch the synced wave runs, in semitones. At 0 the output is the plain shape",
+          "id": "param:sync",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Sync",
+          "param": "sync",
+          "role": "cv"
+        }
+      ],
+      "name": "Pulse",
+      "outputs": [
+        {
+          "doc": "The wave, -1 to 1",
+          "id": "out",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Out",
+          "role": "audio"
+        }
+      ],
+      "params": [
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "How far above the pitch the synced wave runs, in semitones. At 0 the output is the plain shape",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "id": "sync",
+          "max": 48.0,
+          "min": 0.0,
+          "name": "Sync",
+          "uiWidget": "knob",
+          "unit": "semitones"
+        }
+      ]
+    },
+    {
+      "category": "osc",
       "doc": "A band-limited sawtooth with hard sync. Sync, in semitones, runs a second ramp faster than the pitch and restarts it every cycle, which keeps the pitch and adds the classic sync harmonics. The face shows the resulting shape.",
       "flags": {
         "needsTransport": false,
@@ -4968,7 +5047,7 @@
           "role": "pitch"
         },
         {
-          "doc": "How far above the pitch the synced ramp runs, in semitones. At 0 the output is a plain sawtooth",
+          "doc": "How far above the pitch the synced wave runs, in semitones. At 0 the output is the plain shape",
           "id": "param:sync",
           "implicit": true,
           "kind": "continuous",
@@ -4980,7 +5059,7 @@
       "name": "Sawtooth",
       "outputs": [
         {
-          "doc": "The sawtooth, -1 to 1",
+          "doc": "The wave, -1 to 1",
           "id": "out",
           "implicit": false,
           "kind": "continuous",
@@ -4992,7 +5071,7 @@
         {
           "curve": "linear",
           "default": 0.0,
-          "doc": "How far above the pitch the synced ramp runs, in semitones. At 0 the output is a plain sawtooth",
+          "doc": "How far above the pitch the synced wave runs, in semitones. At 0 the output is the plain shape",
           "flags": {
             "enum": false,
             "hidden": false,

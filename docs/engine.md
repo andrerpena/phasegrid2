@@ -110,13 +110,44 @@ attributed to our sources.
 ## Modules
 
 Built-ins are registered in `engine/src/modules/builtin.cpp`, one line each. Own modules are a single `.cpp` under
-`engine/src/modules`; vendored-backed ones a single `ModuleSpec` under `engine/src/modules/vital`. Today, twenty-two:
+`engine/src/modules`; vendored-backed ones a single `ModuleSpec` under `engine/src/modules/vital`. Today, twenty-four:
 
 - own: `io.audioOut`, `note.toCv`, `note.toPoly`, `notes.clip`, `phase.clock`, `math.scaleOffset`, `mix.mixer`,
-  `amp.vca`
+  `amp.vca`, `osc.sawtooth`, `osc.pulse`
 - vendored-backed: `osc.wavetable`, `sampler.player`, `filter.multi`, `env.dahdsr`, `mod.lfo`, `mod.random`, and the
   eight effects `fx.reverb`, `fx.delay`, `fx.chorus`, `fx.flanger`, `fx.phaser`, `fx.distortion`, `fx.compressor`,
   `fx.eq`.
+
+### Oscillators: one core, many shapes
+
+`engine/src/modules/osc/Oscillator.hpp` holds everything an oscillator does that is not about which wave it plays:
+pitch to frequency, the master phase, an external `phase` input in place of it, the `reset` gate, hard sync, the
+band-limiting, the four lanes, and `preview`. A module supplies only a **shape**, which is a value at a phase plus a
+list of where that value steps:
+
+```cpp
+float at(double phase) const;          // -1..1 across one cycle
+uint32_t jumpCount() const;
+ShapeJump jump(uint32_t i) const;      // { phase, delta } -- delta is the value after minus before
+```
+
+`osc.sawtooth` is `2p - 1` with one step of -2 at phase 0; `osc.pulse` is high below its width with +2 at 0 and -2 at
+the width. Each module file is then about forty lines. The shape is built afresh per sample by a callable the module
+passes in, so a parameter that shapes the wave (a pulse width, a skew) is modulatable with nothing else changing; it is
+taken by value, so there is no allocation and nothing virtual on the audio thread.
+
+**Two ways to be band-limited, one interface.** A formula declares its steps and the core spreads each one over four
+samples with the integral of a cubic B-spline, which puts aliases about 40 dB down against 12 dB for a naive wave
+(measured at a 2 kHz fundamental in `test_osc_sawtooth.cpp` and `test_osc_pulse.cpp`). An arbitrary wave -- one drawn,
+one written as an expression, one imported -- cannot declare its steps, and is instead read from a table that was
+band-limited per octave when it was built: such a shape returns `jumpCount() == 0`. Sync is the exception belonging to
+neither, because it is the oscillator that throws the wave back to phase zero mid-cycle; the core computes that step
+itself as `at(0) - at(phase it had reached)`, which is as true of a table as of a formula.
+
+That is the seam for wavetables the user generates or draws. The pieces are already vendored: `LineGenerator`
+(`getValueAtPhase`, `stateToJson`/`jsonToState`, already used by `mod.lfo`) for a breakpoint curve, `vital::Wavetable`
+and `WavetableBank` for band-limited tables, and `NodeModel::data` to carry either through the patch document with undo
+and save for free.
 
 `phase.clock` follows `transport.ppq` while the transport is playing and free-runs off `transport.samplePos` at the
 transport tempo while it is stopped, so a patch keeps moving with nothing rolling. Its swing moves the boundary inside
