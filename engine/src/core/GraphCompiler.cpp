@@ -72,16 +72,40 @@ CompileOutput compileGraph(const GraphModel& model, const Registry& registry, In
     edges.push_back(r);
   }
 
-  // 3. SCC / topological order (Task 13 replaces this block with cluster handling).
+  // 3. SCCs in topological order; inside each non-trivial SCC pick a deterministic order and mark back edges.
   std::vector<std::vector<uint32_t>> adj(N);
   for (const EdgeRef& e : edges) adj[e.from].push_back(e.to);
   Tarjan tarjan(adj);
-  for (const auto& scc : tarjan.sccs) {
-    if (scc.size() > 1) return fail("E_FEEDBACK_UNSUPPORTED", "cycle detected");
-    for (uint32_t w : adj[scc[0]]) if (w == scc[0]) return fail("E_FEEDBACK_UNSUPPORTED", "self loop");
+  struct Group { std::vector<uint32_t> nodes; bool cluster = false; };
+  std::vector<Group> groups;
+  std::vector<uint32_t> pos(N, 0);
+  for (auto it = tarjan.sccs.rbegin(); it != tarjan.sccs.rend(); ++it) {
+    Group g; g.nodes = *it;
+    std::sort(g.nodes.begin(), g.nodes.end());
+    bool selfLoop = false;
+    for (uint32_t w : adj[g.nodes[0]]) if (g.nodes.size() == 1 && w == g.nodes[0]) selfLoop = true;
+    g.cluster = g.nodes.size() > 1 || selfLoop;
+    if (g.cluster) {   // DFS from the smallest id following intra-SCC edges gives a stable order
+      const int32_t c = tarjan.comp[g.nodes[0]];
+      std::vector<uint32_t> ordered; std::vector<bool> seen(N, false);
+      std::function<void(uint32_t)> dfs = [&](uint32_t v) {
+        seen[v] = true; ordered.push_back(v);
+        std::vector<uint32_t> next = adj[v]; std::sort(next.begin(), next.end());
+        for (uint32_t w : next) if (tarjan.comp[w] == c && !seen[w]) dfs(w);
+      };
+      for (uint32_t v : g.nodes) if (!seen[v]) dfs(v);
+      g.nodes = ordered;
+    }
+    for (uint32_t i = 0; i < g.nodes.size(); ++i) pos[g.nodes[i]] = i;
+    groups.push_back(std::move(g));
   }
-  std::vector<uint32_t> order;
-  for (auto it = tarjan.sccs.rbegin(); it != tarjan.sccs.rend(); ++it) order.push_back((*it)[0]);
+  for (EdgeRef& e : edges) {
+    if (tarjan.comp[e.from] != tarjan.comp[e.to]) continue;
+    if (pos[e.from] >= pos[e.to]) {
+      e.back = true;
+      if (types[e.from]->desc->outputs[e.fromPort].kind == PortKind::Event) return fail("E_EVENT_FEEDBACK", e.model->id);
+    }
+  }
 
   // 4. Program skeleton and output buffers.
   auto p = std::make_unique<Program>();
@@ -105,21 +129,34 @@ CompileOutput compileGraph(const GraphModel& model, const Registry& registry, In
       if (d.inputs[k].kind == PortKind::Continuous) s.inBuf[k] = kSilentBuffer; else s.inEvt[k] = kEmptyEvents;
   }
 
-  // 5. Per node in topo order: wire inputs (sum/merge), params (fill), then process.
-  for (uint32_t ni : order) {
+  // 5. Feedback states and read buffers per back edge, then per-group emission.
+  std::map<size_t, uint32_t> fbIndexOfEdge, fbBufOfEdge;
+  for (size_t ei = 0; ei < edges.size(); ++ei) {
+    if (!edges[ei].back) continue;
+    fbIndexOfEdge[ei] = static_cast<uint32_t>(p->feedback.size());
+    p->feedback.push_back(instances.acquireFeedback(edges[ei].model->id));
+    fbBufOfEdge[ei] = p->allocBuffer();
+  }
+
+  std::string fanInError;
+  auto emitNode = [&](uint32_t ni) {
     NodeSlot& s = p->nodes[ni];
     const RegisteredModule& t = *types[ni];
     const ModuleDescriptor& d = *t.desc;
     for (uint32_t ip = 0; ip < t.inputs.size(); ++ip) {
       std::vector<uint32_t> srcs;
-      for (const EdgeRef& e : edges) {
+      for (size_t ei = 0; ei < edges.size(); ++ei) {
+        const EdgeRef& e = edges[ei];
         if (e.to != ni || e.toPort != ip) continue;
         const NodeSlot& src = p->nodes[e.from];
-        srcs.push_back(t.inputs[ip].kind == PortKind::Continuous ? src.outBuf[e.fromPort] : src.outEvt[e.fromPort]);
+        if (e.back) srcs.push_back(fbBufOfEdge.at(ei));
+        else srcs.push_back(t.inputs[ip].kind == PortKind::Continuous ? src.outBuf[e.fromPort] : src.outEvt[e.fromPort]);
       }
       if (srcs.empty()) continue;
-      if (srcs.size() > kMaxPortsPerModule)
-        return fail("E_FAN_IN", nodes[ni]->id + ": more than " + std::to_string(kMaxPortsPerModule) + " connections into one port");
+      if (srcs.size() > kMaxPortsPerModule) {
+        fanInError = nodes[ni]->id + ": more than " + std::to_string(kMaxPortsPerModule) + " connections into one port";
+        return;
+      }
       const bool continuous = t.inputs[ip].kind == PortKind::Continuous;
       uint32_t result;
       if (srcs.size() == 1) {
@@ -140,6 +177,28 @@ CompileOutput compileGraph(const GraphModel& model, const Registry& registry, In
     for (uint32_t o = 0; o < d.numOutputs; ++o)
       if (s.outEvt[o] != kNone) p->ops.push_back(Op{Op::ClearEvents, s.outEvt[o]});
     p->ops.push_back(Op{Op::Process, ni});
+    for (size_t ei = 0; ei < edges.size(); ++ei)
+      if (edges[ei].back && edges[ei].from == ni)
+        p->ops.push_back(Op{Op::FeedbackWrite, fbIndexOfEdge.at(ei), p->nodes[ni].outBuf[edges[ei].fromPort]});
+  };
+
+  for (const Group& g : groups) {
+    if (!g.cluster) {
+      emitNode(g.nodes[0]);
+      if (!fanInError.empty()) return fail("E_FAN_IN", fanInError);
+      continue;
+    }
+    const size_t beginAt = p->ops.size();
+    p->ops.push_back(Op{Op::ClusterBegin, 0});
+    for (size_t ei = 0; ei < edges.size(); ++ei)
+      if (edges[ei].back && tarjan.comp[edges[ei].to] == tarjan.comp[g.nodes[0]])
+        p->ops.push_back(Op{Op::FeedbackRead, fbIndexOfEdge.at(ei), fbBufOfEdge.at(ei)});
+    for (uint32_t ni : g.nodes) {
+      emitNode(ni);
+      if (!fanInError.empty()) return fail("E_FAN_IN", fanInError);
+    }
+    p->ops[beginAt].a = static_cast<uint32_t>(p->ops.size() - beginAt - 1);
+    p->ops.push_back(Op{Op::ClusterEnd});
   }
 
   p->buildSerialIndex();

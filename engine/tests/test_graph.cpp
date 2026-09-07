@@ -80,17 +80,6 @@ TEST_CASE("compile: reuses instances across compiles; voice pairs from voiceCoun
   REQUIRE(pg::lanes::lane(pg::Sample(1.f) & p2->activeVoiceMask[1], 2) == 0.f);   // voice 3 does not exist
 }
 
-TEST_CASE("compile: cycles are rejected until Task 13", "[compiler]") {
-  GraphFixture f;
-  f.node("a", "test.add");
-  f.node("g", "test.gain");
-  f.edge("e1", "a.out", "g.in");
-  f.edge("e2", "g.out", "a.b");
-  pg::CompileOutput o = pg::compileGraph(f.model, f.reg, f.table, 1, 48000.0, 64);
-  REQUIRE(o.program == nullptr);
-  REQUIRE(o.error.find("E_FEEDBACK_UNSUPPORTED") != std::string::npos);
-}
-
 TEST_CASE("compile: rejects fan-in above kMaxPortsPerModule", "[compiler]") {
   GraphFixture f;
   f.node("t", "test.eventTrace");
