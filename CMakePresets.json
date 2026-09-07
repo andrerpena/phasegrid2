@@ -5,7 +5,10 @@
       "name": "dev",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build-dev",
-      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "PG_WERROR": "ON"
+      }
     },
     {
       "name": "asan",
@@ -29,20 +32,33 @@
     }
   ],
   "buildPresets": [
-    { "name": "dev", "configurePreset": "dev" },
-    { "name": "asan", "configurePreset": "asan" },
-    { "name": "rtsan", "configurePreset": "rtsan" }
+    {
+      "name": "dev",
+      "configurePreset": "dev"
+    },
+    {
+      "name": "asan",
+      "configurePreset": "asan"
+    },
+    {
+      "name": "rtsan",
+      "configurePreset": "rtsan"
+    }
   ],
   "testPresets": [
     {
       "name": "dev",
       "configurePreset": "dev",
-      "output": { "outputOnFailure": true }
+      "output": {
+        "outputOnFailure": true
+      }
     },
     {
       "name": "asan",
       "configurePreset": "asan",
-      "output": { "outputOnFailure": true }
+      "output": {
+        "outputOnFailure": true
+      }
     }
   ]
 }

@@ -1,8 +1,11 @@
 file(GLOB_RECURSE VITAL_SOURCES CONFIGURE_DEPENDS src/*.cpp)
 add_library(vital_dsp STATIC ${VITAL_SOURCES})
 target_compile_features(vital_dsp PUBLIC cxx_std_20)
-target_include_directories(vital_dsp PUBLIC
-  shim
+target_include_directories(vital_dsp PUBLIC shim)
+# SYSTEM: the vendored headers are instantiated inside our translation units, and they are not
+# ours to fix. Without this, -Wconversion/-Wsign-compare diagnostics from vendored templates would
+# be attributed to our sources, and PG_WERROR=ON could not be turned on at all.
+target_include_directories(vital_dsp SYSTEM PUBLIC
   src/synthesis/framework src/synthesis/filters src/synthesis/effects src/synthesis/modulators
   src/synthesis/producers src/synthesis/lookups src/synthesis/utilities src/synthesis/modules
   src/common src/common/wavetable third_party)

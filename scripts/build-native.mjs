@@ -23,9 +23,21 @@ const cmake = (args) => {
   if (r.status !== 0) process.exit(r.status ?? 1);
 };
 
-if (!existsSync(resolve(buildDir, "CMakeCache.txt"))) {
+// Warnings-as-errors is opt-in: this script also runs from `postinstall` on end-user machines,
+// where a warning from a future compiler must not turn `npm install` into a hard failure. CI
+// sets PG_WERROR=ON. Re-configure when it is requested so an existing cache picks the flag up.
+const werror = process.env.PG_WERROR === "ON" || process.argv.includes("--werror");
+if (werror || !existsSync(resolve(buildDir, "CMakeCache.txt"))) {
   const gen = has("ninja") ? ["-G", "Ninja"] : [];
-  cmake(["-S", root, "-B", buildDir, "-DCMAKE_BUILD_TYPE=RelWithDebInfo", ...gen]);
+  cmake([
+    "-S",
+    root,
+    "-B",
+    buildDir,
+    "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
+    `-DPG_WERROR=${werror ? "ON" : "OFF"}`,
+    ...gen,
+  ]);
 }
 const targets = process.argv.includes("--tests") ? ["phasegrid-engine", "pg_tests"] : ["phasegrid-engine"];
 cmake(["--build", buildDir, "--target", ...targets, "--parallel"]);

@@ -10,6 +10,10 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 option(PG_BUILD_TESTS "Build engine tests" ON)
+# OFF by default on purpose: `postinstall` builds this engine from source on end-user machines,
+# so a warning from a future compiler must never turn `npm install` into a hard failure.
+# CI and the dev preset turn it ON, which is where warning regressions get caught.
+option(PG_WERROR "Treat compiler warnings as errors" OFF)
 
 enable_testing()
 add_subdirectory(engine)
