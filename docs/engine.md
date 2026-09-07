@@ -249,6 +249,16 @@ pair 0's delayed sample lands in pair 1's loop. `InstanceTable::acquireFeedback`
 compiles, keyed by edge id, and builds a *fresh* one when the voice pair count changes rather than resizing
 one the audio thread may still be reading through an older program.
 
+**Known limitation: transport-driven modules do not belong inside a sample-level cluster.** In
+`feedbackMode: sample` the scheduler runs a cluster's ops once per sample, handing each module
+`numFrames == 1` and no indication of where in the block that sample sits. A module that derives its
+position from the transport therefore computes the same position 128 times instead of advancing, and
+because `ClearEvents` only runs at offset 0, any events it emits are pushed once per sample rather than
+once per block. `phase.clock`, `note.toCv`, `note.toPoly` and `notes.clip` all share this exposure. It is
+harmless today because nothing puts a clock or a note source inside a feedback loop, and the fix is to
+carry the block offset in `ProcessContext` so such a module can advance correctly. Do not add a
+transport-driven module to a sample-level cluster before that lands.
+
 ## Compilation constraints
 
 - Max `kMaxVoices` = 32 voices (16 pairs) per program; `compileGraph` rejects more with `E_VOICES`. `GraphModel` itself accepts 1..64.
