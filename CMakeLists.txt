@@ -17,3 +17,4 @@ option(PG_WERROR "Treat compiler warnings as errors" OFF)
 
 enable_testing()
 add_subdirectory(engine)
+add_subdirectory(native)

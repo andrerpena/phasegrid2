@@ -39,6 +39,17 @@ if (werror || !existsSync(resolve(buildDir, "CMakeCache.txt"))) {
     ...gen,
   ]);
 }
-const targets = process.argv.includes("--tests") ? ["phasegrid-engine", "pg_tests"] : ["phasegrid-engine"];
+// The telemetry addon is skipped when node_modules is not populated yet -- its CMakeLists says so and
+// returns rather than failing, so asking for the target would then be an error. `npm install` runs this
+// after installing dependencies, so the normal path has them.
+const addonAvailable = existsSync(resolve(root, "node_modules/node-addon-api/napi.h"));
+const targets = process.argv.includes("--tests")
+  ? ["phasegrid-engine", "pg_tests"]
+  : ["phasegrid-engine"];
+if (addonAvailable) targets.push("pg_telemetry");
 cmake(["--build", buildDir, "--target", ...targets, "--parallel"]);
-console.log("[build-native] ok: build/engine/phasegrid-engine");
+console.log(
+  addonAvailable
+    ? "[build-native] ok: build/engine/phasegrid-engine, build/native/pg_telemetry.node"
+    : "[build-native] ok: build/engine/phasegrid-engine (addon skipped, no node_modules)",
+);
