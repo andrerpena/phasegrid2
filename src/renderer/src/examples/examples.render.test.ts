@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { CatalogSchema } from "@shared/protocol/catalog";
 import { describe, expect, it } from "vitest";
 import { allExamples, type ModuleExample } from "./registry";
 
@@ -68,11 +69,43 @@ function render(
   return { rms, peak: Math.max(...left.map(Math.abs)) };
 }
 
+/** Modules that deliberately have no example, each with the reason. */
+const WITHOUT_EXAMPLE = new Map<string, string>([
+  [
+    "sampler.player",
+    "needs a sample file, and there is no way yet to give a module an asset over the protocol",
+  ],
+]);
+
 describe("every module example", () => {
   const examples = allExamples();
 
-  it("covers at least one module", () => {
-    expect(examples.length).toBeGreaterThan(0);
+  it("covers every module the engine has", () => {
+    // The promise is one example per module. Without this the promise quietly degrades as modules are
+    // added, and nobody notices until someone goes looking for the one that is missing.
+    const catalog = CatalogSchema.parse(
+      JSON.parse(
+        readFileSync(
+          join(__dirname, "../../../../engine/tests/golden/catalog.json"),
+          "utf8",
+        ),
+      ),
+    );
+    const covered = new Set(examples.map((e) => e.moduleId));
+    const missing = catalog.modules
+      .map((m) => m.id)
+      .filter((id) => !covered.has(id) && !WITHOUT_EXAMPLE.has(id));
+    expect(missing, `modules with no example: ${missing.join(", ")}`).toEqual(
+      [],
+    );
+  });
+
+  it("does not carry an exemption for a module that now has an example", () => {
+    // An exemption that has been fixed should be deleted, or the list becomes a place where the
+    // reason no longer matches the reality.
+    const covered = new Set(examples.map((e) => e.moduleId));
+    for (const id of WITHOUT_EXAMPLE.keys())
+      expect(covered.has(id)).toBe(false);
   });
 
   it.each(examples.map((e) => [e.moduleId, e] as const))(
