@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 phasegrid2 is a generative, grid-based modular music platform (Bitwig Grid-like). AGPL-3.0.
-Spec: docs/superpowers/specs/2026-09-07-phasegrid2-architecture-design.md. Engine rules: docs/engine.md. Protocol: docs/protocol.md.
+Spec: docs/superpowers/specs/2026-09-07-phasegrid2-architecture-design.md. Engine rules: docs/engine.md. Protocol: docs/protocol.md. Telemetry: docs/telemetry.md.
 
 ## Commands
 - `npm run dev` — build engine (incremental) and start Electron with HMR

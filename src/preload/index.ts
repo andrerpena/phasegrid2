@@ -7,6 +7,15 @@ import type {
 } from "../../shared/protocol/commands";
 import type { EventEnvelope } from "../../shared/protocol/envelope";
 import {
+  decodeSlot,
+  readHeader,
+  type SlotReading,
+  slotOffset,
+  TELEMETRY_HEADER_BYTES,
+  TELEMETRY_SLOT_BYTES,
+  type TelemetryHeader,
+} from "../../shared/protocol/telemetry";
+import {
   ENGINE_CALL_CHANNEL,
   ENGINE_EVENT_CHANNEL,
   type EngineCallResult,
@@ -61,13 +70,80 @@ function onEvent(listener: (event: EventEnvelope) => void): () => void {
 
 const engine = { call, onEvent };
 
+/**
+ * The telemetry segment, read straight from the renderer.
+ *
+ * This is the reason the addon exists. A meter redrawn at frame rate through IPC would be a message
+ * round trip per frame per meter; here the renderer reads the same memory the audio thread wrote, with
+ * no hop at all. The addon copies out of the mapping rather than exposing a view, so what a caller
+ * decodes cannot change underneath it while it is decoding.
+ *
+ * Loaded lazily. A renderer with no meters on screen never pays for it, and a build where the addon
+ * failed to compile still runs everything else.
+ */
+let segment: {
+  read(offset: number, length: number): Buffer;
+  close(): void;
+} | null = null;
+
+function openSegment(name: string, byteLength: number): TelemetryHeader | null {
+  closeSegment();
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const addon = require("../../native/index.cjs") as {
+    open(
+      name: string,
+      byteLength: number,
+    ): {
+      read(offset: number, length: number): Buffer;
+      close(): void;
+    };
+  };
+  const opened = addon.open(name, byteLength);
+  const head = opened.read(0, TELEMETRY_HEADER_BYTES);
+  const header = readHeader(
+    new DataView(head.buffer, head.byteOffset, head.byteLength),
+  );
+  if (header === null) {
+    // A segment this build cannot read is not a segment. Closing rather than keeping it means a caller
+    // cannot later read slots out of bytes whose layout was never verified.
+    opened.close();
+    return null;
+  }
+  segment = opened;
+  return header;
+}
+
+function readSlot(index: number): SlotReading | null {
+  if (segment === null) return null;
+  try {
+    const bytes = segment.read(slotOffset(index), TELEMETRY_SLOT_BYTES);
+    return decodeSlot(
+      new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength),
+    );
+  } catch {
+    // An out-of-range slot throws in the addon. A display asking for a slot it no longer owns should
+    // draw nothing, not tear down the renderer.
+    return null;
+  }
+}
+
+function closeSegment(): void {
+  segment?.close();
+  segment = null;
+}
+
+const telemetry = { open: openSegment, read: readSlot, close: closeSegment };
+
 if (process.contextIsolated) {
   contextBridge.exposeInMainWorld("electron", electronAPI);
   contextBridge.exposeInMainWorld("engine", engine);
+  contextBridge.exposeInMainWorld("telemetry", telemetry);
 } else {
   const win = window as unknown as Record<string, unknown>;
   win.electron = electronAPI;
   win.engine = engine;
+  win.telemetry = telemetry;
 }
 
 export type EngineBridge = typeof engine;
+export type TelemetryBridge = typeof telemetry;

@@ -25,7 +25,12 @@ namespace pg {
 inline constexpr uint32_t kTelemetryMagic = 0x4C544750;   // 'PGTL' little-endian
 inline constexpr uint32_t kTelemetryLayoutVersion = 1;
 inline constexpr uint32_t kTelemetryHeaderBytes = 64;
-inline constexpr uint32_t kTelemetrySlotBytes = 8192;
+// 16 KiB, not the 8 KiB the spec names. A scope slot holds `kTelemetryMaxChannels` windows of
+// `kTelemetryScopeFrames` floats, which is 8192 bytes on its own, and the slot header still has to fit
+// in front of it. At 8 KiB a full stereo scope would have run 32 bytes into the next slot. Today's
+// block size is far short of a full window so nothing overflows in practice, which is exactly why this
+// is worth pinning down now rather than discovering when the block size changes.
+inline constexpr uint32_t kTelemetrySlotBytes = 16384;
 inline constexpr uint32_t kTelemetryScopeFrames = 1024;
 inline constexpr uint32_t kTelemetryMaxChannels = 2;
 /// Enough for every display module a milestone-1 patch is likely to hold, and only 512 KiB of memory.
@@ -77,6 +82,10 @@ struct TelemetryHeader {
 };
 static_assert(sizeof(TelemetryHeader) == kTelemetryHeaderBytes,
               "the TypeScript reader assumes a 64-byte segment header");
+static_assert(sizeof(TelemetrySlotHeader) +
+                      kTelemetryMaxChannels * kTelemetryScopeFrames * sizeof(float) <=
+                  kTelemetrySlotBytes,
+              "a slot must hold its header plus a full scope window per channel");
 
 /**
  * Owns the mapping. Created on the message thread; slots are written on the audio thread.
