@@ -25,6 +25,7 @@ if(PG_BUILD_TESTS)
   target_include_directories(pg_tests PRIVATE tests)
   target_compile_definitions(pg_tests PRIVATE PG_TEST_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests")
   target_link_libraries(pg_tests PRIVATE pg_core Catch2::Catch2WithMain)
+  pg_apply_warnings(pg_tests)
   if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     target_compile_options(pg_tests PRIVATE -fno-assume-sane-operator-new)   # never elide calls to our replaced operator new
   endif()
