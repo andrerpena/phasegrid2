@@ -1,0 +1,11 @@
+.host {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  /* The canvas fills this; the element itself only ever provides the box and the focus scope. */
+  touch-action: none;
+}
+
+.host canvas {
+  display: block;
+}

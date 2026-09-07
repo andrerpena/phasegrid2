@@ -35,6 +35,9 @@ export const light: PhasegridTheme = {
     nodeFill: "#ffffff",
     nodeStroke: "#cfd3da",
     nodeSelected: "#3b5bdb",
+    knobBody: "#e9ebef",
+    knobPointer: "#3a3f47",
+    knobLabel: "#6b7280",
     marquee: "#3b5bdb",
     playhead: "#b45309",
     signal: {

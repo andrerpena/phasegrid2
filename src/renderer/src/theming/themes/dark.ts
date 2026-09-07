@@ -35,6 +35,9 @@ export const dark: PhasegridTheme = {
     nodeFill: "#1b1e23",
     nodeStroke: "#2f343c",
     nodeSelected: "#4d7cfe",
+    knobBody: "#c9ced6",
+    knobPointer: "#2b2f36",
+    knobLabel: "#9aa0aa",
     marquee: "#4d7cfe",
     playhead: "#f5a524",
     // These are the seven signal roles the engine declares. They are also written out as

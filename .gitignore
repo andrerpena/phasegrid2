@@ -13,3 +13,4 @@ build-*/
 !engine/tests/golden/*.wav
 .cache/
 compile_commands.json
+storybook-static/

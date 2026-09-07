@@ -19,11 +19,14 @@
     "test": "vitest run --project unit",
     "engine:build": "node scripts/build-native.mjs --tests",
     "engine:test": "node scripts/build-native.mjs --tests && ctest --test-dir build --output-on-failure",
-    "engine:render": "./build/engine/phasegrid-engine --render"
+    "engine:render": "./build/engine/phasegrid-engine --render",
+    "storybook": "storybook dev -p 6006 --no-open",
+    "storybook:build": "storybook build"
   },
   "dependencies": {
     "node-addon-api": "^8.9.2",
     "node-api-headers": "^1.9.0",
+    "pixi.js": "^8.20.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "zod": "^3.25.76",
@@ -33,12 +36,17 @@
     "@biomejs/biome": "^2.3.13",
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
+    "@storybook/addon-a11y": "^10.6.0",
+    "@storybook/addon-docs": "^10.6.0",
+    "@storybook/addon-themes": "^10.6.0",
+    "@storybook/react-vite": "^10.6.0",
     "@types/node": "^22.15.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.4",
     "electron": "^41.1.0",
     "electron-vite": "^5.0.0",
+    "storybook": "^10.6.0",
     "typescript": "^5.8.2",
     "vite": "^6.2.3",
     "vitest": "^3.2.0"

@@ -58,6 +58,16 @@ export interface GridColors {
   nodeFill: string;
   nodeStroke: string;
   nodeSelected: string;
+  /**
+   * The knob body and its pointer.
+   *
+   * A knob is light and its pointer is dark, the way a physical one is. Drawing the body in the panel's
+   * own colour makes the pointer disappear into it, which is the difference between a control you can
+   * read across the window and a dark circle.
+   */
+  knobBody: string;
+  knobPointer: string;
+  knobLabel: string;
   marquee: string;
   playhead: string;
   signal: SignalColors;

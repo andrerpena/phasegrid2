@@ -1,3 +1,4 @@
+import { useCatalogStore } from "@renderer/catalog/catalog-store";
 import { registerShellCommands } from "@renderer/commands/definitions";
 import { CommandPalette } from "@renderer/components/command-palette/CommandPalette";
 import { Dock } from "@renderer/components/dock/Dock";
@@ -6,9 +7,9 @@ import { Panel } from "@renderer/components/panel/Panel";
 import { Tabs } from "@renderer/components/tabs/Tabs";
 import { useConfigStore } from "@renderer/config/config-store";
 import { useEngineStore, watchEngine } from "@renderer/engine/engine-store";
+import { GridView } from "@renderer/grid/GridView";
 import { useKeybindings } from "@renderer/keybindings/use-keybindings";
 import { useLayoutStore } from "@renderer/layout/layout-store";
-import { useThemeStore } from "@renderer/theming/theme-store";
 import { StatusBar } from "@renderer/widgets/StatusBar";
 import { useEffect, useState } from "react";
 import styles from "./App.module.css";
@@ -22,9 +23,11 @@ import styles from "./App.module.css";
  */
 export const App = () => {
   const connect = useEngineStore((s) => s.connect);
+  const loadCatalog = useCatalogStore((s) => s.load);
+  const catalogStatus = useCatalogStore((s) => s.status);
+  const catalogCount = useCatalogStore((s) => s.modules.length);
   const loadConfig = useConfigStore((s) => s.load);
   const loadLayout = useLayoutStore((s) => s.load);
-  const theme = useThemeStore((s) => s.theme);
   const [rightTab, setRightTab] = useState("inspector");
   const paletteOpen = useModalStore((s) => s.isOpen("command-palette"));
   const hideModal = useModalStore((s) => s.hide);
@@ -34,9 +37,10 @@ export const App = () => {
     registerShellCommands();
     void loadConfig();
     void loadLayout();
-    void connect();
+    // The catalogue can only be fetched once the engine answers, so it follows the handshake.
+    void connect().then(() => loadCatalog());
     return watchEngine();
-  }, [connect, loadConfig, loadLayout]);
+  }, [connect, loadCatalog, loadConfig, loadLayout]);
 
   return (
     <>
@@ -45,7 +49,9 @@ export const App = () => {
         leftTop={
           <Panel title="Catalog" scope="catalog">
             <p className={styles.placeholder}>
-              Module catalogue arrives with the grid editor.
+              {catalogStatus === "ready"
+                ? `${catalogCount} modules`
+                : catalogStatus}
             </p>
           </Panel>
         }
@@ -54,22 +60,7 @@ export const App = () => {
             <p className={styles.placeholder}>Undo history.</p>
           </Panel>
         }
-        center={
-          <div className={styles.grid} data-kb-scope="grid">
-            <p className={styles.placeholder}>The grid renders here.</p>
-            <ul className={styles.legend}>
-              {Object.keys(theme.grid.signal).map((role) => (
-                <li key={role} className={styles.legendItem}>
-                  <span
-                    className={styles.swatch}
-                    style={{ background: `var(--color-signal-${role})` }}
-                  />
-                  {role}
-                </li>
-              ))}
-            </ul>
-          </div>
-        }
+        center={<GridView />}
         centerBottom={
           <Panel title="Log" scope="logs">
             <p className={styles.placeholder}>Engine log.</p>

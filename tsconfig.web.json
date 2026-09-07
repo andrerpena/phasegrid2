@@ -11,5 +11,11 @@
       "@shared/*": ["shared/*"]
     }
   },
-  "include": ["src/renderer/src/**/*", "shared/**/*"]
+  "include": [
+    "src/renderer/src/**/*",
+    "shared/**/*",
+    // The engine's own catalogue, used as a fixture so stories draw real modules with no engine
+    // running. A test already checks this file against what a live `--catalog` prints.
+    "engine/tests/golden/catalog.json"
+  ]
 }
