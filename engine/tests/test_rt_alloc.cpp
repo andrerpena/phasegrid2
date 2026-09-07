@@ -6,7 +6,12 @@
 
 TEST_CASE("RtScope detects heap allocation", "[rt]") {
   pg::test::resetRtViolations();
-  { pg::test::RtScope scope; std::vector<int> v(64); (void)v; }
+  {
+    pg::test::RtScope scope;
+    std::vector<int> v(64, 1);
+    asm volatile("" : : "r"(v.data()) : "memory");   // pointer escapes: the allocation cannot be elided
+    REQUIRE(v[3] == 1);
+  }
   REQUIRE(pg::test::rtViolations() > 0);
 }
 
