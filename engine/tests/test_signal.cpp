@@ -46,5 +46,10 @@ TEST_CASE("Block and SignalView slice and clear", "[core]") {
   REQUIRE(pg::lanes::lane(unconnected.readOr()[5], 2) == 0.f);
   REQUIRE(v.readOr() == v.data);
   REQUIRE(reinterpret_cast<uintptr_t>(b.data.data()) % 16 == 0);
+  const pg::SignalView unconnectedSlice = unconnected.slice(4, 2);
+  REQUIRE(unconnectedSlice.empty());
+  REQUIRE(unconnectedSlice.numFrames == 2);
+  REQUIRE(pg::lanes::lane(unconnectedSlice.readOr()[1], 0) == 0.f);
+  REQUIRE(pg::hzToPitch(pg::pitchToHz(0.3f)) == Catch::Approx(0.3f).epsilon(1e-5));
   static_assert(pg::kMaxBlockSize == vital::kMaxBufferSize);
 }

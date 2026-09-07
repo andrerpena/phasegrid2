@@ -13,6 +13,7 @@ using Sample = vital::poly_float;
 using Mask = vital::poly_mask;
 
 inline constexpr uint32_t kMaxBlockSize = static_cast<uint32_t>(vital::kMaxBufferSize);   // 128
+static_assert(kMaxBlockSize == static_cast<uint32_t>(vital::kMaxBufferSize));
 inline constexpr uint32_t kDefaultBlockSize = 64;
 inline constexpr uint32_t kMaxEventsPerBlock = 256;
 inline constexpr uint32_t kMaxPortsPerModule = 32;

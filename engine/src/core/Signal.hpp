@@ -1,5 +1,6 @@
 #pragma once
 #include <array>
+#include <cassert>
 #include <cstdint>
 #include "core/Conventions.hpp"
 
@@ -26,7 +27,11 @@ struct SignalView {
   uint32_t numFrames = 0;
   bool empty() const { return data == nullptr; }
   const Sample* readOr() const;   // data, or the silent block when empty
-  SignalView slice(uint32_t offset, uint32_t n) const { return empty() ? SignalView{nullptr, n} : SignalView{data + offset, n}; }
+  SignalView slice(uint32_t offset, uint32_t n) const {
+    assert(empty() || offset + n <= numFrames);
+    assert(n <= kMaxBlockSize);
+    return empty() ? SignalView{nullptr, n} : SignalView{data + offset, n};
+  }
   void clear() const { for (uint32_t i = 0; i < numFrames; ++i) data[i] = Sample(0.f); }
 };
 
@@ -37,7 +42,8 @@ struct alignas(16) Block {
   void clear() { data.fill(Sample(0.f)); }
 };
 
-inline const Block& silentBlock() { static const Block zeros{}; return zeros; }
-inline const Sample* SignalView::readOr() const { return data ? data : silentBlock().data.data(); }
+inline const Block kSilentBlock{};                       // dynamic-initialized once at load, before any audio thread exists
+inline const Block& silentBlock() { return kSilentBlock; }
+inline const Sample* SignalView::readOr() const { return data ? data : kSilentBlock.data.data(); }
 
 }  // namespace pg
