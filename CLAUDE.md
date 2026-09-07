@@ -21,3 +21,5 @@ Spec: docs/superpowers/specs/2026-09-07-phasegrid2-architecture-design.md. Engin
 - Adding a module = one `.cpp` in `engine/src/modules` + one line in `builtin.cpp`. No TypeScript changes.
 - Styling: CSS Modules + CSS custom properties only. No Tailwind. Use `--font-size-*` and `--space-*` tokens; no inline static px.
 - Descriptors are C-layout; never put std types in them.
+- Signals are `pg::Sample` (vital::poly_float, lanes v0.L v0.R v1.L v1.R). Never add channel counts to ports.
+- `engine/vendor/vital` is vendored GPL code: never edit it (shims only), never use the names "Vital"/"Tytel" in ids, UI or binaries.

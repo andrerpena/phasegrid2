@@ -11,3 +11,9 @@ Generative, grid-based modular music platform. Electron + Pixi.js frontend, C++2
 npm install     # builds the engine
 npm run dev
 ```
+
+## Docs
+- `docs/engine.md` — engine architecture, signal type and RT rules
+- `docs/adding-a-module.md` — how to add a module
+- `docs/superpowers/specs/` — design spec and amendments
+- `engine/vendor/vital/NOTICE.md` — vendored DSP provenance and licensing
