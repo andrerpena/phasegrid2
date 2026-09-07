@@ -10,6 +10,8 @@ import { useEngineStore, watchEngine } from "@renderer/engine/engine-store";
 import { GridView } from "@renderer/grid/GridView";
 import { useKeybindings } from "@renderer/keybindings/use-keybindings";
 import { useLayoutStore } from "@renderer/layout/layout-store";
+import { startEngineSync } from "@renderer/patch/engine-sync";
+import { CatalogPanel } from "@renderer/widgets/CatalogPanel";
 import { StatusBar } from "@renderer/widgets/StatusBar";
 import { useEffect, useState } from "react";
 import styles from "./App.module.css";
@@ -24,8 +26,6 @@ import styles from "./App.module.css";
 export const App = () => {
   const connect = useEngineStore((s) => s.connect);
   const loadCatalog = useCatalogStore((s) => s.load);
-  const catalogStatus = useCatalogStore((s) => s.status);
-  const catalogCount = useCatalogStore((s) => s.modules.length);
   const loadConfig = useConfigStore((s) => s.load);
   const loadLayout = useLayoutStore((s) => s.load);
   const [rightTab, setRightTab] = useState("inspector");
@@ -37,9 +37,24 @@ export const App = () => {
     registerShellCommands();
     void loadConfig();
     void loadLayout();
-    // The catalogue can only be fetched once the engine answers, so it follows the handshake.
-    void connect().then(() => loadCatalog());
-    return watchEngine();
+    // The catalogue is fetched every time the engine becomes ready, not once after the first attempt.
+    // The first handshake can happen before the engine has finished starting, and a restarted engine is
+    // a different process whose catalogue may differ, so a one-shot load leaves the interface either
+    // empty or describing a build that is no longer running.
+    const stopStatus = useEngineStore.subscribe((state, previous) => {
+      if (state.status === "ready" && previous.status !== "ready")
+        void loadCatalog();
+    });
+    void connect();
+    // From here every edit reaches the engine. Started before the first edit can happen, so nothing
+    // is applied to the document that the engine never hears about.
+    const stopSync = startEngineSync();
+    const stopWatch = watchEngine();
+    return () => {
+      stopStatus();
+      stopSync();
+      stopWatch();
+    };
   }, [connect, loadCatalog, loadConfig, loadLayout]);
 
   return (
@@ -48,11 +63,7 @@ export const App = () => {
         top={<div className={styles.transport}>transport</div>}
         leftTop={
           <Panel title="Catalog" scope="catalog">
-            <p className={styles.placeholder}>
-              {catalogStatus === "ready"
-                ? `${catalogCount} modules`
-                : catalogStatus}
-            </p>
+            <CatalogPanel />
           </Panel>
         }
         leftBottom={
