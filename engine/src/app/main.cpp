@@ -2,14 +2,24 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 #include <thread>
+#include <vector>
 #include "app/Tone.hpp"
+#include "core/Engine.hpp"
 #include "core/Version.hpp"
+#include "modules/builtin.hpp"
+#include "render/OfflineRenderer.hpp"
+#include "render/PatchFile.hpp"
 #include "services/BlockSplitter.hpp"
 #include "services/MiniaudioBackend.hpp"
 
 static int usage() {
-  std::puts("phasegrid-engine\n  --version\n  --tone [seconds]      play a 440 Hz test tone on the default device");
+  std::puts(
+      "phasegrid-engine\n"
+      "  --version\n"
+      "  --tone [seconds]      play a 440 Hz test tone on the default device\n"
+      "  --render <patch.json> --out <file.wav> [--seconds N] [--sr N] [--block N]");
   return 2;
 }
 
@@ -46,8 +56,33 @@ static int runTone(int seconds) {
   return 0;
 }
 
+static int runRender(int argc, char** argv) {
+  std::string patch, out; double seconds = 2.0, sr = 48000.0; uint32_t block = 64;
+  for (int i = 2; i < argc; ++i) {
+    const std::string a = argv[i];
+    auto next = [&](double& v) { if (i + 1 < argc) v = std::atof(argv[++i]); };
+    if (a == "--seconds") next(seconds);
+    else if (a == "--sr") next(sr);
+    else if (a == "--block") { double b = 64; next(b); block = static_cast<uint32_t>(b); }
+    else if (a == "--out" && i + 1 < argc) out = argv[++i];
+    else if (patch.empty()) patch = a;
+  }
+  if (patch.empty() || out.empty()) { std::fprintf(stderr, "usage: --render <patch.json> --out <file.wav> [--seconds N] [--sr N] [--block N]\n"); return 2; }
+  pg::Registry reg;
+  pg::registerBuiltinModules(reg);
+  pg::Engine engine{reg, pg::EngineConfig{sr, block}};
+  if (pg::Result r = pg::loadPatchFile(patch, reg, engine.model()); !r) { std::fprintf(stderr, "%s: %s\n", r.code.c_str(), r.message.c_str()); return 1; }
+  if (pg::Result r = engine.commit(); !r) { std::fprintf(stderr, "%s: %s\n", r.code.c_str(), r.message.c_str()); return 1; }
+  const std::vector<float> data = pg::renderInterleaved(engine, pg::RenderOptions{seconds, 2});
+  std::string err;
+  if (!pg::writeWav(out, data, 2, sr, err)) { std::fprintf(stderr, "%s\n", err.c_str()); return 1; }
+  std::printf("rendered %zu frames to %s\n", data.size() / 2, out.c_str());
+  return 0;
+}
+
 int main(int argc, char** argv) {
   if (argc >= 2 && std::strcmp(argv[1], "--version") == 0) { std::printf("%s\n", pg::engineVersion()); return 0; }
   if (argc >= 2 && std::strcmp(argv[1], "--tone") == 0) return runTone(argc >= 3 ? std::atoi(argv[2]) : 3);
+  if (argc >= 2 && std::strcmp(argv[1], "--render") == 0) return runRender(argc, argv);
   return usage();
 }
