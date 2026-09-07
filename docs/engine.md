@@ -26,10 +26,22 @@ never use the names "Vital"/"Tytel" in ids, UI or binaries. `npm run lint:tradem
 `engine/src/vital/` adapts that library to the Grid. `pg::vendor::WrappedModule` is a single `Module` implementation
 that wraps any `vital::SynthModule`; a module type is a `pg::vendor::ModuleSpec` value (see
 `engine/src/modules/vital/`), and `buildDescriptor` generates its `ModuleDescriptor` at registry time from the
-vendored parameter table, so param ranges and units are the DSP's own. Two traps the vendored framework sets:
-every `vital::Output` needs a non-null `owner` Processor (`ModulationSum::process` dereferences it to ask whether
-the signal is control rate), and a control's `string_lookup` may be shorter than its own min..max range when the
-names depend on another control -- `ControlOverride::suppressLabels` covers that case.
+vendored parameter table, so param ranges and units are the DSP's own. Four traps the vendored framework sets:
+
+- Every `vital::Output` needs a non-null `owner` Processor: `ModulationSum::process` dereferences it to ask whether
+  the signal is control rate. The adapter's own Outputs get the `AdapterSource` stub for that.
+- A control's `string_lookup` may be shorter than its own min..max range, when the names depend on a second control
+  (a filter's `style` is named differently per `model`). Generating labels from it would read off the end;
+  `ControlOverride::suppressLabels` emits the control as a plain integer instead.
+- The router runs `local_order_`, but only `global_order_` is topologically sorted by `plug()`, and the rebuild that
+  copies one into the other never fires on the object that owns the graph — upstream processes per-voice *copies*,
+  whose copy constructor does that rebuild. A module that plugs a processor before creating the controls feeding it
+  (the envelope does) would therefore read its controls one block late, and read zero on the first block. Build every
+  vendored module through `pg::vendor::makeModule<T>(...)`, which wraps it in `pg::vendor::Sorted<T>` and asks for the
+  rebuild once, after `init()`.
+- Some modules write only `buffer[0]` of a full-size output (`Envelope::processAudioRate` fills its value buffer per
+  sample but sets the phase once, at the end). `OutputMap::firstFrameOnly` makes the adapter broadcast frame 0 across
+  the block rather than copy samples the module never wrote.
 
 The JUCE shim (`engine/vendor/vital/shim/JuceHeader.h`) reaches **every** engine translation unit, via
 `core/Conventions.hpp` → `common.h`, and it declares `String`, `MemoryOutputStream`, `Base64`, `ProjectInfo` and the
@@ -38,6 +50,18 @@ global `String` or `Base64` of your own, and expect an unqualified `String` in e
 is inherent to the vendoring decision (the vendored sources use those names unqualified); it is recorded here so a
 collision later is not a surprise. The vendored include directories are marked `SYSTEM` so their warnings are not
 attributed to our sources.
+
+## Modules
+
+Built-ins are registered in `engine/src/modules/builtin.cpp`, one line each. Own modules are a single `.cpp` under
+`engine/src/modules`; vendored-backed ones a single `ModuleSpec` under `engine/src/modules/vital`. Today:
+`io.audioOut`, `note.toCv`, `filter.multi`, `osc.wavetable`, `env.dahdsr`.
+
+`pg::vendor::WavetableBank` (`engine/src/vital/WavetableBank.*`) renders the built-in wavetables and reads the
+vendored authoring format from JSON. Message thread only: a render resizes the table's frame storage and the
+vendored `setNumFrames` spins until the audio thread has released the old frames. The audio thread never touches a
+table except through the `markUsed()`/`markUnused()` handshake the vendored oscillator performs for itself, which is
+what lets a table be swapped under a running oscillator without a lock of ours.
 
 ## Params
 
@@ -93,7 +117,7 @@ Event inputs are always valid buffers (empty when unconnected).
 
 ## Tests
 
-`npm run engine:test` runs 65 Catch2 tests. `PG_WERROR=ON npm run engine:test` additionally builds with `-Werror`
+`npm run engine:test` runs 82 Catch2 tests. `PG_WERROR=ON npm run engine:test` additionally builds with `-Werror`
 (CI does this; it is off by default because `postinstall` builds the engine on end-user machines).
 
 Headless render, using a patch built from builtin modules only:
@@ -102,6 +126,6 @@ Headless render, using a patch built from builtin modules only:
 ./build/engine/phasegrid-engine --render engine/tests/golden/silence.json --seconds 2 --out out.wav
 ```
 
-`engine/tests/golden/silence.json` is that patch — a bare `io.audioOut`, so it writes 2 s of silence until the
-oscillator modules land. `engine/tests/golden/const_to_out.json` is a **test-only** fixture: it uses `test.const`,
+`engine/tests/golden/silence.json` is that patch — a bare `io.audioOut`, so it writes 2 s of silence.
+`engine/tests/golden/const_to_out.json` is a **test-only** fixture: it uses `test.const`,
 which only `pg_tests` registers, so `--render` on it exits 1 with `E_UNKNOWN_TYPE`.
