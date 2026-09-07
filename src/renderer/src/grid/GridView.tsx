@@ -1,5 +1,6 @@
 import { useCatalogStore } from "@renderer/catalog/catalog-store";
 import { usePatchStore } from "@renderer/patch/patch-store";
+import { useProjectStore } from "@renderer/project/project-store";
 import { useThemeStore } from "@renderer/theming/theme-store";
 import type { PatchOp } from "@shared/protocol/patch";
 import { Application } from "pixi.js";
@@ -76,31 +77,46 @@ export const GridView = () => {
       observer.observe(element);
       stop.push(() => observer.disconnect());
 
-      const interaction = new GridInteraction(view, created.canvas, {
-        onNodesMoved: (moves) => {
-          usePatchStore.getState().apply(
-            moves.map(
-              (m): PatchOp => ({ op: "moduleMove", id: m.id, x: m.x, y: m.y }),
-            ),
-            {
-              label:
-                moves.length > 1
-                  ? `Move ${moves.length} modules`
-                  : "Move module",
-            },
-          );
-        },
-        onParamChange: (module, param, value, done) => {
-          // Every intermediate value reaches the engine, so the sound follows the knob; only the
-          // release is labelled, so the whole gesture is one step back rather than a hundred.
-          usePatchStore
-            .getState()
-            .apply(
-              [{ op: "paramSet", module, param, value, transient: !done }],
-              done ? { label: "Set parameter" } : {},
+      const interaction = new GridInteraction(
+        view,
+        created.canvas,
+        {
+          onNodesMoved: (moves) => {
+            usePatchStore.getState().apply(
+              moves.map(
+                (m): PatchOp => ({
+                  op: "moduleMove",
+                  id: m.id,
+                  x: m.x,
+                  y: m.y,
+                }),
+              ),
+              {
+                label:
+                  moves.length > 1
+                    ? `Move ${moves.length} modules`
+                    : "Move module",
+              },
             );
+          },
+          onParamChange: (module, param, value, done) => {
+            // Every intermediate value reaches the engine, so the sound follows the knob; only the
+            // release is labelled, so the whole gesture is one step back rather than a hundred.
+            usePatchStore
+              .getState()
+              .apply(
+                [{ op: "paramSet", module, param, value, transient: !done }],
+                done ? { label: "Set parameter" } : {},
+              );
+          },
         },
-      });
+        // An example demonstrates a module: its wiring is fixed and its knobs are live. Read once,
+        // when the canvas is built, because a project's kind never changes while it is open.
+        {
+          parametersOnly:
+            useProjectStore.getState().active()?.kind === "example",
+        },
+      );
       stop.push(interaction.attach());
     };
 

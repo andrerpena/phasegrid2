@@ -24,6 +24,17 @@ import { CELL, hitControl, paramFraction, snap } from "./layout";
  * operation, an undo entry and a message to the engine, or just a value in a story's state.
  */
 
+export interface GridOptions {
+  /**
+   * Parameters only: no moving, no marquee, no connecting.
+   *
+   * What an example project uses. Knob drags are deliberately still allowed, because changing values is
+   * the entire point of a demonstration; what is withheld is only the wiring, which is what makes the
+   * example an example rather than a document someone starts working in.
+   */
+  parametersOnly?: boolean;
+}
+
 export interface GridCallbacks {
   /** A finished drag. Positions are already snapped to the grid. */
   onNodesMoved?: (moves: { id: string; x: number; y: number }[]) => void;
@@ -52,6 +63,7 @@ export class GridInteraction {
     private readonly renderer: GridRenderer,
     private readonly canvas: HTMLCanvasElement,
     private readonly callbacks: GridCallbacks = {},
+    private readonly options: GridOptions = {},
   ) {}
 
   attach(): () => void {
@@ -116,6 +128,9 @@ export class GridInteraction {
       }
 
       this.select(event.shiftKey ? [...this.selection, hit.id] : [hit.id]);
+      // Selecting still works, because selecting is how the inspector knows what to show. Only the
+      // dragging is withheld.
+      if (this.options.parametersOnly === true) return;
       this.dragOrigins.clear();
       for (const id of this.selection) {
         const node = this.renderer.allNodes().get(id);
@@ -129,6 +144,10 @@ export class GridInteraction {
       return;
     }
 
+    if (this.options.parametersOnly === true) {
+      if (!event.shiftKey) this.select([]);
+      return;
+    }
     this.state = beginMarquee(point, event.shiftKey);
     if (!event.shiftKey) this.select([]);
   }

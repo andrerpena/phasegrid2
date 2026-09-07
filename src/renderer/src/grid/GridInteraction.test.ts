@@ -311,3 +311,85 @@ describe("selecting with a marquee", () => {
     ).toEqual(["env", "vca"]);
   });
 });
+
+describe("an example project, where only the parameters may change", () => {
+  it("refuses to move a module", () => {
+    // An example demonstrates a module. Letting someone rearrange one invites them to start working
+    // in a project that has nowhere to save to, which is the trap this avoids.
+    const onNodesMoved = vi.fn();
+    const { renderer, canvas } = rig(nodes);
+    const d = driver(
+      new GridInteraction(
+        renderer,
+        canvas,
+        { onNodesMoved },
+        { parametersOnly: true },
+      ),
+    );
+    d.down(250, 130);
+    d.move(400, 300);
+    d.up(400, 300);
+    expect(onNodesMoved).not.toHaveBeenCalled();
+    expect(nodes.get("vca")?.view.position.x).toBe(240);
+  });
+
+  it("still lets a knob be turned", () => {
+    // Changing values is the entire point of a demonstration; only the wiring is withheld.
+    const onParamChange = vi.fn();
+    const { renderer, canvas } = rig(nodes);
+    const d = driver(
+      new GridInteraction(
+        renderer,
+        canvas,
+        { onParamChange },
+        { parametersOnly: true },
+      ),
+    );
+    const node = nodes.get("env");
+    if (node === undefined) throw new Error("env");
+    const control = node.layout.controls[0];
+    const knob = {
+      x: node.view.position.x + control.x,
+      y: node.view.position.y + control.y,
+    };
+    d.down(knob.x, knob.y);
+    d.move(knob.x, knob.y - 50);
+    d.up(knob.x, knob.y - 50);
+    expect(onParamChange).toHaveBeenCalled();
+  });
+
+  it("still lets a module be selected, so the inspector can show it", () => {
+    const onSelectionChanged = vi.fn();
+    const { renderer, canvas } = rig(nodes);
+    const d = driver(
+      new GridInteraction(
+        renderer,
+        canvas,
+        { onSelectionChanged },
+        { parametersOnly: true },
+      ),
+    );
+    d.down(250, 130);
+    expect((onSelectionChanged.mock.calls.at(-1) as [string[]])[0]).toEqual([
+      "vca",
+    ]);
+  });
+
+  it("does not start a marquee on the empty canvas", () => {
+    const onSelectionChanged = vi.fn();
+    const { renderer, canvas } = rig(nodes);
+    const d = driver(
+      new GridInteraction(
+        renderer,
+        canvas,
+        { onSelectionChanged },
+        { parametersOnly: true },
+      ),
+    );
+    d.down(10, 600);
+    d.move(600, 700);
+    d.up(600, 700);
+    // The click still clears the selection; it just does not sweep a rectangle.
+    expect((onSelectionChanged.mock.calls.at(-1) as [string[]])[0]).toEqual([]);
+  });
+});

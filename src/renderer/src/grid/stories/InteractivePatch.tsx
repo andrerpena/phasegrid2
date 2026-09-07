@@ -141,7 +141,6 @@ export const InteractivePatch = ({
           <ul style={{ margin: "4px 0 12px", paddingLeft: 16 }}>
             {log.map((line, i) => (
               // The log is append-only and short; position is the only identity these lines have.
-              // biome-ignore lint/suspicious/noArrayIndexKey: entries have no id and never reorder
               <li key={i}>{line}</li>
             ))}
             {log.length === 0 && <li>drag a module, or a knob</li>}

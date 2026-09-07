@@ -7,10 +7,10 @@ import { Panel } from "@renderer/components/panel/Panel";
 import { Tabs } from "@renderer/components/tabs/Tabs";
 import { useConfigStore } from "@renderer/config/config-store";
 import { useEngineStore, watchEngine } from "@renderer/engine/engine-store";
-import { GridView } from "@renderer/grid/GridView";
 import { useKeybindings } from "@renderer/keybindings/use-keybindings";
 import { useLayoutStore } from "@renderer/layout/layout-store";
 import { startEngineSync } from "@renderer/patch/engine-sync";
+import { ProjectTabs } from "@renderer/project/ProjectTabs";
 import { CatalogPanel } from "@renderer/widgets/CatalogPanel";
 import { StatusBar } from "@renderer/widgets/StatusBar";
 import { useEffect, useState } from "react";
@@ -71,7 +71,7 @@ export const App = () => {
             <p className={styles.placeholder}>Undo history.</p>
           </Panel>
         }
-        center={<GridView />}
+        center={<ProjectTabs />}
         centerBottom={
           <Panel title="Log" scope="logs">
             <p className={styles.placeholder}>Engine log.</p>

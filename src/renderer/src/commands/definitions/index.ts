@@ -1,6 +1,8 @@
 import { useModalStore } from "@renderer/components/floating/modal/modal-store";
+import { allExamples, projectForExample } from "@renderer/examples/registry";
 import { useHistoryStore } from "@renderer/history/history-store";
 import { useLayoutStore } from "@renderer/layout/layout-store";
+import { emptyProject, useProjectStore } from "@renderer/project/project-store";
 import { useThemeStore } from "@renderer/theming/theme-store";
 import { THEMES } from "@renderer/theming/themes";
 import { commandRegistry } from "../registry";
@@ -68,6 +70,42 @@ export const SHELL_COMMANDS: CommandDefinition<never>[] = [
   },
 ];
 
+/**
+ * One command per module example, so the palette is how you reach them.
+ *
+ * Searching for a module by name finds its example, which makes the palette the answer to "what does
+ * this module do" as well as to "what can this application do".
+ */
+export function exampleCommands(): CommandDefinition<never>[] {
+  return allExamples().map((example) => ({
+    id: `example.${example.moduleId}`,
+    name: `Example: ${example.name}`,
+    category: "Examples",
+    description: `${example.description} (${example.moduleId})`,
+    execute: () => useProjectStore.getState().open(projectForExample(example)),
+  }));
+}
+
+const PROJECT_COMMANDS: CommandDefinition<never>[] = [
+  {
+    id: "project.new",
+    name: "New Project",
+    category: "Project",
+    execute: () => useProjectStore.getState().open(emptyProject()),
+  },
+  {
+    id: "project.close",
+    name: "Close Project",
+    category: "Project",
+    execute: () => {
+      const id = useProjectStore.getState().activeId;
+      if (id !== null) useProjectStore.getState().close(id);
+    },
+  },
+];
+
 export function registerShellCommands(): void {
   commandRegistry.registerAll(SHELL_COMMANDS);
+  commandRegistry.registerAll(PROJECT_COMMANDS);
+  commandRegistry.registerAll(exampleCommands());
 }
