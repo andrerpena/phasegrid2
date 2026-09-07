@@ -1,26 +1,29 @@
-# phasegrid2 Foundation Implementation Plan (Phases 0–2)
+# phasegrid2 Foundation Implementation Plan (Phases 0–2, v2: Vital-native core)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Stand up the repository, toolchain and Electron shell, then build the C++ engine foundation: device I/O, the unified signal/event model, descriptor-driven modules, the graph compiler with per-sample feedback clusters, glitch-free hot-swap, and an offline renderer that turns a JSON patch into a WAV under tests.
+**Goal:** Stand up the repository, toolchain and Electron shell, then build the C++ engine foundation on Vital's `poly_float` SIMD signal type: device I/O, vendored Vital DSP, the unified signal/event model, descriptor-driven modules, the graph compiler with per-sample feedback clusters, glitch-free hot-swap, and an offline renderer that turns a JSON patch into a WAV under tests.
 
-**Architecture:** One npm package containing an Electron/React app (`src/`), a C++20 engine (`engine/`) built by plain CMake on `postinstall`, and shared protocol types (`shared/`). The engine compiles an immutable `Program` from a `GraphModel` on the message thread and the audio thread swaps to it with one atomic exchange; module instances are reused across swaps so state is continuous. Feedback cycles (Tarjan SCCs) run per-sample with a true one-sample delay on back edges; everything else runs per block.
+**Architecture:** One npm package containing an Electron/React app (`src/`), a C++20 engine (`engine/`) built by plain CMake on `postinstall`, and shared protocol types (`shared/`). The wire signal is `vital::poly_float` (`pg::Sample`): four lanes `[voice0.L, voice0.R, voice1.L, voice1.R]`, stereo everywhere, voices in pairs. Vital's DSP is vendored (GPL-3.0-or-later) under `engine/vendor/vital` behind a JUCE shim. The engine compiles an immutable `Program` from a `GraphModel` on the message thread and the audio thread swaps to it with one atomic exchange; module instances are reused across swaps so state is continuous. Feedback cycles (Tarjan SCCs) run per-sample with a true one-sample delay on back edges; everything else runs per block.
 
-**Tech Stack:** C++20 (Apple clang 17), CMake ≥ 3.28 + FetchContent, Ninja (optional), miniaudio 0.11.25, moodycamel readerwriterqueue 1.0.7, nlohmann/json 3.12.0, Catch2 3.16.0; Node 22, Electron 41, electron-vite 5, Vite 6, React 19, TypeScript 5.8, Biome 2.3, Vitest 3.2, Zod 3, Zustand 5.
+**Tech Stack:** C++20 (Apple clang 17), CMake ≥ 3.28 + FetchContent, Ninja (optional), vendored Vital DSP (commit 636ca0e, GPL-3.0-or-later, SSE2/NEON), kissfft (BSD-3) / Accelerate vDSP, miniaudio 0.11.25, moodycamel readerwriterqueue 1.0.7, nlohmann/json 3.12.0, Catch2 3.16.0; Node 22, Electron 41, electron-vite 5, Vite 6, React 19, TypeScript 5.8, Biome 2.3, Vitest 3.2, Zod 3, Zustand 5.
 
-**Spec:** `docs/superpowers/specs/2026-09-07-phasegrid2-architecture-design.md`
+**Spec:** `docs/superpowers/specs/2026-09-07-phasegrid2-architecture-design.md` as amended by `docs/superpowers/specs/2026-09-07-vital-native-core-amendment.md` (the amendment wins on conflict)
 
 ## Global Constraints
 
 - License: AGPL-3.0-only. Every third-party dependency must be MIT/BSD/BSL/MIT-0 or GPL-compatible.
 - C++20, no exceptions across the audio thread, no allocation/locks/syscalls/logging inside `Module::process`, the scheduler, param drains, or program swaps. Enforced by `tests/util/RtGuard` (Task 5).
-- Engine constants: `kMaxBlockSize = 256`, default block 64, `kMaxChannels = 2`, `kMaxEventsPerBlock = 256`, `kMaxPortsPerModule = 32`, `kMaxParamsPerModule = 64`.
+- Engine constants: `kMaxBlockSize = 128` (= `vital::kMaxBufferSize`), default block 64, `kMaxEventsPerBlock = 256`, `kMaxPortsPerModule = 32`, `kMaxParamsPerModule = 64`. No channel count on ports.
+- Wire signal: `pg::Sample = vital::poly_float`, lanes `[voice0.L, voice0.R, voice1.L, voice1.R]`. Mono sources write L = R. Voices run in pairs; `Program.voicePairs = ceil(voiceCount/2)`; unused voice lanes are masked at terminals.
+- Vendored Vital code under `engine/vendor/vital/` keeps every upstream copyright header, is never edited (shims only; any unavoidable edit is listed in `engine/vendor/vital/NOTICE.md`), and is compiled with warnings off. The strings `vital`, `Vital`, `Tytel` never appear in `engine/src`, `shared`, `src` except in the C++ namespace `vital::` and include paths.
 - Signal conventions: nominal ±1 float; pitch `freq = 261.6256 * 2^(v * 10)`; MIDI note n → `(n - 60) / 120`; gate high when `> 0`; phase 0..1.
 - Descriptors are C-layout (`const char*`, raw arrays, no std types) with `abiVersion = 1`.
 - Registration is an explicit list (`modules/builtin.cpp`); no static-initializer registration.
 - Frontend: CSS Modules + CSS custom properties, never Tailwind; tokens `--font-size-{caption,body,heading,display}` = 12/14/16/24 px and `--space-{1..4}` = 4/8/12/16 px; no inline static px.
 - After any TS change run `npm run typecheck && npm run lint:fix`. After any C++ change run `npm run engine:test`.
-- JSON in the engine uses nlohmann/json (glaze v8 needs C++23, which Apple clang 17 does not fully support). This is a deliberate deviation from the spec's "glaze first" wording.
+- JSON in the engine uses nlohmann/json (glaze v8 needs C++23, which Apple clang 17 does not fully support). Vital's `json/json.h` include resolves to a shim forwarding to nlohmann/json.
+- DaisySP is not used.
 - Commit after every task with a conventional message; never commit `build*/`, `out/`, `node_modules/`.
 
 ---
@@ -35,23 +38,24 @@
 | `CMakeLists.txt`, `CMakePresets.json`, `engine/CMakeLists.txt`, `engine/cmake/*.cmake` | C++ build |
 | `scripts/build-native.mjs`, `scripts/dev.mjs` | postinstall build and dev launcher |
 | `engine/src/core/Conventions.hpp` | Numeric constants and conversions |
-| `engine/src/core/Signal.hpp` | `SignalView`, `PlanarBuffer` |
+| `engine/vendor/vital/**`, `scripts/vendor-vital.mjs` | Vendored Vital DSP (GPL-3.0-or-later), JUCE shim, provenance |
+| `engine/src/core/Signal.hpp` | `Sample`, `SignalView`, `Block`, lane helpers |
 | `engine/src/core/Event.hpp/.cpp` | `Event`, `EventBuffer`, `mergeEvents` |
 | `engine/src/core/Descriptor.hpp` | `PortDesc`, `ParamDesc`, `ModuleDescriptor` (C-layout) |
-| `engine/src/core/Param.hpp/.cpp` | Curves, `OnePoleSmoother`, `ParamState` |
+| `engine/src/core/Param.hpp/.cpp` | Curves (scalar + lane-wise), `OnePoleSmoother`, `ParamState`, `ParamView` |
 | `engine/src/core/Module.hpp` | `Module`, `VoicedModule`, `ProcessContext`, `TransportSnapshot`, `AudioBus` |
 | `engine/src/core/Registry.hpp/.cpp` | Type registry, implicit param ports, validation |
 | `engine/src/core/GraphModel.hpp/.cpp` | Engine-side document mirror with validation |
-| `engine/src/core/Program.hpp` | `Op`, `NodeSlot`, `Program`, `ModuleInstance`, `FeedbackState` |
+| `engine/src/core/Program.hpp` | `Op`, `NodeSlot`, `Program` (`Block` buffers, voice pairs), `ModuleInstance`, `FeedbackState` |
 | `engine/src/core/InstanceTable.hpp/.cpp` | Instance reuse across compiles (hot-swap state continuity) |
 | `engine/src/core/Scheduler.hpp/.cpp` | Executes ops (block mode + per-sample clusters) |
 | `engine/src/core/GraphCompiler.hpp/.cpp` | GraphModel → Program (SCC, back edges, buffer allocation) |
-| `engine/src/core/Engine.hpp/.cpp` | Program swap, retire queue, param queue, render entry |
+| `engine/src/core/Engine.hpp/.cpp` | Program swap, retire queue, param queue, bus fold to L/R with voice mask |
 | `engine/src/services/AudioDevice.hpp`, `NullBackend.hpp`, `MiniaudioBackend.hpp/.cpp`, `MiniaudioImpl.cpp`, `BlockSplitter.hpp` | Device layer |
 | `engine/src/modules/AudioOut.cpp`, `builtin.cpp` | First real module + registration list |
 | `engine/src/render/PatchFile.hpp/.cpp`, `OfflineRenderer.hpp/.cpp` | JSON patch → engine, engine → WAV |
 | `engine/src/app/main.cpp`, `Tone.hpp` | CLI: `--version`, `--tone`, `--render` |
-| `engine/tests/**` | Catch2 suites, `util/RtGuard`, `util/GraphFixture.hpp`, `modules/TestModules` |
+| `engine/tests/**` | Catch2 suites, `util/RtGuard`, `util/GraphFixture.hpp`, `modules/TestModules`, `test_vital_spike` |
 | `docs/engine.md`, `docs/adding-a-module.md`, `CLAUDE.md` | Engineering docs |
 
 ---
@@ -1396,17 +1400,363 @@ git commit -m "test(engine): RT allocation guard and first RT-safety test"
 
 ---
 
-### Task 6: Conventions, signal views, event buffers
+
+### Task 6: Vendor Vital DSP behind a JUCE shim, build `vital_dsp`, run a standalone spike
+
+**Files:**
+- Create: `scripts/vendor-vital.mjs`, `engine/vendor/vital/NOTICE.md`, `engine/vendor/vital/CMakeLists.txt`
+- Create: `engine/vendor/vital/shim/JuceHeader.h`, `engine/vendor/vital/shim/json/json.h`, `engine/vendor/vital/shim/load_save.h`, `engine/vendor/vital/shim/voice_handler.h`
+- Create (by the script): `engine/vendor/vital/LICENSE`, `engine/vendor/vital/src/**`, `engine/vendor/vital/third_party/kissfft/**`
+- Modify: `engine/CMakeLists.txt`
+- Test: `engine/tests/test_vital_spike.cpp`
+
+**Interfaces:**
+- Consumes: `pg::test::RtScope` (Task 5).
+- Produces: CMake target `vital_dsp` (PUBLIC include dirs for every vendored directory and the shim; `pg_core` links it PUBLIC). Headers become includable by their Vital names: `"poly_values.h"`, `"processor.h"`, `"synth_module.h"`, `"filter_module.h"`, `"synth_parameters.h"`, `"wavetable_creator.h"`, etc. The spike confirms `vital::FilterModule` runs standalone (this decides the wrapping level for the `vital-modules` plan).
+
+- [ ] **Step 1: Write the vendoring script**
+
+`scripts/vendor-vital.mjs`:
+```js
+#!/usr/bin/env node
+// Copies the curated Vital DSP subset (GPL-3.0-or-later, https://github.com/mtytel/vital, commit 636ca0e)
+// into engine/vendor/vital. Run once; the copied files are committed. Re-run to refresh from VITAL_SRC.
+import { cpSync, mkdirSync, readdirSync, rmSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const src = process.env.VITAL_SRC ?? "/Users/andrepena/gitp/vital";
+const dst = join(root, "engine/vendor/vital");
+
+const EXCLUDE_STEMS = new Set(["synth_voice_handler", "producers_module", "filters_module", "reorderable_effect_chain"]);
+const FRAMEWORK_KEEP = new Set([
+  "common.h", "poly_values.h", "poly_utils.h", "futils.h", "utils.h", "utils.cpp", "matrix.h", "circular_queue.h",
+  "processor.h", "processor.cpp", "processor_router.h", "processor_router.cpp", "value.h", "value.cpp",
+  "feedback.h", "feedback.cpp", "operators.h", "operators.cpp", "synth_module.h", "synth_module.cpp", "note_handler.h",
+]);
+const DIRS = [
+  "src/synthesis/framework", "src/synthesis/filters", "src/synthesis/effects", "src/synthesis/modulators",
+  "src/synthesis/producers", "src/synthesis/lookups", "src/synthesis/utilities", "src/synthesis/modules",
+  "src/common/wavetable",
+];
+const FILES = [
+  "src/common/synth_constants.h", "src/common/synth_types.h", "src/common/synth_types.cpp",
+  "src/common/synth_parameters.h", "src/common/synth_parameters.cpp", "src/common/fourier_transform.h",
+  "src/common/line_generator.h", "src/common/line_generator.cpp",
+  "third_party/kissfft/kissfft.h", "third_party/kissfft/COPYING", "LICENSE",
+];
+const RENAMES = { "src/interface/look_and_feel/synth_strings.h": "src/common/synth_strings.h" };
+
+rmSync(join(dst, "src"), { recursive: true, force: true });
+rmSync(join(dst, "third_party"), { recursive: true, force: true });
+let count = 0;
+const copy = (rel, to = rel) => {
+  const target = join(dst, to);
+  mkdirSync(dirname(target), { recursive: true });
+  cpSync(join(src, rel), target);
+  count += 1;
+};
+for (const dir of DIRS) {
+  for (const file of readdirSync(join(src, dir))) {
+    if (!/\.(h|cpp)$/.test(file)) continue;
+    if (EXCLUDE_STEMS.has(file.replace(/\.(h|cpp)$/, ""))) continue;
+    if (dir.endsWith("framework") && !FRAMEWORK_KEEP.has(file)) continue;
+    copy(join(dir, file));
+  }
+}
+for (const file of FILES) copy(file);
+for (const [from, to] of Object.entries(RENAMES)) copy(from, to);
+console.log(`[vendor-vital] copied ${count} files from ${src} to engine/vendor/vital`);
+```
+
+Run: `node scripts/vendor-vital.mjs` — Expected: about 175 files copied. Then `grep -rl JuceHeader.h engine/vendor/vital/src | wc -l` shows ~20 (all satisfied by the shim below).
+
+- [ ] **Step 2: Write the shim headers**
+
+`engine/vendor/vital/shim/JuceHeader.h`:
+```cpp
+#pragma once
+// phasegrid2 shim that replaces JUCE for the vendored Vital DSP. Vital's engine uses JUCE only for
+// leak-detector macros, String/MemoryOutputStream/Base64 in JSON (de)serializers, and ProjectInfo.
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <string>
+#include <vector>
+
+#define JUCE_LEAK_DETECTOR(x)
+#define JUCE_DECLARE_NON_COPYABLE(x)
+#define JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(x)
+
+class String {
+public:
+  String() = default;
+  String(const char* s) : s_(s ? s : "") {}
+  String(std::string s) : s_(std::move(s)) {}
+  const std::string& toStdString() const { return s_; }
+  bool isEmpty() const { return s_.empty(); }
+  const char* toRawUTF8() const { return s_.c_str(); }
+private:
+  std::string s_;
+};
+
+class MemoryOutputStream {
+public:
+  explicit MemoryOutputStream(size_t reserveBytes = 0) { data_.reserve(reserveBytes); }
+  void write(const void* p, size_t n) { const auto* b = static_cast<const uint8_t*>(p); data_.insert(data_.end(), b, b + n); }
+  const void* getData() const { return data_.data(); }
+  size_t getDataSize() const { return data_.size(); }
+private:
+  std::vector<uint8_t> data_;
+};
+
+struct Base64 {
+  static String toBase64(const void* data, size_t bytes) {
+    static const char* k = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const auto* in = static_cast<const uint8_t*>(data);
+    std::string out; out.reserve((bytes + 2) / 3 * 4);
+    for (size_t i = 0; i < bytes; i += 3) {
+      const uint32_t n = (uint32_t(in[i]) << 16) | (i + 1 < bytes ? uint32_t(in[i + 1]) << 8 : 0) | (i + 2 < bytes ? uint32_t(in[i + 2]) : 0);
+      out.push_back(k[(n >> 18) & 63]); out.push_back(k[(n >> 12) & 63]);
+      out.push_back(i + 1 < bytes ? k[(n >> 6) & 63] : '='); out.push_back(i + 2 < bytes ? k[n & 63] : '=');
+    }
+    return String(std::move(out));
+  }
+  static bool convertFromBase64(MemoryOutputStream& out, const std::string& text) {
+    auto val = [](char c) -> int {
+      if (c >= 'A' && c <= 'Z') return c - 'A'; if (c >= 'a' && c <= 'z') return c - 'a' + 26;
+      if (c >= '0' && c <= '9') return c - '0' + 52; if (c == '+') return 62; if (c == '/') return 63; return -1; };
+    uint32_t acc = 0; int bits = 0;
+    for (char c : text) {
+      if (c == '=') break;
+      const int v = val(c); if (v < 0) continue;
+      acc = (acc << 6) | uint32_t(v); bits += 6;
+      if (bits >= 8) { bits -= 8; const uint8_t byte = uint8_t((acc >> bits) & 0xFF); out.write(&byte, 1); }
+    }
+    return true;
+  }
+};
+
+namespace ProjectInfo { inline constexpr const char* versionString = "phasegrid2"; }
+```
+
+`engine/vendor/vital/shim/json/json.h`:
+```cpp
+#pragma once
+#include <nlohmann/json.hpp>
+using json = nlohmann::json;
+```
+
+`engine/vendor/vital/shim/load_save.h` (only the three static helpers `wavetable_creator.cpp` uses):
+```cpp
+#pragma once
+#include <cstdint>
+#include <memory>
+#include <string>
+#include "JuceHeader.h"
+#include "json/json.h"
+#include "utils.h"
+
+class LoadSave {
+public:
+  static int compareVersionStrings(String a, String b) { return compare(a.toStdString(), b.toStdString()); }
+
+  static void convertBufferToPcm(json& data, const std::string& field) {
+    if (data.count(field) == 0) return;
+    MemoryOutputStream decoded; Base64::convertFromBase64(decoded, data[field].get<std::string>());
+    const int size = static_cast<int>(decoded.getDataSize() / sizeof(float));
+    std::unique_ptr<float[]> f(new float[size]); std::memcpy(f.get(), decoded.getData(), size * sizeof(float));
+    std::unique_ptr<int16_t[]> pcm(new int16_t[size]); vital::utils::floatToPcmData(pcm.get(), f.get(), size);
+    data[field] = Base64::toBase64(pcm.get(), sizeof(int16_t) * size).toStdString();
+  }
+  static void convertPcmToFloatBuffer(json& data, const std::string& field) {
+    if (data.count(field) == 0) return;
+    MemoryOutputStream decoded; Base64::convertFromBase64(decoded, data[field].get<std::string>());
+    const int size = static_cast<int>(decoded.getDataSize() / sizeof(int16_t));
+    std::unique_ptr<int16_t[]> pcm(new int16_t[size]); std::memcpy(pcm.get(), decoded.getData(), size * sizeof(int16_t));
+    std::unique_ptr<float[]> f(new float[size]); vital::utils::pcmToFloatData(f.get(), pcm.get(), size);
+    data[field] = Base64::toBase64(f.get(), sizeof(float) * size).toStdString();
+  }
+
+private:
+  static int compare(std::string a, std::string b) {   // "0.3.7" style, recursive on the first component
+    auto trim = [](std::string& s) { while (!s.empty() && isspace(static_cast<unsigned char>(s.back()))) s.pop_back();
+                                     while (!s.empty() && isspace(static_cast<unsigned char>(s.front()))) s.erase(0, 1); };
+    trim(a); trim(b);
+    if (a.empty() && b.empty()) return 0;
+    auto head = [](const std::string& s) { const auto d = s.find('.'); return d == std::string::npos ? s : s.substr(0, d); };
+    auto tail = [](const std::string& s) { const auto d = s.find('.'); return d == std::string::npos ? std::string() : s.substr(d + 1); };
+    auto num = [](const std::string& s) { return s.empty() || s.find_first_not_of("0123456789") != std::string::npos ? 0 : std::stoi(s); };
+    const int x = num(head(a)), y = num(head(b));
+    if (x != y) return x > y ? 1 : -1;
+    return compare(tail(a), tail(b));
+  }
+};
+```
+
+`engine/vendor/vital/shim/voice_handler.h` (constants-only stand-in; the real one needs JUCE-based tuning):
+```cpp
+#pragma once
+// Constants-only stand-in for Vital's VoiceHandler, enough for synth_parameters.cpp. The real voice handler
+// is not vendored: phasegrid2 has its own voice allocation.
+#include "synth_constants.h"
+namespace vital {
+class VoiceHandler {
+public:
+  enum VoicePriority { kNewest, kOldest, kHighest, kLowest, kRoundRobin, kNumVoicePriorities };
+  enum VoiceOverride { kKill, kSteal, kNumVoiceOverrides };
+};
+}  // namespace vital
+```
+
+- [ ] **Step 3: Write NOTICE.md and CMake**
+
+`engine/vendor/vital/NOTICE.md`:
+```markdown
+# Vendored Vital DSP
+
+Source: https://github.com/mtytel/vital, commit 636ca0ef517a4db087a6a08a6a8a5e704e21f836 (2022-04-20).
+Copyright 2013-2019 Matt Tytel. License: GNU General Public License v3.0 or later (see LICENSE here).
+phasegrid2 is AGPL-3.0-only; GPLv3 section 13 permits this combination.
+
+Only the DSP engine is vendored (src/synthesis minus the voice handler and aggregate modules, the wavetable
+authoring layer, parameters, line generator, FFT wrapper) plus kissfft (BSD-3-Clause). No UI, plugin, standalone,
+authentication or Firebase code. `scripts/vendor-vital.mjs` reproduces the copy.
+
+Trademark: the names "Vital", "Vital Audio", "Tytel" and "Matt Tytel" are not used for phasegrid2 module ids,
+UI strings, binaries or marketing. Vital's presets and factory wavetables are not redistributed.
+
+JUCE is replaced by `shim/JuceHeader.h` (leak-detector macros as no-ops; minimal String, MemoryOutputStream,
+Base64; ProjectInfo), `shim/json/json.h` (nlohmann/json), `shim/load_save.h` (three static helpers) and
+`shim/voice_handler.h` (constants only). `synth_strings.h` is copied from src/interface/look_and_feel.
+
+Modified vendored files: none. (List any future edits here with the reason.)
+```
+
+`engine/vendor/vital/CMakeLists.txt`:
+```cmake
+file(GLOB_RECURSE VITAL_SOURCES CONFIGURE_DEPENDS src/*.cpp)
+add_library(vital_dsp STATIC ${VITAL_SOURCES})
+target_compile_features(vital_dsp PUBLIC cxx_std_20)
+target_include_directories(vital_dsp PUBLIC
+  shim
+  src/synthesis/framework src/synthesis/filters src/synthesis/effects src/synthesis/modulators
+  src/synthesis/producers src/synthesis/lookups src/synthesis/utilities src/synthesis/modules
+  src/common src/common/wavetable third_party)
+target_link_libraries(vital_dsp PUBLIC nlohmann_json::nlohmann_json)
+target_compile_options(vital_dsp PRIVATE -w)
+target_compile_definitions(vital_dsp PUBLIC NO_AUTH=1 $<$<CONFIG:Debug>:DEBUG=1>)
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+  target_compile_options(vital_dsp PUBLIC -msse2)
+endif()
+if(APPLE)
+  target_link_libraries(vital_dsp PUBLIC "-framework Accelerate")
+endif()
+```
+
+In `engine/CMakeLists.txt`, after `include(cmake/Deps.cmake)` add `add_subdirectory(vendor/vital)`, and change the `pg_core` link line to `target_link_libraries(pg_core PUBLIC vital_dsp readerwriterqueue nlohmann_json::nlohmann_json miniaudio_headers)`.
+
+- [ ] **Step 4: Build the vendored library**
+
+Run: `npm run engine:build` — Expected: `vital_dsp` compiles. If a vendored file fails on a missing include from the excluded set, add that file to `FILES`/remove it from `EXCLUDE_STEMS` in the script, re-run the script, and record the addition in NOTICE.md. If a file needs a JUCE symbol the shim lacks, extend the shim (never edit the vendored file). Record every such adjustment in the report.
+
+- [ ] **Step 5: Write the spike test**
+
+`engine/tests/test_vital_spike.cpp`:
+```cpp
+#include <catch2/catch_test_macros.hpp>
+#include <cmath>
+#include "filter_module.h"
+#include "synth_constants.h"
+#include "synth_filter.h"
+#include "util/RtGuard.hpp"
+
+namespace {
+constexpr int kBlock = 64;
+constexpr float kRate = 48000.f;
+
+// Runs a standalone FilterModule (digital SVF, 12 dB low-pass near 1 kHz) over a sine of `hz` and returns
+// the output RMS over the last second (after settling).
+float filteredRms(float hz) {
+  vital::FilterModule filter("filter_1");
+  filter.init();
+  filter.setSampleRate(static_cast<int>(kRate));
+  vital::Output audio; vital::cr::Output reset; vital::cr::Output keytrack; vital::Output midi;
+  filter.plug(&audio, vital::FilterModule::kAudio);
+  filter.plug(&reset, vital::FilterModule::kReset);
+  filter.plug(&keytrack, vital::FilterModule::kKeytrack);
+  filter.plug(&midi, vital::FilterModule::kMidi);
+  vital::control_map controls = filter.getControls();
+  controls["filter_1_on"]->set(1.0f);
+  controls["filter_1_model"]->set(static_cast<float>(vital::constants::kDigital));
+  controls["filter_1_style"]->set(static_cast<float>(vital::SynthFilter::k12Db));
+  controls["filter_1_cutoff"]->set(83.0f);     // MIDI note 83 ~ 988 Hz
+  controls["filter_1_resonance"]->set(0.3f);
+  controls["filter_1_blend"]->set(0.0f);       // low pass
+  controls["filter_1_mix"]->set(1.0f);
+  controls["filter_1_drive"]->set(0.0f);
+
+  double phase = 0.0; const double inc = hz / kRate;
+  double sumSq = 0.0; int counted = 0;
+  const int totalBlocks = 2 * 48000 / kBlock;
+  for (int b = 0; b < totalBlocks; ++b) {
+    for (int i = 0; i < kBlock; ++i) { audio.buffer[i] = vital::poly_float(static_cast<float>(std::sin(2.0 * M_PI * phase))); phase += inc; if (phase >= 1.0) phase -= 1.0; }
+    filter.process(kBlock);
+    if (b >= totalBlocks / 2) for (int i = 0; i < kBlock; ++i) { const float v = filter.output()->buffer[i][0]; sumSq += v * v; ++counted; }
+  }
+  return static_cast<float>(std::sqrt(sumSq / counted));
+}
+}  // namespace
+
+TEST_CASE("vendored FilterModule runs standalone and low-passes", "[vital]") {
+  const float low = filteredRms(200.f);
+  const float high = filteredRms(8000.f);
+  REQUIRE(low > 0.5f);                 // passband: ~ -3 dB or better relative to 0.707 input RMS
+  REQUIRE(high < low * 0.1f);          // > 20 dB down three octaves above cutoff
+}
+
+TEST_CASE("vendored FilterModule steady state is allocation free", "[vital][rt]") {
+  vital::FilterModule filter("filter_1");
+  filter.init();
+  filter.setSampleRate(48000);
+  vital::Output audio; vital::cr::Output reset; vital::cr::Output keytrack; vital::Output midi;
+  filter.plug(&audio, vital::FilterModule::kAudio); filter.plug(&reset, vital::FilterModule::kReset);
+  filter.plug(&keytrack, vital::FilterModule::kKeytrack); filter.plug(&midi, vital::FilterModule::kMidi);
+  filter.getControls()["filter_1_on"]->set(1.0f);
+  for (int i = 0; i < 4; ++i) filter.process(kBlock);   // warm up: first process may lazily sort
+  pg::test::resetRtViolations();
+  { pg::test::RtScope scope; for (int i = 0; i < 1000; ++i) filter.process(kBlock); }
+  REQUIRE(pg::test::rtViolations() == 0);
+}
+```
+This is a spike: names such as `FilterModule::kAudio`, `control_map`, `constants::kDigital`, `SynthFilter::k12Db` are taken from the vendored headers; if one differs, follow the header and note it. The two REQUIREs are the contract. If `init()` or `process()` asserts because a `SynthModule` needs a parent router (`getMonoRouter()` walks `router_`), report DONE_WITH_CONCERNS describing exactly what failed: the controller decides between fixing the harness and falling back to raw-processor wrapping.
+
+- [ ] **Step 6: Run the tests**
+
+Run: `npm run engine:test` — Expected: both `[vital]` tests pass with the rest of the suite.
+
+- [ ] **Step 7: Trademark lint and commit**
+
+```bash
+grep -riE 'vital|tytel' engine/src shared src scripts/dev.mjs scripts/build-native.mjs | grep -v 'vendor' ; echo "exit=$?"   # expect no matches (exit=1)
+git add scripts/vendor-vital.mjs engine/vendor engine/CMakeLists.txt engine/tests/test_vital_spike.cpp
+git commit -m "feat(engine): vendor Vital DSP behind a JUCE shim and prove standalone FilterModule"
+```
+
+---
+
+### Task 7: Sample type, signal views, blocks, lanes, events
 
 **Files:**
 - Create: `engine/src/core/Conventions.hpp`, `engine/src/core/Signal.hpp`, `engine/src/core/Event.hpp`, `engine/src/core/Event.cpp`
 - Test: `engine/tests/test_signal.cpp`, `engine/tests/test_event.cpp`
 
 **Interfaces:**
-- Produces: constants `pg::kMaxBlockSize=256`, `kMaxChannels=2`, `kMaxEventsPerBlock=256`, `kMaxPortsPerModule=32`, `kMaxParamsPerModule=64`; `pitchToHz(float)`, `midiNoteToPitch(float)`, `gateHigh(float)`.
-- `pg::SignalView { std::array<float*,kMaxChannels> ch; uint32_t numChannels, numFrames; read(c); write(c); slice(offset,n); clear(); }`
-- `pg::PlanarBuffer { float* data(c); const float* data(c) const; void clear(); }`
-- `pg::Event { uint32_t frame; EventType type; uint8_t channel, flags; uint32_t noteId; float a,b,c; }`, `pg::EventBuffer { bool push(const Event&); void clear(); uint32_t size() const; const Event& operator[](i) const; begin()/end(); }`, `void pg::mergeEvents(const EventBuffer* const* sources, uint32_t n, EventBuffer& dst)`.
+- Produces: `pg::Sample = vital::poly_float`, `pg::Mask = vital::poly_mask`; constants `kMaxBlockSize = 128` (static-asserted equal to `vital::kMaxBufferSize`), `kDefaultBlockSize = 64`, `kMaxEventsPerBlock = 256`, `kMaxPortsPerModule = 32`, `kMaxParamsPerModule = 64`, `kOctavesPerUnit = 10`, `kMiddleCHz`; scalar `pitchToHz`, `hzToPitch`, `midiNoteToPitch`, `pitchToMidiNote`, `gateHigh`; lane-wise `pitchToMidiNote(Sample)`, `midiNoteToPitch(Sample)`.
+- `pg::SignalView { Sample* data; uint32_t numFrames; empty(); readOr(); slice(offset, n); clear(); }` (empty = unconnected; `readOr()` returns the silent block), `pg::Block { alignas(16) std::array<Sample,kMaxBlockSize> data; SignalView view(frames); void clear(); }`, `const Block& pg::silentBlock()`.
+- `pg::lanes`: `Mask voice(uint32_t v)`, `Mask left()`, `Mask right()`, `Sample mono(float)`, `Sample stereo(float l, float r)` (both voices), `float lane(Sample, uint32_t i)`, `float left(Sample, uint32_t v)`, `float right(Sample, uint32_t v)`.
+- `pg::Event`, `pg::EventBuffer`, `pg::mergeEvents` as in the original design (unchanged).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1421,22 +1771,46 @@ TEST_CASE("pitch and gate conventions", "[core]") {
   REQUIRE(pg::pitchToHz(0.f) == Catch::Approx(261.6256f));
   REQUIRE(pg::pitchToHz(0.1f) == Catch::Approx(523.2512f).epsilon(1e-4));
   REQUIRE(pg::midiNoteToPitch(72.f) == Catch::Approx(0.1f));
+  REQUIRE(pg::pitchToMidiNote(0.1f) == Catch::Approx(72.f));
   REQUIRE(pg::gateHigh(0.5f));
   REQUIRE_FALSE(pg::gateHigh(0.f));
+  const pg::Sample notes = pg::pitchToMidiNote(pg::lanes::mono(0.1f));
+  REQUIRE(pg::lanes::lane(notes, 0) == Catch::Approx(72.f));
+  REQUIRE(pg::lanes::lane(notes, 3) == Catch::Approx(72.f));
 }
 
-TEST_CASE("SignalView broadcasts mono to stereo readers and slices", "[core]") {
-  pg::PlanarBuffer buf;
-  for (uint32_t i = 0; i < 8; ++i) buf.data(0)[i] = static_cast<float>(i);
-  pg::SignalView v = buf.view(1, 8);
-  REQUIRE(v.numChannels == 1);
-  REQUIRE(v.read(1)[3] == 3.f);          // channel 1 reads channel 0
+TEST_CASE("lanes: layout is v0.L v0.R v1.L v1.R", "[core]") {
+  const pg::Sample s = pg::lanes::stereo(0.25f, -0.5f);
+  REQUIRE(pg::lanes::left(s, 0) == 0.25f);
+  REQUIRE(pg::lanes::right(s, 0) == -0.5f);
+  REQUIRE(pg::lanes::left(s, 1) == 0.25f);
+  REQUIRE(pg::lanes::right(s, 1) == -0.5f);
+  const pg::Sample onlyVoice0 = s & pg::lanes::voice(0);
+  REQUIRE(pg::lanes::left(onlyVoice0, 0) == 0.25f);
+  REQUIRE(pg::lanes::left(onlyVoice0, 1) == 0.f);
+  const pg::Sample onlyLeft = s & pg::lanes::left();
+  REQUIRE(pg::lanes::right(onlyLeft, 0) == 0.f);
+  REQUIRE(pg::lanes::left(onlyLeft, 1) == 0.25f);
+}
+
+TEST_CASE("Block and SignalView slice and clear", "[core]") {
+  pg::Block b;
+  for (uint32_t i = 0; i < 8; ++i) b.data[i] = pg::lanes::mono(static_cast<float>(i));
+  pg::SignalView v = b.view(8);
+  REQUIRE(v.numFrames == 8);
+  REQUIRE(pg::lanes::lane(v.data[3], 1) == 3.f);
   pg::SignalView s = v.slice(4, 2);
   REQUIRE(s.numFrames == 2);
-  REQUIRE(s.read(0)[0] == 4.f);
+  REQUIRE(pg::lanes::lane(s.data[0], 0) == 4.f);
   s.clear();
-  REQUIRE(buf.data(0)[4] == 0.f);
-  REQUIRE(buf.data(0)[6] == 6.f);
+  REQUIRE(pg::lanes::lane(b.data[4], 0) == 0.f);
+  REQUIRE(pg::lanes::lane(b.data[6], 0) == 6.f);
+  pg::SignalView unconnected;
+  REQUIRE(unconnected.empty());
+  REQUIRE(pg::lanes::lane(unconnected.readOr()[5], 2) == 0.f);
+  REQUIRE(v.readOr() == v.data);
+  REQUIRE(reinterpret_cast<uintptr_t>(b.data.data()) % 16 == 0);
+  static_assert(pg::kMaxBlockSize == vital::kMaxBufferSize);
 }
 ```
 
@@ -1470,9 +1844,7 @@ TEST_CASE("mergeEvents is a stable k-way merge by frame", "[core]") {
 }
 ```
 
-- [ ] **Step 2: Run to verify failure**
-
-Run: `npm run engine:test` — Expected: compile errors (headers missing).
+- [ ] **Step 2: Run to verify failure** — `npm run engine:test` fails to compile.
 
 - [ ] **Step 3: Write the headers**
 
@@ -1481,22 +1853,31 @@ Run: `npm run engine:test` — Expected: compile errors (headers missing).
 #pragma once
 #include <cmath>
 #include <cstdint>
+#include "common.h"        // vital: kMaxBufferSize, mono_float, poly_values.h
+#include "futils.h"        // vital fast math with poly_float overloads
 
 namespace pg {
 
-inline constexpr uint32_t kMaxBlockSize = 256;
+using Sample = vital::poly_float;
+using Mask = vital::poly_mask;
+
+inline constexpr uint32_t kMaxBlockSize = static_cast<uint32_t>(vital::kMaxBufferSize);   // 128
 inline constexpr uint32_t kDefaultBlockSize = 64;
-inline constexpr uint32_t kMaxChannels = 2;
 inline constexpr uint32_t kMaxEventsPerBlock = 256;
 inline constexpr uint32_t kMaxPortsPerModule = 32;
 inline constexpr uint32_t kMaxParamsPerModule = 64;
+static_assert(vital::poly_float::kSize == 4, "phasegrid2 assumes 4 SIMD lanes: v0.L v0.R v1.L v1.R");
 
 inline constexpr float kOctavesPerUnit = 10.f;
 inline constexpr float kMiddleCHz = 261.6256f;
+inline constexpr float kMiddleCMidi = 60.f;
 
 inline float pitchToHz(float v) { return kMiddleCHz * std::exp2(v * kOctavesPerUnit); }
 inline float hzToPitch(float hz) { return std::log2(hz / kMiddleCHz) / kOctavesPerUnit; }
-inline float midiNoteToPitch(float note) { return (note - 60.f) / 120.f; }
+inline float midiNoteToPitch(float note) { return (note - kMiddleCMidi) / (12.f * kOctavesPerUnit); }
+inline float pitchToMidiNote(float v) { return kMiddleCMidi + v * 12.f * kOctavesPerUnit; }
+inline Sample midiNoteToPitch(Sample note) { return (note - kMiddleCMidi) * (1.f / (12.f * kOctavesPerUnit)); }
+inline Sample pitchToMidiNote(Sample v) { return v * (12.f * kOctavesPerUnit) + kMiddleCMidi; }
 inline bool gateHigh(float v) { return v > 0.f; }
 
 }  // namespace pg
@@ -1505,54 +1886,53 @@ inline bool gateHigh(float v) { return v > 0.f; }
 `engine/src/core/Signal.hpp`:
 ```cpp
 #pragma once
-#include <algorithm>
 #include <array>
 #include <cstdint>
 #include "core/Conventions.hpp"
 
 namespace pg {
 
-/// Non-owning planar view. Mono views broadcast to any channel index on read.
+namespace lanes {
+inline Mask voice(uint32_t v) { return v == 0 ? Mask(-1, -1, 0, 0) : Mask(0, 0, -1, -1); }
+inline Mask left() { return Mask(-1, 0, -1, 0); }
+inline Mask right() { return Mask(0, -1, 0, -1); }
+inline Sample mono(float x) { return Sample(x); }
+inline Sample stereo(float l, float r) { return Sample(l, r, l, r); }
+inline float lane(Sample s, uint32_t i) { return s[static_cast<int>(i)]; }
+inline float left(Sample s, uint32_t v) { return s[static_cast<int>(2 * v)]; }
+inline float right(Sample s, uint32_t v) { return s[static_cast<int>(2 * v + 1)]; }
+}  // namespace lanes
+
+/// Non-owning view over Sample frames.
+struct Block;
+const Block& silentBlock();   // kMaxBlockSize frames of zeros, never written
+
+/// Non-owning view over Sample frames. Empty (data == nullptr) means "unconnected": readOr() yields silence.
 struct SignalView {
-  std::array<float*, kMaxChannels> ch{};
-  uint32_t numChannels = 0;
+  Sample* data = nullptr;
   uint32_t numFrames = 0;
-
-  const float* read(uint32_t c) const { return ch[c < numChannels ? c : numChannels - 1]; }
-  float* write(uint32_t c) const { return ch[c]; }
-  bool empty() const { return numChannels == 0; }
-
-  SignalView slice(uint32_t offset, uint32_t n) const {
-    SignalView s = *this;
-    for (uint32_t c = 0; c < numChannels; ++c) s.ch[c] += offset;
-    s.numFrames = n;
-    return s;
-  }
-  void clear() const {
-    for (uint32_t c = 0; c < numChannels; ++c) std::fill_n(ch[c], numFrames, 0.f);
-  }
+  bool empty() const { return data == nullptr; }
+  const Sample* readOr() const;   // data, or the silent block when empty
+  SignalView slice(uint32_t offset, uint32_t n) const { return empty() ? SignalView{nullptr, n} : SignalView{data + offset, n}; }
+  void clear() const { for (uint32_t i = 0; i < numFrames; ++i) data[i] = Sample(0.f); }
 };
 
-/// Owns kMaxChannels * kMaxBlockSize floats. Allocated by the compiler on the message thread.
-class PlanarBuffer {
-public:
-  float* data(uint32_t c) { return data_.data() + static_cast<size_t>(c) * kMaxBlockSize; }
-  const float* data(uint32_t c) const { return data_.data() + static_cast<size_t>(c) * kMaxBlockSize; }
-  void clear() { data_.fill(0.f); }
-  SignalView view(uint32_t channels, uint32_t frames) {
-    SignalView v; v.numChannels = channels; v.numFrames = frames;
-    for (uint32_t c = 0; c < channels; ++c) v.ch[c] = data(c);
-    return v;
-  }
-private:
-  std::array<float, kMaxChannels * kMaxBlockSize> data_{};
+/// Owns kMaxBlockSize frames, 16-byte aligned for SIMD loads. Allocated by the compiler on the message thread.
+struct alignas(16) Block {
+  std::array<Sample, kMaxBlockSize> data{};
+  SignalView view(uint32_t frames) { return SignalView{data.data(), frames}; }
+  void clear() { data.fill(Sample(0.f)); }
 };
+
+inline const Block& silentBlock() { static const Block zeros{}; return zeros; }
+inline const Sample* SignalView::readOr() const { return data ? data : silentBlock().data.data(); }
 
 }  // namespace pg
 ```
 
-`engine/src/core/Event.hpp`:
+`engine/src/core/Event.hpp` and `engine/src/core/Event.cpp`: identical to the original design:
 ```cpp
+// Event.hpp
 #pragma once
 #include <array>
 #include <cstdint>
@@ -1565,16 +1945,15 @@ namespace pg {
 enum class EventType : uint16_t { NoteOn = 1, NoteOff = 2, NotePressure = 3, NoteExpression = 4, Trigger = 5 };
 
 struct Event {
-  uint32_t frame = 0;         // sample offset within the block
+  uint32_t frame = 0;
   EventType type = EventType::Trigger;
   uint8_t channel = 0;
   uint8_t flags = 0;
-  uint32_t noteId = 0;        // per-note identity (MPE); 0 = none
+  uint32_t noteId = 0;
   float a = 0.f, b = 0.f, c = 0.f;   // NoteOn: pitch (MIDI note), velocity 0..1, detune
 };
 static_assert(std::is_trivially_copyable_v<Event>);
 
-/// Fixed capacity, frame-ordered. Producers must push in non-decreasing frame order.
 class EventBuffer {
 public:
   bool push(const Event& e) {
@@ -1593,25 +1972,21 @@ private:
   uint32_t count_ = 0;
 };
 
-/// Stable k-way merge by frame (earlier source wins ties). Clears dst first. RT-safe.
 void mergeEvents(const EventBuffer* const* sources, uint32_t numSources, EventBuffer& dst);
 
 }  // namespace pg
 ```
-
-`engine/src/core/Event.cpp`:
 ```cpp
+// Event.cpp
 #include "core/Event.hpp"
 
 namespace pg {
-
 void mergeEvents(const EventBuffer* const* sources, uint32_t numSources, EventBuffer& dst) {
   dst.clear();
   std::array<uint32_t, kMaxPortsPerModule> heads{};
   const uint32_t n = numSources < kMaxPortsPerModule ? numSources : kMaxPortsPerModule;
   for (;;) {
-    int best = -1;
-    uint32_t bestFrame = 0;
+    int best = -1; uint32_t bestFrame = 0;
     for (uint32_t s = 0; s < n; ++s) {
       if (heads[s] >= sources[s]->size()) continue;
       const uint32_t f = (*sources[s])[heads[s]].frame;
@@ -1622,34 +1997,31 @@ void mergeEvents(const EventBuffer* const* sources, uint32_t numSources, EventBu
     ++heads[best];
   }
 }
-
 }  // namespace pg
 ```
 
-- [ ] **Step 4: Run the tests**
-
-Run: `npm run engine:test` — Expected: all pass.
+- [ ] **Step 4: Run the tests** — `npm run engine:test` passes. If `poly_float`/`poly_mask` constructor arities differ from the four-argument forms used above, use the constructors `poly_values.h` actually offers (e.g. `poly_float(a, b, c, d)` and `poly_int(a, b, c, d)`) and note it.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add engine
-git commit -m "feat(engine): conventions, planar signal views, event buffers"
+git commit -m "feat(engine): Sample (poly_float) signal type, blocks, lanes and event buffers"
 ```
 
 ---
 
-### Task 7: Descriptors and parameters
+### Task 8: Descriptors and lane-wise parameters
 
 **Files:**
 - Create: `engine/src/core/Descriptor.hpp`, `engine/src/core/Param.hpp`, `engine/src/core/Param.cpp`
 - Test: `engine/tests/test_param.cpp`
 
 **Interfaces:**
-- Produces: `pg::PortKind {Continuous, Event}`, `pg::SignalRole`, `pg::ParamUnit`, `pg::ParamCurve {Linear, Log, Exp}`, flags `kParamModulatable=1, kParamInteger=2, kParamEnum=4, kParamHidden=8, kParamNoSmooth=16`, module flags `kModuleTerminal=1, kModuleNeedsTransport=2, kModuleWritesTelemetry=4`, `pg::PortDesc`, `pg::ParamDesc`, `pg::ModuleDescriptor` (with `Module* (*create)()`), `kModuleAbiVersion = 1`, `countOf(array)`.
-- `float pg::paramNormalize(const ParamDesc&, float value)`, `float pg::paramDenormalize(const ParamDesc&, float norm)` (both clamp).
-- `pg::OnePoleSmoother { prepare(sampleRate, ms); snap(v); setTarget(t); isMoving(); next(); value(); }`
-- `pg::ParamState { void prepare(const ParamDesc*, double sr, float initialNorm); void setTargetNorm(float); void fillRamp(uint32_t frames); bool rampIsConstant; float constNorm, constValue; std::array<float,kMaxBlockSize> rampNorm, rampValue; const ParamDesc* desc; }`
+- Produces: `pg::PortKind {Continuous, Event}`, `pg::SignalRole`, `pg::ParamUnit`, `pg::ParamCurve {Linear, Log, Exp}`, flags `kParamModulatable=1, kParamInteger=2, kParamEnum=4, kParamHidden=8, kParamNoSmooth=16`, module flags `kModuleTerminal=1, kModuleNeedsTransport=2, kModuleWritesTelemetry=4`, `pg::PortDesc` (the `channels` field stays for ABI stability and is always 1 for continuous ports), `pg::ParamDesc`, `pg::ModuleDescriptor`, `kModuleAbiVersion = 1`, `countOf(array)`.
+- `float pg::paramNormalize(const ParamDesc&, float value)`, `float pg::paramDenormalize(const ParamDesc&, float norm)`, `Sample pg::paramDenormalize(const ParamDesc&, Sample norm)` (lane-wise, clamps).
+- `pg::OnePoleSmoother` (scalar), `pg::ParamState { desc; target; noSmooth; rampIsConstant; constNorm; constValue; std::array<float,kMaxBlockSize> rampNorm, rampValue; prepare(desc, sr, initialNorm); setTargetNorm(norm); fillRamp(frames); }`.
+- `pg::ParamView { const Sample* polyBuf; const float* monoBuf; float k; Sample at(uint32_t i) const; }` — `polyBuf` when modulated (lane-wise values), else `monoBuf` while smoothing, else constant `k`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1659,6 +2031,7 @@ git commit -m "feat(engine): conventions, planar signal views, event buffers"
 #include <catch2/catch_test_macros.hpp>
 #include "core/Descriptor.hpp"
 #include "core/Param.hpp"
+#include "core/Signal.hpp"
 
 static pg::ParamDesc lin{"g", "Gain", 0.f, 2.f, 1.f, pg::ParamUnit::Ratio, pg::ParamCurve::Linear, pg::kParamModulatable, nullptr, 0, "slider", nullptr, nullptr};
 static pg::ParamDesc logp{"c", "Cutoff", 20.f, 20000.f, 1000.f, pg::ParamUnit::Hz, pg::ParamCurve::Log, pg::kParamModulatable, nullptr, 0, "slider", nullptr, nullptr};
@@ -1668,12 +2041,26 @@ static pg::ParamDesc en{"m", "Mode", 0.f, 2.f, 0.f, pg::ParamUnit::None, pg::Par
 TEST_CASE("param curves round-trip and clamp", "[param]") {
   REQUIRE(pg::paramDenormalize(lin, 0.5f) == Catch::Approx(1.f));
   REQUIRE(pg::paramNormalize(lin, 2.f) == Catch::Approx(1.f));
-  REQUIRE(pg::paramNormalize(lin, 5.f) == Catch::Approx(1.f));           // clamped
+  REQUIRE(pg::paramNormalize(lin, 5.f) == Catch::Approx(1.f));
   REQUIRE(pg::paramDenormalize(logp, 0.f) == Catch::Approx(20.f));
   REQUIRE(pg::paramDenormalize(logp, 1.f) == Catch::Approx(20000.f));
   REQUIRE(pg::paramNormalize(logp, pg::paramDenormalize(logp, 0.3f)) == Catch::Approx(0.3f).epsilon(1e-4));
-  REQUIRE(pg::paramDenormalize(en, 0.74f) == Catch::Approx(1.f));          // rounds to integer
+  REQUIRE(pg::paramDenormalize(en, 0.74f) == Catch::Approx(1.f));
   REQUIRE(pg::paramDenormalize(en, 0.76f) == Catch::Approx(2.f));
+}
+
+TEST_CASE("lane-wise denormalize matches scalar per lane and clamps", "[param]") {
+  const pg::Sample norm(0.25f, 0.5f, 1.5f, -1.f);
+  const pg::Sample v = pg::paramDenormalize(lin, norm);
+  REQUIRE(pg::lanes::lane(v, 0) == Catch::Approx(0.5f));
+  REQUIRE(pg::lanes::lane(v, 1) == Catch::Approx(1.f));
+  REQUIRE(pg::lanes::lane(v, 2) == Catch::Approx(2.f));   // clamped
+  REQUIRE(pg::lanes::lane(v, 3) == Catch::Approx(0.f));   // clamped
+  const pg::Sample lv = pg::paramDenormalize(logp, pg::Sample(0.3f));
+  REQUIRE(pg::lanes::lane(lv, 0) == Catch::Approx(pg::paramDenormalize(logp, 0.3f)).epsilon(1e-3));
+  const pg::Sample ev = pg::paramDenormalize(en, pg::Sample(0.74f, 0.76f, 0.f, 1.f));
+  REQUIRE(pg::lanes::lane(ev, 0) == 1.f);
+  REQUIRE(pg::lanes::lane(ev, 1) == 2.f);
 }
 
 TEST_CASE("smoother ramps toward target and reports movement", "[param]") {
@@ -1689,27 +2076,34 @@ TEST_CASE("smoother ramps toward target and reports movement", "[param]") {
   REQUIRE_FALSE(s.isMoving());
 }
 
-TEST_CASE("ParamState produces constants when idle and ramps when moving", "[param]") {
+TEST_CASE("ParamState produces constants when idle and ramps when moving; ParamView reads all three forms", "[param]") {
   pg::ParamState p;
   p.prepare(&lin, 48000.0, 0.5f);
   p.fillRamp(64);
   REQUIRE(p.rampIsConstant);
   REQUIRE(p.constValue == Catch::Approx(1.f));
+  pg::ParamView constant{nullptr, nullptr, p.constValue};
+  REQUIRE(pg::lanes::lane(constant.at(10), 2) == Catch::Approx(1.f));
   p.setTargetNorm(1.f);
   p.fillRamp(64);
   REQUIRE_FALSE(p.rampIsConstant);
   REQUIRE(p.rampValue[63] > p.rampValue[0]);
-  REQUIRE(p.rampValue[63] <= 2.f);
+  pg::ParamView ramp{nullptr, p.rampValue.data(), 0.f};
+  REQUIRE(pg::lanes::lane(ramp.at(63), 3) == Catch::Approx(p.rampValue[63]));
+  pg::Sample poly[2] = {pg::Sample(1.f, 2.f, 3.f, 4.f), pg::Sample(5.f)};
+  pg::ParamView modulated{poly, nullptr, 0.f};
+  REQUIRE(pg::lanes::lane(modulated.at(0), 1) == 2.f);
+  REQUIRE(pg::lanes::lane(modulated.at(1), 3) == 5.f);
   pg::ParamState e;
   e.prepare(&en, 48000.0, 0.f);
   e.setTargetNorm(1.f);
   e.fillRamp(64);
-  REQUIRE(e.rampIsConstant);              // kParamNoSmooth jumps at block boundary
+  REQUIRE(e.rampIsConstant);
   REQUIRE(e.constValue == Catch::Approx(2.f));
 }
 ```
 
-- [ ] **Step 2: Run to verify failure** — `npm run engine:test` fails to compile.
+- [ ] **Step 2: Run to verify failure** — compile errors.
 
 - [ ] **Step 3: Write Descriptor.hpp**
 
@@ -1737,12 +2131,12 @@ inline constexpr uint32_t kModuleTerminal        = 1u << 0;
 inline constexpr uint32_t kModuleNeedsTransport  = 1u << 1;
 inline constexpr uint32_t kModuleWritesTelemetry = 1u << 2;
 
-// All descriptor structs are C-layout so they can cross a dlopen boundary unchanged.
+// C-layout so descriptors can cross a dlopen boundary unchanged.
 struct PortDesc {
   const char* id;
   const char* name;
   PortKind kind;
-  uint8_t channels;     // 1 or 2 for Continuous, 0 for Event
+  uint8_t channels;     // ABI slot; always 1 for Continuous (signals are poly_float), 0 for Event
   SignalRole role;      // UI coloring hint only
   const char* doc;
 };
@@ -1750,22 +2144,22 @@ struct PortDesc {
 struct ParamDesc {
   const char* id;
   const char* name;
-  float min, max, def;  // in display units
+  float min, max, def;  // display units
   ParamUnit unit;
   ParamCurve curve;
   uint32_t flags;
-  const char* const* enumLabels;   // kParamEnum only
+  const char* const* enumLabels;
   uint32_t enumCount;
-  const char* uiWidget;            // "slider" | "knob" | "toggle" | "select"
-  const char* group;               // optional
-  const char* doc;                 // optional
+  const char* uiWidget;   // "slider" | "knob" | "toggle" | "select"
+  const char* group;
+  const char* doc;
 };
 
 class Module;
 
 struct ModuleDescriptor {
   uint32_t abiVersion;
-  const char* id;          // "osc.saw"
+  const char* id;          // "osc.wavetable"
   const char* name;
   const char* category;
   const char* doc;
@@ -1797,6 +2191,7 @@ namespace pg {
 
 float paramNormalize(const ParamDesc& d, float value);
 float paramDenormalize(const ParamDesc& d, float norm);
+Sample paramDenormalize(const ParamDesc& d, Sample norm);   // lane-wise; clamps each lane
 
 class OnePoleSmoother {
 public:
@@ -1807,29 +2202,33 @@ public:
   void snap(float v) { value_ = target_ = v; }
   void setTarget(float t) { target_ = t; }
   bool isMoving() const { return std::fabs(value_ - target_) > 1e-6f; }
-  float next() {
-    value_ = target_ + coeff_ * (value_ - target_);
-    if (!isMoving()) value_ = target_;
-    return value_;
-  }
+  float next() { value_ = target_ + coeff_ * (value_ - target_); if (!isMoving()) value_ = target_; return value_; }
   float value() const { return value_; }
 private:
   float value_ = 0.f, target_ = 0.f, coeff_ = 0.f;
 };
 
-/// Per-instance (not per-voice) parameter state. Survives program swaps.
+/// Per-instance parameter state (knob + smoother). Survives program swaps.
 struct ParamState {
   const ParamDesc* desc = nullptr;
   OnePoleSmoother smoother;
-  float target = 0.f;                 // normalized
+  float target = 0.f;                // normalized
   bool noSmooth = false;
   bool rampIsConstant = true;
   float constNorm = 0.f, constValue = 0.f;
   std::array<float, kMaxBlockSize> rampNorm{}, rampValue{};
 
   void prepare(const ParamDesc* d, double sampleRate, float initialNorm);
-  void setTargetNorm(float norm);      // audio thread (via param queue) or before publish
-  void fillRamp(uint32_t frames);      // audio thread, once per block
+  void setTargetNorm(float norm);
+  void fillRamp(uint32_t frames);    // audio thread, once per block
+};
+
+/// What a module reads. Exactly one of polyBuf / monoBuf / k is used, in that priority.
+struct ParamView {
+  const Sample* polyBuf = nullptr;   // per-sample lane-wise values (modulated)
+  const float* monoBuf = nullptr;    // per-sample scalar values (smoothing)
+  float k = 0.f;                     // constant
+  Sample at(uint32_t i) const { return polyBuf ? polyBuf[i] : Sample(monoBuf ? monoBuf[i] : k); }
 };
 
 }  // namespace pg
@@ -1839,6 +2238,7 @@ struct ParamState {
 ```cpp
 #include "core/Param.hpp"
 #include <algorithm>
+#include "poly_utils.h"
 
 namespace pg {
 
@@ -1854,6 +2254,18 @@ float paramDenormalize(const ParamDesc& d, float norm) {
   }
   if (d.flags & (kParamInteger | kParamEnum)) v = std::round(v);
   return std::min(d.max, std::max(d.min, v));
+}
+
+Sample paramDenormalize(const ParamDesc& d, Sample norm) {
+  const Sample n = vital::utils::clamp(norm, 0.f, 1.f);
+  Sample v;
+  switch (d.curve) {
+    case ParamCurve::Log:    v = vital::futils::exp2(n * std::log2(d.max / d.min)) * d.min; break;
+    case ParamCurve::Exp:    v = n * n * (d.max - d.min) + d.min; break;
+    case ParamCurve::Linear: v = n * (d.max - d.min) + d.min; break;
+  }
+  if (d.flags & (kParamInteger | kParamEnum)) v = vital::utils::round(v);
+  return vital::utils::clamp(v, d.min, d.max);
 }
 
 float paramNormalize(const ParamDesc& d, float value) {
@@ -1877,13 +2289,10 @@ void ParamState::prepare(const ParamDesc* d, double sampleRate, float initialNor
   constValue = paramDenormalize(*d, target);
 }
 
-void ParamState::setTargetNorm(float norm) {
-  target = clamp01(norm);
-  smoother.setTarget(target);
-}
+void ParamState::setTargetNorm(float norm) { target = clamp01(norm); smoother.setTarget(target); }
 
 void ParamState::fillRamp(uint32_t frames) {
-  if (noSmooth) { smoother.snap(target); }
+  if (noSmooth) smoother.snap(target);
   if (!smoother.isMoving()) {
     rampIsConstant = true;
     constNorm = smoother.value();
@@ -1891,14 +2300,12 @@ void ParamState::fillRamp(uint32_t frames) {
     return;
   }
   rampIsConstant = false;
-  for (uint32_t i = 0; i < frames; ++i) {
-    rampNorm[i] = smoother.next();
-    rampValue[i] = paramDenormalize(*desc, rampNorm[i]);
-  }
+  for (uint32_t i = 0; i < frames; ++i) { rampNorm[i] = smoother.next(); rampValue[i] = paramDenormalize(*desc, rampNorm[i]); }
 }
 
 }  // namespace pg
 ```
+`vital::utils::clamp(poly_float, mono_float, mono_float)`, `vital::utils::round(poly_float)` and `vital::futils::exp2(poly_float)` are provided by the vendored `poly_utils.h` / `futils.h`; if a name differs, use the equivalent from those headers and note it.
 
 - [ ] **Step 5: Run the tests** — `npm run engine:test` passes.
 
@@ -1906,12 +2313,12 @@ void ParamState::fillRamp(uint32_t frames) {
 
 ```bash
 git add engine
-git commit -m "feat(engine): C-layout descriptors, param curves, smoothing"
+git commit -m "feat(engine): C-layout descriptors, lane-wise param curves, smoothing"
 ```
 
 ---
 
-### Task 8: Module interface, registry with implicit param ports, test modules
+### Task 9: Module interface, registry with implicit param ports, test modules (poly_float)
 
 **Files:**
 - Create: `engine/src/core/Module.hpp`, `engine/src/core/Registry.hpp`, `engine/src/core/Registry.cpp`
@@ -1919,9 +2326,9 @@ git commit -m "feat(engine): C-layout descriptors, param curves, smoothing"
 - Test: `engine/tests/test_registry.cpp`
 
 **Interfaces:**
-- Produces: `pg::PrepareInfo{sampleRate, maxBlock, voiceCount}`, `pg::TransportSnapshot{tempo, playing, ppq, samplePos}`, `pg::AudioBus{std::array<float*,kMaxChannels> ch; uint32_t channels, frames}`, `pg::ParamView{buf,k; at(i)}`, `pg::ProcessContext` (fields `numFrames, voice, sampleRate, transport, outputBus, inputs, outputs, eventInputs, eventOutputs, params`; methods `in(p), out(p), eventIn(p), eventOut(p), param(i)`), `pg::Module` (`prepare`, `reset`, `process`), `pg::VoicedModule<State>` (`st(ctx)`, `onPrepare`, `info()`).
-- `pg::RegisteredModule { desc; inputs (declared + implicit); inputParam; findInput(id); findOutput(id); findParam(id); numDeclaredInputs() }`, `pg::Registry { std::optional<std::string> add(const ModuleDescriptor&); find(typeId); all(); }`. Implicit port id format: `param:<paramId>`.
-- Test modules: `test.const` (out `out`; param `value` [-1,1] modulatable), `test.gain` (in `in`; out `out`; param `gain` [0,2] def 1 modulatable), `test.add` (in `a`,`b`; out `out`), `test.impulse` (out `out`: 1 at frame 0 of first block after prepare/reset), `test.sink` (in `in`; terminal; adds into bus ch 0 and 1), `test.eventGen` (event out `events`; params `frame` [0,255] int, `tag` [0,100] int), `test.eventTrace` (event in `events`; out `out`: `out[frame] += a`). `void pg::test::registerTestModules(Registry&)`.
+- Produces: `pg::PrepareInfo{sampleRate, maxBlock, voiceCount}`, `pg::TransportSnapshot{tempo, playing, ppq, samplePos}`, `pg::AudioBus{Sample* data; uint32_t frames;}` (one stereo-per-voice block terminals ADD into), `pg::ProcessContext` (fields `numFrames, voice, sampleRate, transport, outputBus, inputs, outputs, eventInputs, eventOutputs, params`; methods `in(p), out(p), eventIn(p), eventOut(p), param(i)`), `pg::Module` (`prepare`, `reset`, `process`), `pg::VoicedModule<State>`.
+- `pg::RegisteredModule { desc; inputs; inputParam; implicitIds; findInput(id); findOutput(id); findParam(id); numDeclaredInputs() }`, `pg::Registry { std::optional<std::string> add(const ModuleDescriptor&); find(typeId); all(); }`. Implicit port id `param:<paramId>`.
+- Test modules: `test.const` (out `out`; param `value` [-1,1] modulatable), `test.gain` (in `in`; out `out`; param `gain` [0,2] def 1 modulatable), `test.add` (in `a`,`b`; out `out`), `test.impulse` (out `out`: 1 at frame 0 of first block after prepare/reset, all lanes), `test.sink` (in `in`; terminal; adds into the bus), `test.eventGen` (event out `events`; params `frame` [0,127] int, `tag` [0,100] int), `test.eventTrace` (event in `events`; out `out`: `out[frame] += a` on all lanes). `void pg::test::registerTestModules(Registry&)`.
 
 - [ ] **Step 1: Write the failing registry test**
 
@@ -1953,9 +2360,9 @@ TEST_CASE("registry rejects invalid descriptors", "[registry]") {
   pg::test::registerTestModules(reg);
   static pg::ParamDesc badLog{"c", "C", 0.f, 10.f, 1.f, pg::ParamUnit::Hz, pg::ParamCurve::Log, 0, nullptr, 0, "slider", nullptr, nullptr};
   static pg::ModuleDescriptor bad{pg::kModuleAbiVersion, "test.bad", "Bad", "test", "", nullptr, 0, nullptr, 0, &badLog, 1, 0, 0, nullptr};
-  REQUIRE(reg.add(bad).has_value());                       // Log curve with min == 0
+  REQUIRE(reg.add(bad).has_value());
   static pg::ModuleDescriptor dup{pg::kModuleAbiVersion, "test.gain", "Dup", "test", "", nullptr, 0, nullptr, 0, nullptr, 0, 0, 0, nullptr};
-  REQUIRE(reg.add(dup).has_value());                       // duplicate id
+  REQUIRE(reg.add(dup).has_value());
 }
 ```
 
@@ -1963,12 +2370,12 @@ TEST_CASE("registry rejects invalid descriptors", "[registry]") {
 
 ```cpp
 #pragma once
-#include <array>
 #include <cstdint>
 #include <vector>
 #include "core/Conventions.hpp"
 #include "core/Descriptor.hpp"
 #include "core/Event.hpp"
+#include "core/Param.hpp"
 #include "core/Signal.hpp"
 
 namespace pg {
@@ -1983,21 +2390,14 @@ struct PrepareInfo {
 struct TransportSnapshot {
   double tempo = 120.0;
   bool playing = false;
-  double ppq = 0.0;          // quarter notes at block start
-  uint64_t samplePos = 0;    // absolute sample position at block start
+  double ppq = 0.0;
+  uint64_t samplePos = 0;
 };
 
-/// Engine output bus for the current block. Terminal modules ADD into it.
+/// Engine output for the current block (stereo lanes per voice). Terminal modules ADD into it.
 struct AudioBus {
-  std::array<float*, kMaxChannels> ch{};
-  uint32_t channels = 2;
+  Sample* data = nullptr;
   uint32_t frames = 0;
-};
-
-struct ParamView {
-  const float* buf = nullptr;   // per-sample values in display units, or null
-  float k = 0.f;                // constant value when buf is null
-  float at(uint32_t i) const { return buf ? buf[i] : k; }
 };
 
 struct TelemetrySlot;  // phase 5
@@ -2005,13 +2405,13 @@ struct TelemetrySlot;  // phase 5
 /// Built by the scheduler per Process op. Port indices are the descriptor's declared indices.
 struct ProcessContext {
   uint32_t numFrames = 0;
-  uint32_t voice = 0;
+  uint32_t voice = 0;                 // voice PAIR index
   double sampleRate = 48000.0;
   const TransportSnapshot* transport = nullptr;
   AudioBus* outputBus = nullptr;
-  const SignalView* inputs = nullptr;               // [numDeclaredInputs]; empty view for event ports
+  const SignalView* inputs = nullptr;               // [numDeclaredInputs]; empty view for event ports / unconnected
   const SignalView* outputs = nullptr;              // [numOutputs]
-  const EventBuffer* const* eventInputs = nullptr;  // [numDeclaredInputs]; null for continuous ports
+  const EventBuffer* const* eventInputs = nullptr;  // [numDeclaredInputs]
   EventBuffer* const* eventOutputs = nullptr;       // [numOutputs]
   const ParamView* params = nullptr;                // [numParams]
 
@@ -2026,20 +2426,20 @@ class Module {
 public:
   virtual ~Module() = default;
   virtual void prepare(const PrepareInfo&) = 0;   // message thread; the only place to allocate
-  virtual void reset(uint32_t /*voice*/) {}
+  virtual void reset(uint32_t /*voicePair*/) {}
   virtual void process(ProcessContext&) = 0;      // audio thread; no alloc/lock/IO/exceptions
 };
 
-/// Keeps all mutable DSP state in a per-voice State struct.
+/// Keeps all mutable DSP state in one State struct per voice pair.
 template <class State>
 class VoicedModule : public Module {
 public:
   void prepare(const PrepareInfo& p) final {
-    states_.assign(p.voiceCount, State{});
+    states_.assign((p.voiceCount + 1) / 2, State{});
     info_ = p;
     onPrepare(p);
   }
-  void reset(uint32_t voice) override { states_[voice] = State{}; }
+  void reset(uint32_t voicePair) override { states_[voicePair] = State{}; }
 protected:
   virtual void onPrepare(const PrepareInfo&) {}
   State& st(const ProcessContext& c) { return states_[c.voice]; }
@@ -2082,8 +2482,7 @@ struct RegisteredModule {
 
 class Registry {
 public:
-  /// Returns an error message on rejection.
-  std::optional<std::string> add(const ModuleDescriptor& desc);
+  std::optional<std::string> add(const ModuleDescriptor& desc);   // error message on rejection
   const RegisteredModule* find(std::string_view typeId) const;
   std::vector<const RegisteredModule*> all() const;
 private:
@@ -2124,11 +2523,8 @@ std::optional<std::string> Registry::add(const ModuleDescriptor& d) {
   if (!d.create) return id + ": missing create()";
 
   std::set<std::string> ids;
-  for (uint32_t i = 0; i < d.numInputs; ++i) {
+  for (uint32_t i = 0; i < d.numInputs; ++i)
     if (!ids.insert(d.inputs[i].id).second) return id + ": duplicate input id " + d.inputs[i].id;
-    if (d.inputs[i].kind == PortKind::Continuous && (d.inputs[i].channels < 1 || d.inputs[i].channels > kMaxChannels))
-      return id + ": bad channel count on input " + d.inputs[i].id;
-  }
   ids.clear();
   for (uint32_t i = 0; i < d.numOutputs; ++i)
     if (!ids.insert(d.outputs[i].id).second) return id + ": duplicate output id " + d.outputs[i].id;
@@ -2179,7 +2575,6 @@ std::vector<const RegisteredModule*> Registry::all() const {
 ```cpp
 #pragma once
 #include "core/Registry.hpp"
-
 namespace pg::test {
 /// Registers test.const, test.gain, test.add, test.impulse, test.sink, test.eventGen, test.eventTrace.
 void registerTestModules(Registry& registry);
@@ -2189,92 +2584,85 @@ void registerTestModules(Registry& registry);
 `engine/tests/modules/TestModules.cpp`:
 ```cpp
 #include "modules/TestModules.hpp"
+#include <stdexcept>
 #include "core/Module.hpp"
 
 namespace pg::test {
 namespace {
 
-// ---- test.const
 const PortDesc kConstOut[] = {{"out", "Out", PortKind::Continuous, 1, SignalRole::Cv, ""}};
 const ParamDesc kConstParams[] = {{"value", "Value", -1.f, 1.f, 0.f, ParamUnit::None, ParamCurve::Linear, kParamModulatable, nullptr, 0, "slider", nullptr, ""}};
 class Const : public VoicedModule<int> {
   void process(ProcessContext& c) override {
-    const ParamView v = c.param(0);
-    float* o = c.out(0).write(0);
+    const ParamView v = c.param(0); Sample* o = c.out(0).data;
     for (uint32_t i = 0; i < c.numFrames; ++i) o[i] = v.at(i);
   }
 };
 const ModuleDescriptor kConst{kModuleAbiVersion, "test.const", "Const", "test", "", nullptr, 0, kConstOut, 1, kConstParams, 1, 0, 0, [] () -> Module* { return new Const(); }};
 
-// ---- test.gain
 const PortDesc kGainIn[] = {{"in", "In", PortKind::Continuous, 1, SignalRole::Any, ""}};
 const PortDesc kGainOut[] = {{"out", "Out", PortKind::Continuous, 1, SignalRole::Any, ""}};
 const ParamDesc kGainParams[] = {{"gain", "Gain", 0.f, 2.f, 1.f, ParamUnit::Ratio, ParamCurve::Linear, kParamModulatable, nullptr, 0, "slider", nullptr, ""}};
 class Gain : public VoicedModule<int> {
   void process(ProcessContext& c) override {
-    const float* in = c.in(0).read(0); float* o = c.out(0).write(0); const ParamView g = c.param(0);
+    const Sample* in = c.in(0).readOr(); Sample* o = c.out(0).data; const ParamView g = c.param(0);
     for (uint32_t i = 0; i < c.numFrames; ++i) o[i] = in[i] * g.at(i);
   }
 };
 const ModuleDescriptor kGain{kModuleAbiVersion, "test.gain", "Gain", "test", "", kGainIn, 1, kGainOut, 1, kGainParams, 1, 0, 0, [] () -> Module* { return new Gain(); }};
 
-// ---- test.add
 const PortDesc kAddIn[] = {{"a", "A", PortKind::Continuous, 1, SignalRole::Any, ""}, {"b", "B", PortKind::Continuous, 1, SignalRole::Any, ""}};
 const PortDesc kAddOut[] = {{"out", "Out", PortKind::Continuous, 1, SignalRole::Any, ""}};
 class Add : public VoicedModule<int> {
   void process(ProcessContext& c) override {
-    const float* a = c.in(0).read(0); const float* b = c.in(1).read(0); float* o = c.out(0).write(0);
+    const Sample* a = c.in(0).readOr(); const Sample* b = c.in(1).readOr(); Sample* o = c.out(0).data;
     for (uint32_t i = 0; i < c.numFrames; ++i) o[i] = a[i] + b[i];
   }
 };
 const ModuleDescriptor kAdd{kModuleAbiVersion, "test.add", "Add", "test", "", kAddIn, 2, kAddOut, 1, nullptr, 0, 0, 0, [] () -> Module* { return new Add(); }};
 
-// ---- test.impulse: 1.0 at the first frame after prepare/reset, then 0.
 struct ImpulseState { bool fired = false; };
 const PortDesc kImpulseOut[] = {{"out", "Out", PortKind::Continuous, 1, SignalRole::Gate, ""}};
 class Impulse : public VoicedModule<ImpulseState> {
   void process(ProcessContext& c) override {
-    float* o = c.out(0).write(0);
-    for (uint32_t i = 0; i < c.numFrames; ++i) o[i] = 0.f;
-    if (!st(c).fired) { o[0] = 1.f; st(c).fired = true; }
+    Sample* o = c.out(0).data;
+    for (uint32_t i = 0; i < c.numFrames; ++i) o[i] = Sample(0.f);
+    if (!st(c).fired) { o[0] = Sample(1.f); st(c).fired = true; }
   }
 };
 const ModuleDescriptor kImpulse{kModuleAbiVersion, "test.impulse", "Impulse", "test", "", nullptr, 0, kImpulseOut, 1, nullptr, 0, 0, 0, [] () -> Module* { return new Impulse(); }};
 
-// ---- test.sink: terminal; adds input into both bus channels.
 const PortDesc kSinkIn[] = {{"in", "In", PortKind::Continuous, 1, SignalRole::Audio, ""}};
 class Sink : public VoicedModule<int> {
   void process(ProcessContext& c) override {
-    const float* in = c.in(0).read(0);
-    for (uint32_t ch = 0; ch < c.outputBus->channels; ++ch)
-      for (uint32_t i = 0; i < c.numFrames; ++i) c.outputBus->ch[ch][i] += in[i];
+    if (!c.outputBus) return;
+    const Sample* in = c.in(0).readOr();
+    for (uint32_t i = 0; i < c.numFrames; ++i) c.outputBus->data[i] += in[i];
   }
 };
 const ModuleDescriptor kSink{kModuleAbiVersion, "test.sink", "Sink", "test", "", kSinkIn, 1, nullptr, 0, nullptr, 0, kModuleTerminal, 0, [] () -> Module* { return new Sink(); }};
 
-// ---- test.eventGen: one Trigger per block at `frame`, payload a = tag.
 const PortDesc kEvGenOut[] = {{"events", "Events", PortKind::Event, 0, SignalRole::Any, ""}};
 const ParamDesc kEvGenParams[] = {
-  {"frame", "Frame", 0.f, 255.f, 0.f, ParamUnit::None, ParamCurve::Linear, kParamInteger | kParamNoSmooth, nullptr, 0, "slider", nullptr, ""},
+  {"frame", "Frame", 0.f, 127.f, 0.f, ParamUnit::None, ParamCurve::Linear, kParamInteger | kParamNoSmooth, nullptr, 0, "slider", nullptr, ""},
   {"tag", "Tag", 0.f, 100.f, 1.f, ParamUnit::None, ParamCurve::Linear, kParamInteger | kParamNoSmooth, nullptr, 0, "slider", nullptr, ""}};
 class EventGen : public VoicedModule<int> {
   void process(ProcessContext& c) override {
-    const uint32_t frame = static_cast<uint32_t>(c.param(0).at(0));
+    const uint32_t frame = static_cast<uint32_t>(lanes::lane(c.param(0).at(0), 0));
     if (frame >= c.numFrames) return;
-    Event e; e.frame = frame; e.type = EventType::Trigger; e.a = c.param(1).at(0);
+    Event e; e.frame = frame; e.type = EventType::Trigger; e.a = lanes::lane(c.param(1).at(0), 0);
     c.eventOut(0).push(e);
   }
 };
 const ModuleDescriptor kEventGen{kModuleAbiVersion, "test.eventGen", "EventGen", "test", "", nullptr, 0, kEvGenOut, 1, kEvGenParams, 2, 0, 0, [] () -> Module* { return new EventGen(); }};
 
-// ---- test.eventTrace: out[e.frame] += e.a
 const PortDesc kEvTraceIn[] = {{"events", "Events", PortKind::Event, 0, SignalRole::Any, ""}};
 const PortDesc kEvTraceOut[] = {{"out", "Out", PortKind::Continuous, 1, SignalRole::Cv, ""}};
 class EventTrace : public VoicedModule<int> {
   void process(ProcessContext& c) override {
-    float* o = c.out(0).write(0);
-    for (uint32_t i = 0; i < c.numFrames; ++i) o[i] = 0.f;
-    for (const Event& e : c.eventIn(0)) if (e.frame < c.numFrames) o[e.frame] += e.a;
+    Sample* o = c.out(0).data;
+    for (uint32_t i = 0; i < c.numFrames; ++i) o[i] = Sample(0.f);
+    for (const Event& e : c.eventIn(0)) if (e.frame < c.numFrames) o[e.frame] += Sample(e.a);
   }
 };
 const ModuleDescriptor kEventTrace{kModuleAbiVersion, "test.eventTrace", "EventTrace", "test", "", kEvTraceIn, 1, kEvTraceOut, 1, nullptr, 0, 0, 0, [] () -> Module* { return new EventTrace(); }};
@@ -2288,27 +2676,26 @@ void registerTestModules(Registry& r) {
 
 }  // namespace pg::test
 ```
-(Add `#include <stdexcept>` at the top.)
 
-- [ ] **Step 5: Run the tests** — `npm run engine:test` passes (registry tests + earlier suites).
+- [ ] **Step 5: Run the tests** — `npm run engine:test` passes.
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add engine
-git commit -m "feat(engine): module interface, registry with implicit param ports, test modules"
+git commit -m "feat(engine): module interface, registry with implicit param ports, poly test modules"
 ```
 
 ---
 
-### Task 9: GraphModel with validation
+### Task 10: GraphModel with validation
 
 **Files:**
 - Create: `engine/src/core/Result.hpp`, `engine/src/core/GraphModel.hpp`, `engine/src/core/GraphModel.cpp`
 - Test: `engine/tests/test_graph_model.cpp`
 
 **Interfaces:**
-- Produces: `pg::Result { bool ok; std::string code, message; static Result fail(code, message); explicit operator bool() }`, `pg::FeedbackMode {Sample, Block}`, `pg::NodeModel { id, type, std::map<std::string,float> params }` (param values in display units), `pg::EdgeModel { id, fromNode, fromPort, toNode, toPort }`, `pg::GraphModel { addNode(reg, NodeModel); removeNode(id); addEdge(reg, EdgeModel); removeEdge(id); setParam(reg, node, param, value); clear(); nodes(); edges(); uint32_t voiceCount; FeedbackMode feedbackMode; }`.
+- Produces: `pg::Result { bool ok; std::string code, message; static Result fail(code, message); explicit operator bool() }`, `pg::FeedbackMode {Sample, Block}`, `pg::NodeModel { id, type, std::map<std::string,float> params }` (display units), `pg::EdgeModel { id, fromNode, fromPort, toNode, toPort }`, `pg::GraphModel { addNode(reg, NodeModel); removeNode(id); addEdge(reg, EdgeModel); removeEdge(id); setParam(reg, node, param, value); setVoiceCount(n); clear(); nodes(); edges(); uint32_t voiceCount; FeedbackMode feedbackMode; }`.
 - Error codes: `E_DUP_ID`, `E_UNKNOWN_TYPE`, `E_NODE_NOT_FOUND`, `E_PORT_NOT_FOUND`, `E_KIND_MISMATCH`, `E_EDGE_NOT_FOUND`, `E_PARAM_NOT_FOUND`, `E_DUP_EDGE`, `E_VOICES`.
 
 - [ ] **Step 1: Write the failing test**
@@ -2332,7 +2719,7 @@ TEST_CASE("GraphModel validates nodes, edges and params", "[model]") {
   REQUIRE(m.addEdge(reg(), {"e1", "c", "out", "g", "in"}));
   REQUIRE(m.addEdge(reg(), {"e1", "c", "out", "g", "in"}).code == "E_DUP_ID");
   REQUIRE(m.addEdge(reg(), {"e2", "c", "out", "g", "in"}).code == "E_DUP_EDGE");
-  REQUIRE(m.addEdge(reg(), {"e3", "c", "out", "g", "param:gain"}));   // implicit port is addressable
+  REQUIRE(m.addEdge(reg(), {"e3", "c", "out", "g", "param:gain"}));
   REQUIRE(m.addEdge(reg(), {"e4", "c", "nope", "g", "in"}).code == "E_PORT_NOT_FOUND");
   REQUIRE(m.addEdge(reg(), {"e5", "zz", "out", "g", "in"}).code == "E_NODE_NOT_FOUND");
 
@@ -2342,16 +2729,19 @@ TEST_CASE("GraphModel validates nodes, edges and params", "[model]") {
   REQUIRE(m.setParam(reg(), "g", "gain", 0.25f));
   REQUIRE(m.nodes().at("g").params.at("gain") == 0.25f);
   REQUIRE(m.setParam(reg(), "g", "nope", 1.f).code == "E_PARAM_NOT_FOUND");
+  REQUIRE(m.setVoiceCount(3));
+  REQUIRE(m.voiceCount == 3);
+  REQUIRE(m.setVoiceCount(0).code == "E_VOICES");
 
   REQUIRE(m.removeEdge("e3"));
   REQUIRE(m.removeEdge("e3").code == "E_EDGE_NOT_FOUND");
-  REQUIRE(m.removeNode("c"));                 // also drops e1
+  REQUIRE(m.removeNode("c"));
   REQUIRE(m.edges().count("e1") == 0);
   REQUIRE(m.removeNode("c").code == "E_NODE_NOT_FOUND");
 }
 ```
 
-- [ ] **Step 2: Run to verify failure** — `npm run engine:test` fails to compile.
+- [ ] **Step 2: Run to verify failure** — compile errors.
 
 - [ ] **Step 3: Write the model**
 
@@ -2359,7 +2749,6 @@ TEST_CASE("GraphModel validates nodes, edges and params", "[model]") {
 ```cpp
 #pragma once
 #include <string>
-
 namespace pg {
 struct Result {
   bool ok = true;
@@ -2383,16 +2772,8 @@ namespace pg {
 
 enum class FeedbackMode { Sample, Block };
 
-struct NodeModel {
-  std::string id;
-  std::string type;
-  std::map<std::string, float> params;   // display units; missing = descriptor default
-};
-
-struct EdgeModel {
-  std::string id;
-  std::string fromNode, fromPort, toNode, toPort;
-};
+struct NodeModel { std::string id; std::string type; std::map<std::string, float> params; };
+struct EdgeModel { std::string id; std::string fromNode, fromPort, toNode, toPort; };
 
 /// Engine-side mirror of the frontend's patch document. Message thread only.
 class GraphModel {
@@ -2404,12 +2785,10 @@ public:
   Result setParam(const Registry& reg, const std::string& node, const std::string& param, float value);
   Result setVoiceCount(uint32_t n);
   void clear();
-
   const std::map<std::string, NodeModel>& nodes() const { return nodes_; }
   const std::map<std::string, EdgeModel>& edges() const { return edges_; }
   uint32_t voiceCount = 1;
   FeedbackMode feedbackMode = FeedbackMode::Sample;
-
 private:
   std::map<std::string, NodeModel> nodes_;
   std::map<std::string, EdgeModel> edges_;
@@ -2421,6 +2800,7 @@ private:
 `engine/src/core/GraphModel.cpp`:
 ```cpp
 #include "core/GraphModel.hpp"
+#include <iterator>
 
 namespace pg {
 
@@ -2485,7 +2865,7 @@ void GraphModel::clear() { nodes_.clear(); edges_.clear(); voiceCount = 1; feedb
 }  // namespace pg
 ```
 
-- [ ] **Step 4: Run the tests** — `npm run engine:test` passes.
+- [ ] **Step 4: Run the tests** — passes.
 
 - [ ] **Step 5: Commit**
 
@@ -2496,17 +2876,17 @@ git commit -m "feat(engine): GraphModel document mirror with validation"
 
 ---
 
-### Task 10: Program, InstanceTable, Scheduler (executes hand-built programs)
+### Task 11: Program, InstanceTable, Scheduler over `Block` buffers and voice pairs
 
 **Files:**
 - Create: `engine/src/core/Program.hpp`, `engine/src/core/InstanceTable.hpp`, `engine/src/core/InstanceTable.cpp`, `engine/src/core/Scheduler.hpp`, `engine/src/core/Scheduler.cpp`
 - Test: `engine/tests/test_scheduler.cpp`
 
 **Interfaces:**
-- Produces: `pg::ModuleInstance { std::string id; uint64_t serial; const RegisteredModule* type; std::unique_ptr<Module> module; std::vector<ParamState> params; }`, `pg::FeedbackState { std::array<std::array<float,kMaxBlockSize>,kMaxChannels> z; uint32_t channels; }`, `pg::Op { Kind kind; uint32_t a,b,c; }` with kinds `Sum, Merge, FillParam, FeedbackRead, FeedbackWrite, ClearEvents, Process, ClusterBegin, ClusterEnd`, `pg::NodeSlot { inst; inBuf, outBuf, inEvt, outEvt, paramBuf (vectors of uint32_t) }`, `pg::Program { revision, voiceCount, blockSize, sampleRate, feedbackMode, nodes, buffers, bufferChannels, eventBufs, args, ops, feedback, serialIndex; findNodeBySerial(serial); allocBuffer(channels); allocEventBuffer(); }`, constants `kNone = UINT32_MAX`, `kSilentBuffer = 0`, `kEmptyEvents = 0`.
-- Op operand meaning: `Sum{a=dst buffer, b=args start, c=count}`; `Merge{a=dst event buffer, b=args start, c=count}`; `FillParam{a=node, b=param index, c=modulation buffer}`; `FeedbackRead{a=feedback index, b=dst buffer}`; `FeedbackWrite{a=feedback index, b=src buffer}`; `ClearEvents{a=event buffer}`; `Process{a=node}`; `ClusterBegin{a=op count}`.
-- `pg::InstanceTable { std::shared_ptr<ModuleInstance> acquire(id, const RegisteredModule&, const PrepareInfo&, const std::map<std::string,float>& params); std::shared_ptr<FeedbackState> acquireFeedback(edgeId, channels); void prune(const std::set<std::string>& liveNodeIds, const std::set<std::string>& liveEdgeIds); const ModuleInstance* find(id) const; size_t size() const; }`
-- `pg::Scheduler::run(Program&, uint32_t numFrames, const TransportSnapshot&, AudioBus*)`.
+- Produces: `pg::ModuleInstance { std::string id; uint64_t serial; const RegisteredModule* type; std::unique_ptr<Module> module; std::vector<ParamState> params; }`, `pg::FeedbackState { std::array<Sample,kMaxBlockSize> z; }`, `pg::Op { Kind kind; uint32_t a,b,c; }` with kinds `Sum, Merge, FillParam, FeedbackRead, FeedbackWrite, ClearEvents, Process, ClusterBegin, ClusterEnd`, `pg::NodeSlot { inst; inBuf, outBuf, inEvt, outEvt, paramBuf }`, `pg::Program { revision, voiceCount, voicePairs, activeVoiceMask (std::vector<Mask>, one per pair), blockSize, sampleRate, feedbackMode, nodes, buffers (std::vector<Block>), eventBufs, args, ops, feedback, serialIndex; findNodeBySerial(serial); allocBuffer(); allocEventBuffer(); buildSerialIndex(); }`, constants `kNone = UINT32_MAX`, `kSilentBuffer = 0`, `kEmptyEvents = 0`.
+- Op operands: `Sum{a=dst buffer, b=args start, c=count}`; `Merge{a=dst event buffer, b=args start, c=count}`; `FillParam{a=node, b=param index, c=modulation buffer}`; `FeedbackRead{a=feedback index, b=dst buffer}`; `FeedbackWrite{a=feedback index, b=src buffer}`; `ClearEvents{a=event buffer}`; `Process{a=node}`; `ClusterBegin{a=op count}`.
+- `pg::InstanceTable { acquire(id, const RegisteredModule&, const PrepareInfo&, const std::map<std::string,float>& params); acquireFeedback(edgeId); prune(liveNodeIds, liveEdgeIds); find(id); size(); }`.
+- `pg::Scheduler::run(Program&, uint32_t numFrames, const TransportSnapshot&, AudioBus*)`. Rule: a declared continuous input with no incoming edge (`inBuf == kSilentBuffer`) reaches the module as an **empty** `SignalView`; modules read it through `readOr()`.
 
 - [ ] **Step 1: Write the failing test (hand-built program)**
 
@@ -2519,37 +2899,29 @@ git commit -m "feat(engine): GraphModel document mirror with validation"
 #include "core/Scheduler.hpp"
 #include "modules/TestModules.hpp"
 
+static float lane0(const pg::Program& p, uint32_t buf, uint32_t frame) { return pg::lanes::lane(p.buffers[buf].data[frame], 0); }
+
 TEST_CASE("Scheduler runs a hand-built const -> gain program with a modulated param", "[scheduler]") {
   pg::Registry reg; pg::test::registerTestModules(reg);
   pg::InstanceTable table;
   pg::PrepareInfo info{48000.0, pg::kMaxBlockSize, 1};
   pg::Program p;
-  p.allocBuffer(1);   // buffer 0 = silent
-  p.allocEventBuffer();   // event buffer 0 = always empty
-
-  // node 0: const value 0.5   node 1: gain knob 0.5 (norm 0.25) modulated by node 2: const 0.2
+  p.allocBuffer(); p.allocEventBuffer();
   pg::NodeSlot c; c.inst = table.acquire("c", *reg.find("test.const"), info, {{"value", 0.5f}});
-  c.outBuf = {p.allocBuffer(1)}; c.outEvt = {pg::kNone}; c.paramBuf = {pg::kNone};
+  c.outBuf = {p.allocBuffer()}; c.outEvt = {pg::kNone}; c.paramBuf = {pg::kNone};
   pg::NodeSlot m; m.inst = table.acquire("m", *reg.find("test.const"), info, {{"value", 0.2f}});
-  m.outBuf = {p.allocBuffer(1)}; m.outEvt = {pg::kNone}; m.paramBuf = {pg::kNone};
+  m.outBuf = {p.allocBuffer()}; m.outEvt = {pg::kNone}; m.paramBuf = {pg::kNone};
   pg::NodeSlot g; g.inst = table.acquire("g", *reg.find("test.gain"), info, {{"gain", 0.5f}});
-  g.inBuf = {c.outBuf[0]}; g.inEvt = {pg::kNone}; g.outBuf = {p.allocBuffer(1)}; g.outEvt = {pg::kNone};
-  g.paramBuf = {p.allocBuffer(1)};
+  g.inBuf = {c.outBuf[0]}; g.inEvt = {pg::kNone}; g.outBuf = {p.allocBuffer()}; g.outEvt = {pg::kNone};
+  g.paramBuf = {p.allocBuffer()};
   p.nodes = {c, m, g};
-  p.ops = {
-    pg::Op{pg::Op::Process, 0}, pg::Op{pg::Op::Process, 1},
-    pg::Op{pg::Op::FillParam, 2, 0, m.outBuf[0]},
-    pg::Op{pg::Op::Process, 2},
-  };
+  p.ops = { pg::Op{pg::Op::Process, 0}, pg::Op{pg::Op::Process, 1}, pg::Op{pg::Op::FillParam, 2, 0, m.outBuf[0]}, pg::Op{pg::Op::Process, 2} };
   p.buildSerialIndex();
-
-  pg::Scheduler s;
-  pg::TransportSnapshot t;
+  pg::Scheduler s; pg::TransportSnapshot t;
   s.run(p, 64, t, nullptr);
-  const float* out = p.buffers[g.outBuf[0]].data(0);
-  // effective gain norm = 0.25 + 0.2 = 0.45 -> 0.9 ; 0.5 * 0.9 = 0.45
-  REQUIRE(out[0] == Catch::Approx(0.45f));
-  REQUIRE(out[63] == Catch::Approx(0.45f));
+  // effective gain norm = 0.25 + 0.2 = 0.45 -> 0.9 ; 0.5 * 0.9 = 0.45, on every lane
+  REQUIRE(lane0(p, g.outBuf[0], 0) == Catch::Approx(0.45f));
+  REQUIRE(pg::lanes::lane(p.buffers[g.outBuf[0]].data[63], 3) == Catch::Approx(0.45f));
 }
 
 TEST_CASE("Scheduler sums fan-in and routes events", "[scheduler]") {
@@ -2557,21 +2929,21 @@ TEST_CASE("Scheduler sums fan-in and routes events", "[scheduler]") {
   pg::InstanceTable table;
   pg::PrepareInfo info{48000.0, pg::kMaxBlockSize, 1};
   pg::Program p;
-  p.allocBuffer(1); p.allocEventBuffer();
+  p.allocBuffer(); p.allocEventBuffer();
   pg::NodeSlot a; a.inst = table.acquire("a", *reg.find("test.const"), info, {{"value", 0.25f}});
-  a.outBuf = {p.allocBuffer(1)}; a.outEvt = {pg::kNone}; a.paramBuf = {pg::kNone};
+  a.outBuf = {p.allocBuffer()}; a.outEvt = {pg::kNone}; a.paramBuf = {pg::kNone};
   pg::NodeSlot b; b.inst = table.acquire("b", *reg.find("test.const"), info, {{"value", 0.5f}});
-  b.outBuf = {p.allocBuffer(1)}; b.outEvt = {pg::kNone}; b.paramBuf = {pg::kNone};
-  const uint32_t sum = p.allocBuffer(1);
+  b.outBuf = {p.allocBuffer()}; b.outEvt = {pg::kNone}; b.paramBuf = {pg::kNone};
+  const uint32_t sum = p.allocBuffer();
   pg::NodeSlot g; g.inst = table.acquire("g", *reg.find("test.gain"), info, {});
-  g.inBuf = {sum}; g.inEvt = {pg::kNone}; g.outBuf = {p.allocBuffer(1)}; g.outEvt = {pg::kNone}; g.paramBuf = {pg::kNone};
+  g.inBuf = {sum}; g.inEvt = {pg::kNone}; g.outBuf = {p.allocBuffer()}; g.outEvt = {pg::kNone}; g.paramBuf = {pg::kNone};
   pg::NodeSlot e1; e1.inst = table.acquire("e1", *reg.find("test.eventGen"), info, {{"frame", 3.f}, {"tag", 2.f}});
   e1.outBuf = {pg::kNone}; e1.outEvt = {p.allocEventBuffer()}; e1.paramBuf = {pg::kNone, pg::kNone};
   pg::NodeSlot e2; e2.inst = table.acquire("e2", *reg.find("test.eventGen"), info, {{"frame", 3.f}, {"tag", 5.f}});
   e2.outBuf = {pg::kNone}; e2.outEvt = {p.allocEventBuffer()}; e2.paramBuf = {pg::kNone, pg::kNone};
   const uint32_t merged = p.allocEventBuffer();
   pg::NodeSlot tr; tr.inst = table.acquire("tr", *reg.find("test.eventTrace"), info, {});
-  tr.inBuf = {pg::kNone}; tr.inEvt = {merged}; tr.outBuf = {p.allocBuffer(1)}; tr.outEvt = {pg::kNone}; tr.paramBuf = {};
+  tr.inBuf = {pg::kNone}; tr.inEvt = {merged}; tr.outBuf = {p.allocBuffer()}; tr.outEvt = {pg::kNone}; tr.paramBuf = {};
   p.nodes = {a, b, g, e1, e2, tr};
   p.args = {a.outBuf[0], b.outBuf[0], e1.outEvt[0], e2.outEvt[0]};
   p.ops = {
@@ -2584,12 +2956,11 @@ TEST_CASE("Scheduler sums fan-in and routes events", "[scheduler]") {
   p.buildSerialIndex();
   pg::Scheduler s; pg::TransportSnapshot t;
   s.run(p, 64, t, nullptr);
-  REQUIRE(p.buffers[g.outBuf[0]].data(0)[10] == Catch::Approx(0.75f));
-  const float* trace = p.buffers[tr.outBuf[0]].data(0);
-  REQUIRE(trace[3] == Catch::Approx(7.f));
-  REQUIRE(trace[2] == 0.f);
-  s.run(p, 64, t, nullptr);                       // second block: events cleared and regenerated, not accumulated
-  REQUIRE(trace[3] == Catch::Approx(7.f));
+  REQUIRE(lane0(p, g.outBuf[0], 10) == Catch::Approx(0.75f));
+  REQUIRE(lane0(p, tr.outBuf[0], 3) == Catch::Approx(7.f));
+  REQUIRE(lane0(p, tr.outBuf[0], 2) == 0.f);
+  s.run(p, 64, t, nullptr);
+  REQUIRE(lane0(p, tr.outBuf[0], 3) == Catch::Approx(7.f));
 }
 ```
 
@@ -2628,10 +2999,9 @@ struct ModuleInstance {
   std::vector<ParamState> params;
 };
 
-/// Delay memory for one back edge. z[c][i] holds the last written frame(s).
+/// Delay memory for one back edge: z[i] holds the last written frame(s).
 struct FeedbackState {
-  std::array<std::array<float, kMaxBlockSize>, kMaxChannels> z{};
-  uint32_t channels = 1;
+  std::array<Sample, kMaxBlockSize> z{};
 };
 
 struct Op {
@@ -2642,43 +3012,46 @@ struct Op {
 
 struct NodeSlot {
   std::shared_ptr<ModuleInstance> inst;
-  std::vector<uint32_t> inBuf;     // per declared input: buffer index (kSilentBuffer if unconnected, kNone for event ports)
-  std::vector<uint32_t> outBuf;    // per output: buffer index (kNone for event ports)
-  std::vector<uint32_t> inEvt;     // per declared input: event buffer index (kNone for continuous ports)
-  std::vector<uint32_t> outEvt;    // per output: event buffer index (kNone for continuous ports)
-  std::vector<uint32_t> paramBuf;  // per param: buffer with per-sample values when modulated, else kNone
+  std::vector<uint32_t> inBuf;     // per declared input: buffer (kSilentBuffer if unconnected, kNone for event ports)
+  std::vector<uint32_t> outBuf;    // per output: buffer (kNone for event ports)
+  std::vector<uint32_t> inEvt;     // per declared input: event buffer (kNone for continuous ports)
+  std::vector<uint32_t> outEvt;    // per output: event buffer (kNone for continuous ports)
+  std::vector<uint32_t> paramBuf;  // per param: buffer with lane-wise per-sample values when modulated, else kNone
 };
 
 /// Immutable once published. Built on the message thread, executed on the audio thread.
 struct Program {
   uint64_t revision = 0;
   uint32_t voiceCount = 1;
+  uint32_t voicePairs = 1;
+  std::vector<Mask> activeVoiceMask;   // one per pair; lanes of voices that exist
   uint32_t blockSize = kDefaultBlockSize;
   double sampleRate = 48000.0;
   FeedbackMode feedbackMode = FeedbackMode::Sample;
 
   std::vector<NodeSlot> nodes;
-  std::vector<PlanarBuffer> buffers;
-  std::vector<uint32_t> bufferChannels;
+  std::vector<Block> buffers;
   std::vector<EventBuffer> eventBufs;
   std::vector<uint32_t> args;       // operand lists for Sum/Merge
   std::vector<Op> ops;
   std::vector<std::shared_ptr<FeedbackState>> feedback;
   std::vector<std::pair<uint64_t, uint32_t>> serialIndex;   // sorted (serial, node index)
 
-  uint32_t allocBuffer(uint32_t channels) {
-    buffers.emplace_back(); bufferChannels.push_back(channels);
-    return static_cast<uint32_t>(buffers.size() - 1);
-  }
+  uint32_t allocBuffer() { buffers.emplace_back(); return static_cast<uint32_t>(buffers.size() - 1); }
   uint32_t allocEventBuffer() { eventBufs.emplace_back(); return static_cast<uint32_t>(eventBufs.size() - 1); }
   void buildSerialIndex() {
     serialIndex.clear();
     for (uint32_t i = 0; i < nodes.size(); ++i) serialIndex.emplace_back(nodes[i].inst->serial, i);
     std::sort(serialIndex.begin(), serialIndex.end());
   }
-  int32_t findNodeBySerial(uint64_t serial) const {   // RT-safe binary search
+  int32_t findNodeBySerial(uint64_t serial) const {
     auto it = std::lower_bound(serialIndex.begin(), serialIndex.end(), std::make_pair(serial, uint32_t{0}));
     return (it != serialIndex.end() && it->first == serial) ? static_cast<int32_t>(it->second) : -1;
+  }
+  static Mask voiceMaskFor(uint32_t voiceCount, uint32_t pair) {
+    const uint32_t first = pair * 2;
+    const bool v0 = first < voiceCount, v1 = first + 1 < voiceCount;
+    return Mask(v0 ? -1 : 0, v0 ? -1 : 0, v1 ? -1 : 0, v1 ? -1 : 0);
   }
 };
 
@@ -2705,11 +3078,10 @@ public:
   /// Params are applied only to newly created instances (live ones change through the param queue).
   std::shared_ptr<ModuleInstance> acquire(const std::string& id, const RegisteredModule& type,
                                           const PrepareInfo& info, const std::map<std::string, float>& params);
-  std::shared_ptr<FeedbackState> acquireFeedback(const std::string& edgeId, uint32_t channels);
+  std::shared_ptr<FeedbackState> acquireFeedback(const std::string& edgeId);
   void prune(const std::set<std::string>& liveNodeIds, const std::set<std::string>& liveEdgeIds);
   const ModuleInstance* find(const std::string& id) const;
   size_t size() const { return byId_.size(); }
-
 private:
   std::map<std::string, std::shared_ptr<ModuleInstance>> byId_;
   std::map<std::string, std::shared_ptr<FeedbackState>> feedbackById_;
@@ -2728,7 +3100,7 @@ namespace pg {
 
 std::shared_ptr<ModuleInstance> InstanceTable::acquire(const std::string& id, const RegisteredModule& type,
                                                        const PrepareInfo& info, const std::map<std::string, float>& params) {
-  if (!(info == lastInfo_)) {       // sample rate / block / voices changed: re-prepare everything
+  if (!(info == lastInfo_)) {
     for (auto& [k, inst] : byId_) {
       inst->module->prepare(info);
       for (auto& p : inst->params) p.prepare(p.desc, info.sampleRate, p.target);
@@ -2748,18 +3120,16 @@ std::shared_ptr<ModuleInstance> InstanceTable::acquire(const std::string& id, co
   for (uint32_t i = 0; i < type.desc->numParams; ++i) {
     const ParamDesc& d = type.desc->params[i];
     auto pv = params.find(d.id);
-    const float value = pv == params.end() ? d.def : pv->second;
-    inst->params[i].prepare(&d, info.sampleRate, paramNormalize(d, value));
+    inst->params[i].prepare(&d, info.sampleRate, paramNormalize(d, pv == params.end() ? d.def : pv->second));
   }
   byId_[id] = inst;
   return inst;
 }
 
-std::shared_ptr<FeedbackState> InstanceTable::acquireFeedback(const std::string& edgeId, uint32_t channels) {
+std::shared_ptr<FeedbackState> InstanceTable::acquireFeedback(const std::string& edgeId) {
   auto it = feedbackById_.find(edgeId);
-  if (it != feedbackById_.end() && it->second->channels == channels) return it->second;
+  if (it != feedbackById_.end()) return it->second;
   auto fb = std::make_shared<FeedbackState>();
-  fb->channels = channels;
   feedbackById_[edgeId] = fb;
   return fb;
 }
@@ -2788,15 +3158,14 @@ const ModuleInstance* InstanceTable::find(const std::string& id) const {
 
 namespace pg {
 
-/// Executes a Program's op list. All methods are audio-thread safe after construction.
+/// Executes a Program's op list once per voice pair. Audio-thread safe after construction.
 class Scheduler {
 public:
   PG_RT_NONBLOCKING void run(Program& p, uint32_t numFrames, const TransportSnapshot& t, AudioBus* bus);
-
 private:
-  void exec(Program& p, const Op& op, uint32_t offset, uint32_t n, uint32_t voice, const TransportSnapshot& t, AudioBus* bus);
-  void runCluster(Program& p, size_t first, uint32_t count, uint32_t numFrames, uint32_t voice, const TransportSnapshot& t, AudioBus* bus);
-  SignalView view(Program& p, uint32_t buf, uint32_t offset, uint32_t n) const;
+  void exec(Program& p, const Op& op, uint32_t offset, uint32_t n, uint32_t pair, const TransportSnapshot& t, AudioBus* bus);
+  void runCluster(Program& p, size_t first, uint32_t count, uint32_t numFrames, uint32_t pair, const TransportSnapshot& t, AudioBus* bus);
+  static SignalView view(Program& p, uint32_t buf, uint32_t offset, uint32_t n) { return SignalView{p.buffers[buf].data.data() + offset, n}; }
 
   std::array<SignalView, kMaxPortsPerModule> in_{}, out_{};
   std::array<const EventBuffer*, kMaxPortsPerModule> evIn_{};
@@ -2814,53 +3183,38 @@ private:
 
 namespace pg {
 
-SignalView Scheduler::view(Program& p, uint32_t buf, uint32_t offset, uint32_t n) const {
-  SignalView v;
-  v.numChannels = p.bufferChannels[buf];
-  v.numFrames = n;
-  for (uint32_t c = 0; c < v.numChannels; ++c) v.ch[c] = p.buffers[buf].data(c) + offset;
-  return v;
-}
-
 void Scheduler::run(Program& p, uint32_t numFrames, const TransportSnapshot& t, AudioBus* bus) {
   p.buffers[kSilentBuffer].clear();
   p.eventBufs[kEmptyEvents].clear();
   for (NodeSlot& slot : p.nodes)
     for (ParamState& ps : slot.inst->params) ps.fillRamp(numFrames);
 
-  for (uint32_t voice = 0; voice < p.voiceCount; ++voice) {
+  for (uint32_t pair = 0; pair < p.voicePairs; ++pair) {
     for (size_t i = 0; i < p.ops.size(); ++i) {
       const Op& op = p.ops[i];
-      if (op.kind == Op::ClusterBegin) {
-        runCluster(p, i + 1, op.a, numFrames, voice, t, bus);
-        i += op.a + 1;   // skip the cluster body and its ClusterEnd
-        continue;
-      }
-      exec(p, op, 0, numFrames, voice, t, bus);
+      if (op.kind == Op::ClusterBegin) { runCluster(p, i + 1, op.a, numFrames, pair, t, bus); i += op.a + 1; continue; }
+      exec(p, op, 0, numFrames, pair, t, bus);
     }
   }
 }
 
-void Scheduler::runCluster(Program& p, size_t first, uint32_t count, uint32_t numFrames, uint32_t voice, const TransportSnapshot& t, AudioBus* bus) {
+void Scheduler::runCluster(Program& p, size_t first, uint32_t count, uint32_t numFrames, uint32_t pair, const TransportSnapshot& t, AudioBus* bus) {
   if (p.feedbackMode == FeedbackMode::Block) {
-    for (uint32_t k = 0; k < count; ++k) exec(p, p.ops[first + k], 0, numFrames, voice, t, bus);
+    for (uint32_t k = 0; k < count; ++k) exec(p, p.ops[first + k], 0, numFrames, pair, t, bus);
     return;
   }
   for (uint32_t s = 0; s < numFrames; ++s)
-    for (uint32_t k = 0; k < count; ++k) exec(p, p.ops[first + k], s, 1, voice, t, bus);
+    for (uint32_t k = 0; k < count; ++k) exec(p, p.ops[first + k], s, 1, pair, t, bus);
 }
 
-void Scheduler::exec(Program& p, const Op& op, uint32_t offset, uint32_t n, uint32_t voice, const TransportSnapshot& t, AudioBus* bus) {
+void Scheduler::exec(Program& p, const Op& op, uint32_t offset, uint32_t n, uint32_t pair, const TransportSnapshot& t, AudioBus* bus) {
   switch (op.kind) {
     case Op::Sum: {
-      SignalView dst = view(p, op.a, offset, n);
-      dst.clear();
+      Sample* dst = p.buffers[op.a].data.data() + offset;
+      for (uint32_t i = 0; i < n; ++i) dst[i] = Sample(0.f);
       for (uint32_t k = 0; k < op.c; ++k) {
-        const SignalView src = view(p, p.args[op.b + k], offset, n);
-        for (uint32_t c = 0; c < dst.numChannels; ++c) {
-          float* d = dst.write(c); const float* s = src.read(c);
-          for (uint32_t i = 0; i < n; ++i) d[i] += s[i];
-        }
+        const Sample* src = p.buffers[p.args[op.b + k]].data.data() + offset;
+        for (uint32_t i = 0; i < n; ++i) dst[i] += src[i];
       }
       return;
     }
@@ -2876,37 +3230,32 @@ void Scheduler::exec(Program& p, const Op& op, uint32_t offset, uint32_t n, uint
       return;
     case Op::FillParam: {
       const NodeSlot& slot = p.nodes[op.a];
-      ParamState& ps = slot.inst->params[op.b];
-      float* dst = p.buffers[slot.paramBuf[op.b]].data(0) + offset;
-      const float* mod = p.buffers[op.c].data(0) + offset;
+      const ParamState& ps = slot.inst->params[op.b];
+      Sample* dst = p.buffers[slot.paramBuf[op.b]].data.data() + offset;
+      const Sample* mod = p.buffers[op.c].data.data() + offset;
       for (uint32_t i = 0; i < n; ++i) {
         const float norm = ps.rampIsConstant ? ps.constNorm : ps.rampNorm[offset + i];
-        dst[i] = paramDenormalize(*ps.desc, norm + mod[i]);
+        dst[i] = paramDenormalize(*ps.desc, Sample(norm) + mod[i]);
       }
       return;
     }
     case Op::FeedbackRead: {
-      FeedbackState& fb = *p.feedback[op.a];
-      for (uint32_t c = 0; c < fb.channels; ++c) {
-        float* d = p.buffers[op.b].data(c) + offset;
-        for (uint32_t i = 0; i < n; ++i) d[i] = fb.z[c][i];
-      }
+      const FeedbackState& fb = *p.feedback[op.a];
+      Sample* d = p.buffers[op.b].data.data() + offset;
+      for (uint32_t i = 0; i < n; ++i) d[i] = fb.z[i];
       return;
     }
     case Op::FeedbackWrite: {
       FeedbackState& fb = *p.feedback[op.a];
-      const SignalView src = view(p, op.b, offset, n);
-      for (uint32_t c = 0; c < fb.channels; ++c) {
-        const float* s = src.read(c);
-        for (uint32_t i = 0; i < n; ++i) fb.z[c][i] = s[i];
-      }
+      const Sample* s = p.buffers[op.b].data.data() + offset;
+      for (uint32_t i = 0; i < n; ++i) fb.z[i] = s[i];
       return;
     }
     case Op::Process: {
       NodeSlot& slot = p.nodes[op.a];
       const ModuleDescriptor& d = *slot.inst->type->desc;
       for (uint32_t i = 0; i < d.numInputs; ++i) {
-        in_[i] = slot.inBuf[i] == kNone ? SignalView{} : view(p, slot.inBuf[i], offset, n);
+        in_[i] = (slot.inBuf[i] == kNone || slot.inBuf[i] == kSilentBuffer) ? SignalView{} : view(p, slot.inBuf[i], offset, n);   // unconnected -> empty view
         evIn_[i] = slot.inEvt[i] == kNone ? &emptyEvents_ : &p.eventBufs[slot.inEvt[i]];
       }
       for (uint32_t i = 0; i < d.numOutputs; ++i) {
@@ -2915,14 +3264,14 @@ void Scheduler::exec(Program& p, const Op& op, uint32_t offset, uint32_t n, uint
       }
       for (uint32_t i = 0; i < d.numParams; ++i) {
         const ParamState& ps = slot.inst->params[i];
-        if (slot.paramBuf[i] != kNone) params_[i] = ParamView{p.buffers[slot.paramBuf[i]].data(0) + offset, 0.f};
-        else if (ps.rampIsConstant) params_[i] = ParamView{nullptr, ps.constValue};
-        else params_[i] = ParamView{ps.rampValue.data() + offset, 0.f};
+        if (slot.paramBuf[i] != kNone) params_[i] = ParamView{p.buffers[slot.paramBuf[i]].data.data() + offset, nullptr, 0.f};
+        else if (ps.rampIsConstant) params_[i] = ParamView{nullptr, nullptr, ps.constValue};
+        else params_[i] = ParamView{nullptr, ps.rampValue.data() + offset, 0.f};
       }
       AudioBus busSlice;
-      if (bus) { busSlice = *bus; busSlice.frames = n; for (uint32_t c = 0; c < bus->channels; ++c) busSlice.ch[c] = bus->ch[c] + offset; }
+      if (bus) { busSlice.data = bus->data + offset; busSlice.frames = n; }
       ProcessContext ctx;
-      ctx.numFrames = n; ctx.voice = voice; ctx.sampleRate = p.sampleRate; ctx.transport = &t;
+      ctx.numFrames = n; ctx.voice = pair; ctx.sampleRate = p.sampleRate; ctx.transport = &t;
       ctx.outputBus = bus ? &busSlice : nullptr;
       ctx.inputs = in_.data(); ctx.outputs = out_.data(); ctx.eventInputs = evIn_.data(); ctx.eventOutputs = evOut_.data();
       ctx.params = params_.data();
@@ -2937,19 +3286,20 @@ void Scheduler::exec(Program& p, const Op& op, uint32_t offset, uint32_t n, uint
 
 }  // namespace pg
 ```
+Note: buffers are shared across voice pairs in this milestone (`voicePairs == 1`). The per-pair buffer dimension is added with polyphony later; the loop structure is already in place.
 
-- [ ] **Step 6: Run the tests** — `npm run engine:test`: both scheduler tests pass.
+- [ ] **Step 6: Run the tests** — both scheduler tests pass.
 
 - [ ] **Step 7: Commit**
 
 ```bash
 git add engine
-git commit -m "feat(engine): Program, InstanceTable and Scheduler executing op lists"
+git commit -m "feat(engine): Program with Block buffers, InstanceTable, Scheduler over voice pairs"
 ```
 
 ---
 
-### Task 11: GraphCompiler for acyclic graphs
+### Task 12: GraphCompiler for acyclic graphs
 
 **Files:**
 - Create: `engine/src/core/GraphCompiler.hpp`, `engine/src/core/GraphCompiler.cpp`
@@ -2957,8 +3307,8 @@ git commit -m "feat(engine): Program, InstanceTable and Scheduler executing op l
 - Test: `engine/tests/test_graph.cpp`
 
 **Interfaces:**
-- Produces: `pg::CompileOutput { std::unique_ptr<Program> program; std::string error; }`, `pg::CompileOutput pg::compileGraph(const GraphModel&, const Registry&, InstanceTable&, uint64_t revision, double sampleRate, uint32_t blockSize)`. Cycles return error `"E_FEEDBACK_UNSUPPORTED"` in this task; Task 12 replaces that with clusters.
-- Test fixture `pg::test::GraphFixture { Registry reg; GraphModel model; InstanceTable table; Scheduler scheduler; void node(id, type, params={}); void edge(id, "node.port", "node.port"); std::unique_ptr<Program> compile(); const float* out(Program&, node, port); void run(Program&, frames, AudioBus* = nullptr); }`.
+- Produces: `pg::CompileOutput { std::unique_ptr<Program> program; std::string error; }`, `pg::CompileOutput pg::compileGraph(const GraphModel&, const Registry&, InstanceTable&, uint64_t revision, double sampleRate, uint32_t blockSize)`. Cycles return error `"E_FEEDBACK_UNSUPPORTED"` in this task; Task 13 replaces that with clusters. Sets `voicePairs` and `activeVoiceMask` from `voiceCount`.
+- Fixture `pg::test::GraphFixture { Registry reg; GraphModel model; InstanceTable table; Scheduler scheduler; TransportSnapshot transport; node(id, type, params={}); edge(id, "node.port", "node.port"); compile(); float out(Program&, node, port, frame, lane=0); run(Program&, frames, AudioBus* = nullptr); }`.
 
 - [ ] **Step 1: Write the fixture and failing tests**
 
@@ -2988,8 +3338,7 @@ struct GraphFixture {
     Result r = model.addNode(reg, NodeModel{id, type, std::move(params)});
     if (!r) throw std::runtime_error(r.message);
   }
-  /// endpoints are "node.port"
-  void edge(const std::string& id, const std::string& from, const std::string& to) {
+  void edge(const std::string& id, const std::string& from, const std::string& to) {   // "node.port"
     auto split = [](const std::string& s) { auto d = s.find('.'); return std::pair{s.substr(0, d), s.substr(d + 1)}; };
     auto [fn, fp] = split(from); auto [tn, tp] = split(to);
     Result r = model.addEdge(reg, EdgeModel{id, fn, fp, tn, tp});
@@ -3000,9 +3349,10 @@ struct GraphFixture {
     if (!o.program) throw std::runtime_error(o.error);
     return std::move(o.program);
   }
-  const float* out(Program& p, const std::string& nodeId, const std::string& port) {
+  float out(Program& p, const std::string& nodeId, const std::string& port, uint32_t frame, uint32_t lane = 0) {
     for (const NodeSlot& s : p.nodes)
-      if (s.inst->id == nodeId) return p.buffers[s.outBuf[static_cast<size_t>(s.inst->type->findOutput(port))]].data(0);
+      if (s.inst->id == nodeId)
+        return lanes::lane(p.buffers[s.outBuf[static_cast<size_t>(s.inst->type->findOutput(port))]].data[frame], lane);
     throw std::runtime_error("no node " + nodeId);
   }
   void run(Program& p, uint32_t frames, AudioBus* bus = nullptr) { scheduler.run(p, frames, transport, bus); }
@@ -3026,7 +3376,11 @@ TEST_CASE("compile: chain const -> gain", "[compiler]") {
   f.edge("e", "c.out", "g.in");
   auto p = f.compile();
   f.run(*p, 64);
-  REQUIRE(f.out(*p, "g", "out")[63] == Catch::Approx(0.25f));
+  REQUIRE(f.out(*p, "g", "out", 63) == Catch::Approx(0.25f));
+  REQUIRE(f.out(*p, "g", "out", 63, 3) == Catch::Approx(0.25f));
+  REQUIRE(p->voicePairs == 1);
+  REQUIRE(pg::lanes::lane(pg::Sample(1.f) & p->activeVoiceMask[0], 0) == 1.f);
+  REQUIRE(pg::lanes::lane(pg::Sample(1.f) & p->activeVoiceMask[0], 2) == 0.f);   // voice 1 inactive at voiceCount 1
 }
 
 TEST_CASE("compile: fan-in sums, unconnected inputs are silent", "[compiler]") {
@@ -3039,8 +3393,8 @@ TEST_CASE("compile: fan-in sums, unconnected inputs are silent", "[compiler]") {
   f.edge("e2", "b.out", "g.in");
   auto p = f.compile();
   f.run(*p, 64);
-  REQUIRE(f.out(*p, "g", "out")[0] == Catch::Approx(0.75f));
-  REQUIRE(f.out(*p, "lonely", "out")[0] == 0.f);
+  REQUIRE(f.out(*p, "g", "out", 0) == Catch::Approx(0.75f));
+  REQUIRE(f.out(*p, "lonely", "out", 0) == 0.f);
 }
 
 TEST_CASE("compile: implicit param port modulates the knob", "[compiler]") {
@@ -3052,7 +3406,7 @@ TEST_CASE("compile: implicit param port modulates the knob", "[compiler]") {
   f.edge("e2", "mod.out", "g.param:gain");
   auto p = f.compile();
   f.run(*p, 64);
-  REQUIRE(f.out(*p, "g", "out")[10] == Catch::Approx(0.9f));   // norm 0.25 + 0.2 -> 0.9
+  REQUIRE(f.out(*p, "g", "out", 10) == Catch::Approx(0.9f));   // norm 0.25 + 0.2 -> 0.9
 }
 
 TEST_CASE("compile: event ports merge by frame", "[compiler]") {
@@ -3064,7 +3418,7 @@ TEST_CASE("compile: event ports merge by frame", "[compiler]") {
   f.edge("y", "e2.events", "t.events");
   auto p = f.compile();
   f.run(*p, 64);
-  REQUIRE(f.out(*p, "t", "out")[3] == Catch::Approx(7.f));
+  REQUIRE(f.out(*p, "t", "out", 3) == Catch::Approx(7.f));
 }
 
 TEST_CASE("compile: topological order is respected regardless of id order", "[compiler]") {
@@ -3074,20 +3428,24 @@ TEST_CASE("compile: topological order is respected regardless of id order", "[co
   f.edge("e", "z_source.out", "a_sink.in");
   auto p = f.compile();
   f.run(*p, 64);
-  REQUIRE(f.out(*p, "a_sink", "out")[0] == Catch::Approx(0.5f));
+  REQUIRE(f.out(*p, "a_sink", "out", 0) == Catch::Approx(0.5f));
 }
 
-TEST_CASE("compile: reuses instances across compiles", "[compiler]") {
+TEST_CASE("compile: reuses instances across compiles; voice pairs from voiceCount", "[compiler]") {
   GraphFixture f;
   f.node("c", "test.const", {{"value", 0.5f}});
   auto p1 = f.compile();
   f.node("g", "test.gain");
+  f.model.setVoiceCount(3);
   auto p2 = f.compile();
   REQUIRE(p1->nodes[0].inst.get() == p2->nodes[0].inst.get());
   REQUIRE(f.table.size() == 2);
+  REQUIRE(p2->voicePairs == 2);
+  REQUIRE(pg::lanes::lane(pg::Sample(1.f) & p2->activeVoiceMask[1], 0) == 1.f);   // voice 2 active
+  REQUIRE(pg::lanes::lane(pg::Sample(1.f) & p2->activeVoiceMask[1], 2) == 0.f);   // voice 3 does not exist
 }
 
-TEST_CASE("compile: cycles are rejected until Task 12", "[compiler]") {
+TEST_CASE("compile: cycles are rejected until Task 13", "[compiler]") {
   GraphFixture f;
   f.node("a", "test.add");
   f.node("g", "test.gain");
@@ -3099,7 +3457,7 @@ TEST_CASE("compile: cycles are rejected until Task 12", "[compiler]") {
 }
 ```
 
-- [ ] **Step 2: Run to verify failure** — compile error, `core/GraphCompiler.hpp` missing.
+- [ ] **Step 2: Run to verify failure** — compile error.
 
 - [ ] **Step 3: Write the compiler**
 
@@ -3113,16 +3471,13 @@ TEST_CASE("compile: cycles are rejected until Task 12", "[compiler]") {
 #include "core/Program.hpp"
 
 namespace pg {
-
 struct CompileOutput {
   std::unique_ptr<Program> program;   // null on error
   std::string error;                  // "E_CODE: message"
 };
-
 /// Message thread. Allocates everything the audio thread will need.
 CompileOutput compileGraph(const GraphModel& model, const Registry& registry, InstanceTable& instances,
                            uint64_t revision, double sampleRate, uint32_t blockSize);
-
 }  // namespace pg
 ```
 
@@ -3131,6 +3486,7 @@ CompileOutput compileGraph(const GraphModel& model, const Registry& registry, In
 #include "core/GraphCompiler.hpp"
 #include <algorithm>
 #include <functional>
+#include <map>
 #include <set>
 
 namespace pg {
@@ -3140,7 +3496,7 @@ struct EdgeRef {
   const EdgeModel* model;
   uint32_t from, fromPort;   // node index, output index
   uint32_t to, toPort;       // node index, input index (declared + implicit)
-  bool back = false;         // set in Task 12
+  bool back = false;         // set in Task 13
 };
 
 struct Tarjan {
@@ -3201,7 +3557,7 @@ CompileOutput compileGraph(const GraphModel& model, const Registry& registry, In
     edges.push_back(r);
   }
 
-  // 3. SCC / topological order.
+  // 3. SCC / topological order (Task 13 replaces this block with cluster handling).
   std::vector<std::vector<uint32_t>> adj(N);
   for (const EdgeRef& e : edges) adj[e.from].push_back(e.to);
   Tarjan tarjan(adj);
@@ -3214,10 +3570,11 @@ CompileOutput compileGraph(const GraphModel& model, const Registry& registry, In
 
   // 4. Program skeleton and output buffers.
   auto p = std::make_unique<Program>();
-  p->revision = revision; p->voiceCount = model.voiceCount; p->blockSize = blockSize; p->sampleRate = sampleRate;
-  p->feedbackMode = model.feedbackMode;
-  p->allocBuffer(1);        // kSilentBuffer
-  p->allocEventBuffer();    // kEmptyEvents
+  p->revision = revision; p->voiceCount = model.voiceCount; p->voicePairs = (model.voiceCount + 1) / 2;
+  for (uint32_t pair = 0; pair < p->voicePairs; ++pair) p->activeVoiceMask.push_back(Program::voiceMaskFor(model.voiceCount, pair));
+  p->blockSize = blockSize; p->sampleRate = sampleRate; p->feedbackMode = model.feedbackMode;
+  p->allocBuffer();        // kSilentBuffer
+  p->allocEventBuffer();   // kEmptyEvents
   p->nodes.resize(N);
   for (uint32_t i = 0; i < N; ++i) {
     NodeSlot& s = p->nodes[i];
@@ -3227,8 +3584,7 @@ CompileOutput compileGraph(const GraphModel& model, const Registry& registry, In
     s.outBuf.assign(d.numOutputs, kNone); s.outEvt.assign(d.numOutputs, kNone);
     s.paramBuf.assign(d.numParams, kNone);
     for (uint32_t o = 0; o < d.numOutputs; ++o) {
-      if (d.outputs[o].kind == PortKind::Continuous) s.outBuf[o] = p->allocBuffer(d.outputs[o].channels);
-      else s.outEvt[o] = p->allocEventBuffer();
+      if (d.outputs[o].kind == PortKind::Continuous) s.outBuf[o] = p->allocBuffer(); else s.outEvt[o] = p->allocEventBuffer();
     }
     for (uint32_t k = 0; k < d.numInputs; ++k)
       if (d.inputs[k].kind == PortKind::Continuous) s.inBuf[k] = kSilentBuffer; else s.inEvt[k] = kEmptyEvents;
@@ -3251,22 +3607,16 @@ CompileOutput compileGraph(const GraphModel& model, const Registry& registry, In
       uint32_t result;
       if (srcs.size() == 1) {
         result = srcs[0];
-      } else if (continuous) {
-        uint32_t ch = 1; for (uint32_t b : srcs) ch = std::max(ch, p->bufferChannels[b]);
-        result = p->allocBuffer(ch);
-        const uint32_t argStart = static_cast<uint32_t>(p->args.size());
-        p->args.insert(p->args.end(), srcs.begin(), srcs.end());
-        p->ops.push_back(Op{Op::Sum, result, argStart, static_cast<uint32_t>(srcs.size())});
       } else {
-        result = p->allocEventBuffer();
+        result = continuous ? p->allocBuffer() : p->allocEventBuffer();
         const uint32_t argStart = static_cast<uint32_t>(p->args.size());
         p->args.insert(p->args.end(), srcs.begin(), srcs.end());
-        p->ops.push_back(Op{Op::Merge, result, argStart, static_cast<uint32_t>(srcs.size())});
+        p->ops.push_back(Op{continuous ? Op::Sum : Op::Merge, result, argStart, static_cast<uint32_t>(srcs.size())});
       }
       const int32_t paramIdx = t.inputParam[ip];
       if (paramIdx < 0) { if (continuous) s.inBuf[ip] = result; else s.inEvt[ip] = result; }
       else {
-        s.paramBuf[paramIdx] = p->allocBuffer(1);
+        s.paramBuf[paramIdx] = p->allocBuffer();
         p->ops.push_back(Op{Op::FillParam, ni, static_cast<uint32_t>(paramIdx), result});
       }
     }
@@ -3286,32 +3636,33 @@ CompileOutput compileGraph(const GraphModel& model, const Registry& registry, In
 }  // namespace pg
 ```
 
-- [ ] **Step 4: Run the tests** — `npm run engine:test`: all `[compiler]` tests pass.
+- [ ] **Step 4: Run the tests** — all `[compiler]` tests pass.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add engine
-git commit -m "feat(engine): graph compiler for acyclic graphs with fan-in and implicit param ports"
+git commit -m "feat(engine): graph compiler for acyclic graphs with fan-in, implicit param ports and voice pairs"
 ```
 
 ---
 
-### Task 12: Feedback clusters with one-sample delay
+### Task 13: Feedback clusters with one-sample delay
 
 **Files:**
 - Modify: `engine/src/core/GraphCompiler.cpp`
 - Test: `engine/tests/test_feedback.cpp`; modify `engine/tests/test_graph.cpp` (remove the "cycles are rejected" case)
 
 **Interfaces:**
-- Produces: the compiler emits `ClusterBegin … ClusterEnd` around every SCC with ≥ 2 nodes or a self loop; back edges get a `FeedbackState` (reused by edge id) and `FeedbackRead`/`FeedbackWrite` ops. Event back edges return `E_EVENT_FEEDBACK` (no test module can form an event cycle yet; covered when `note.toCv` arrives).
+- Produces: the compiler emits `ClusterBegin … ClusterEnd` around every SCC with ≥ 2 nodes or a self loop; back edges get a `FeedbackState` (reused by edge id) and `FeedbackRead`/`FeedbackWrite` ops. Event back edges return `E_EVENT_FEEDBACK` (untestable with the test modules; covered when `note.toCv` exists).
 
 - [ ] **Step 1: Write the failing tests**
 
-Delete the `"compile: cycles are rejected until Task 12"` test from `test_graph.cpp`. Create `engine/tests/test_feedback.cpp`:
+Delete `"compile: cycles are rejected until Task 13"` from `test_graph.cpp`. Create `engine/tests/test_feedback.cpp`:
 ```cpp
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <cmath>
 #include "util/GraphFixture.hpp"
 #include "util/RtGuard.hpp"
 
@@ -3331,14 +3682,14 @@ TEST_CASE("feedback: per-sample cluster has exactly one sample of delay", "[feed
   GraphFixture f; buildIir(f);
   auto p = f.compile();
   f.run(*p, 64);
-  const float* y = f.out(*p, "add", "out");
-  REQUIRE(y[0] == 1.f);
-  REQUIRE(y[1] == 0.5f);
-  REQUIRE(y[2] == 0.25f);
-  REQUIRE(y[10] == Catch::Approx(std::pow(0.5, 10)));
-  const float last = y[63];
-  f.run(*p, 64);                                 // state continues across blocks
-  REQUIRE(y[0] == Catch::Approx(last * 0.5f));
+  REQUIRE(f.out(*p, "add", "out", 0) == 1.f);
+  REQUIRE(f.out(*p, "add", "out", 1) == 0.5f);
+  REQUIRE(f.out(*p, "add", "out", 2) == 0.25f);
+  REQUIRE(f.out(*p, "add", "out", 2, 3) == 0.25f);   // every lane
+  REQUIRE(f.out(*p, "add", "out", 10) == Catch::Approx(std::pow(0.5, 10)));
+  const float last = f.out(*p, "add", "out", 63);
+  f.run(*p, 64);
+  REQUIRE(f.out(*p, "add", "out", 0) == Catch::Approx(last * 0.5f));
 }
 
 TEST_CASE("feedback: block mode delays by one block", "[feedback]") {
@@ -3346,12 +3697,11 @@ TEST_CASE("feedback: block mode delays by one block", "[feedback]") {
   f.model.feedbackMode = pg::FeedbackMode::Block;
   auto p = f.compile();
   f.run(*p, 64);
-  const float* y = f.out(*p, "add", "out");
-  REQUIRE(y[0] == 1.f);
-  REQUIRE(y[1] == 0.f);
+  REQUIRE(f.out(*p, "add", "out", 0) == 1.f);
+  REQUIRE(f.out(*p, "add", "out", 1) == 0.f);
   f.run(*p, 64);
-  REQUIRE(y[0] == 0.5f);
-  REQUIRE(y[1] == 0.f);
+  REQUIRE(f.out(*p, "add", "out", 0) == 0.5f);
+  REQUIRE(f.out(*p, "add", "out", 1) == 0.f);
 }
 
 TEST_CASE("feedback: self loop", "[feedback]") {
@@ -3362,21 +3712,20 @@ TEST_CASE("feedback: self loop", "[feedback]") {
   f.edge("e_self", "g.out", "g.in");
   auto p = f.compile();
   f.run(*p, 64);
-  const float* y = f.out(*p, "g", "out");   // y[n] = 0.5 (x[n] + y[n-1])
-  REQUIRE(y[0] == 0.5f);
-  REQUIRE(y[1] == 0.25f);
-  REQUIRE(y[2] == 0.125f);
+  REQUIRE(f.out(*p, "g", "out", 0) == 0.5f);     // y[n] = 0.5 (x[n] + y[n-1])
+  REQUIRE(f.out(*p, "g", "out", 1) == 0.25f);
+  REQUIRE(f.out(*p, "g", "out", 2) == 0.125f);
 }
 
 TEST_CASE("feedback: FeedbackState survives recompiles", "[feedback]") {
   GraphFixture f; buildIir(f);
   auto p1 = f.compile();
   f.run(*p1, 64);
-  const float last = f.out(*p1, "add", "out")[63];
+  const float last = f.out(*p1, "add", "out", 63);
   f.node("unrelated", "test.const");
   auto p2 = f.compile();
   f.run(*p2, 64);
-  REQUIRE(f.out(*p2, "add", "out")[0] == Catch::Approx(last * 0.5f));
+  REQUIRE(f.out(*p2, "add", "out", 0) == Catch::Approx(last * 0.5f));
 }
 
 TEST_CASE("feedback: scheduler run is allocation free", "[feedback][rt]") {
@@ -3388,11 +3737,11 @@ TEST_CASE("feedback: scheduler run is allocation free", "[feedback][rt]") {
 }
 ```
 
-- [ ] **Step 2: Run to verify failure** — the first four `[feedback]` tests fail (`E_FEEDBACK_UNSUPPORTED`).
+- [ ] **Step 2: Run to verify failure** — the first four `[feedback]` tests fail with `E_FEEDBACK_UNSUPPORTED`.
 
 - [ ] **Step 3: Replace the SCC handling and emission in `GraphCompiler.cpp`**
 
-Replace step 3 ("SCC / topological order") with:
+Replace step 3 with:
 ```cpp
   // 3. SCCs in topological order; inside each non-trivial SCC pick a deterministic order and mark back edges.
   std::vector<std::vector<uint32_t>> adj(N);
@@ -3430,16 +3779,15 @@ Replace step 3 ("SCC / topological order") with:
   }
 ```
 
-Replace step 5 (the `for (uint32_t ni : order)` loop) with a per-group emission. Add these helpers above the loop:
+Replace step 5 (the `for (uint32_t ni : order)` loop) with:
 ```cpp
-  // Back-edge feedback states and their read buffers, keyed by edge index.
+  // 5. Feedback states and read buffers per back edge, then per-group emission.
   std::map<size_t, uint32_t> fbIndexOfEdge, fbBufOfEdge;
   for (size_t ei = 0; ei < edges.size(); ++ei) {
     if (!edges[ei].back) continue;
-    const uint32_t ch = p->bufferChannels[p->nodes[edges[ei].from].outBuf[edges[ei].fromPort]];
     fbIndexOfEdge[ei] = static_cast<uint32_t>(p->feedback.size());
-    p->feedback.push_back(instances.acquireFeedback(edges[ei].model->id, ch));
-    fbBufOfEdge[ei] = p->allocBuffer(ch);
+    p->feedback.push_back(instances.acquireFeedback(edges[ei].model->id));
+    fbBufOfEdge[ei] = p->allocBuffer();
   }
 
   auto emitNode = [&](uint32_t ni) {
@@ -3460,22 +3808,16 @@ Replace step 5 (the `for (uint32_t ni : order)` loop) with a per-group emission.
       uint32_t result;
       if (srcs.size() == 1) {
         result = srcs[0];
-      } else if (continuous) {
-        uint32_t ch = 1; for (uint32_t b : srcs) ch = std::max(ch, p->bufferChannels[b]);
-        result = p->allocBuffer(ch);
-        const uint32_t argStart = static_cast<uint32_t>(p->args.size());
-        p->args.insert(p->args.end(), srcs.begin(), srcs.end());
-        p->ops.push_back(Op{Op::Sum, result, argStart, static_cast<uint32_t>(srcs.size())});
       } else {
-        result = p->allocEventBuffer();
+        result = continuous ? p->allocBuffer() : p->allocEventBuffer();
         const uint32_t argStart = static_cast<uint32_t>(p->args.size());
         p->args.insert(p->args.end(), srcs.begin(), srcs.end());
-        p->ops.push_back(Op{Op::Merge, result, argStart, static_cast<uint32_t>(srcs.size())});
+        p->ops.push_back(Op{continuous ? Op::Sum : Op::Merge, result, argStart, static_cast<uint32_t>(srcs.size())});
       }
       const int32_t paramIdx = t.inputParam[ip];
       if (paramIdx < 0) { if (continuous) s.inBuf[ip] = result; else s.inEvt[ip] = result; }
       else {
-        s.paramBuf[paramIdx] = p->allocBuffer(1);
+        s.paramBuf[paramIdx] = p->allocBuffer();
         p->ops.push_back(Op{Op::FillParam, ni, static_cast<uint32_t>(paramIdx), result});
       }
     }
@@ -3492,16 +3834,16 @@ Replace step 5 (the `for (uint32_t ni : order)` loop) with a per-group emission.
     const size_t beginAt = p->ops.size();
     p->ops.push_back(Op{Op::ClusterBegin, 0});
     for (size_t ei = 0; ei < edges.size(); ++ei)
-      if (edges[ei].back && pos[edges[ei].to] <= pos[edges[ei].from] && tarjan.comp[edges[ei].to] == tarjan.comp[g.nodes[0]])
+      if (edges[ei].back && tarjan.comp[edges[ei].to] == tarjan.comp[g.nodes[0]])
         p->ops.push_back(Op{Op::FeedbackRead, fbIndexOfEdge.at(ei), fbBufOfEdge.at(ei)});
     for (uint32_t ni : g.nodes) emitNode(ni);
     p->ops[beginAt].a = static_cast<uint32_t>(p->ops.size() - beginAt - 1);
     p->ops.push_back(Op{Op::ClusterEnd});
   }
 ```
-Remove the old `order` vector and the `E_FEEDBACK_UNSUPPORTED` checks. Add `#include <map>` at the top.
+Remove the old `order` vector and the `E_FEEDBACK_UNSUPPORTED` checks.
 
-- [ ] **Step 4: Run the tests** — `npm run engine:test`: all `[feedback]` and `[compiler]` tests pass. The IIR values must be exact (`==`), which holds because powers of two are exact in float.
+- [ ] **Step 4: Run the tests** — all `[feedback]` and `[compiler]` tests pass (powers of two are exact in float, so `==` holds).
 
 - [ ] **Step 5: Commit**
 
@@ -3512,14 +3854,14 @@ git commit -m "feat(engine): per-sample feedback clusters with one-sample delay 
 
 ---
 
-### Task 13: Engine with atomic program swap, retire queue and param queue
+### Task 14: Engine with atomic program swap, retire queue, param queue and bus fold
 
 **Files:**
 - Create: `engine/src/core/Engine.hpp`, `engine/src/core/Engine.cpp`
 - Test: `engine/tests/test_hotswap.cpp`
 
 **Interfaces:**
-- Produces: `pg::EngineConfig { double sampleRate = 48000; uint32_t blockSize = 64; }`, `pg::Engine(Registry&, EngineConfig)` with message-thread API `GraphModel& model()`, `Result commit()`, `Result setParam(node, param, value)`, `void collectGarbage()`, `uint64_t revision() const`, `size_t retiredCount() const`, `const EngineConfig& config() const`; audio-thread API `void renderBlock(float* const* out, uint32_t channels, uint32_t numFrames, const TransportSnapshot&)` (planar, `numFrames <= blockSize`) and `void renderInterleaved(float* out, uint32_t frames, uint32_t channels, const TransportSnapshot&)` (any frame count, uses `BlockSplitter`).
+- Produces: `pg::EngineConfig { double sampleRate = 48000; uint32_t blockSize = 64; }`, `pg::Engine(Registry&, EngineConfig)` with message-thread API `GraphModel& model()`, `Result commit()`, `Result setParam(node, param, value)`, `void collectGarbage()`, `uint64_t revision() const`, `size_t retiredCount() const`, `const EngineConfig& config() const`; audio-thread API `void renderBlock(float* const* out, uint32_t channels, uint32_t numFrames, const TransportSnapshot&)` (planar L/R after folding voices with `activeVoiceMask`) and `void renderInterleaved(float* out, uint32_t frames, uint32_t channels, const TransportSnapshot&)`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -3527,7 +3869,6 @@ git commit -m "feat(engine): per-sample feedback clusters with one-sample delay 
 ```cpp
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
-#include <cmath>
 #include <vector>
 #include "core/Engine.hpp"
 #include "modules/TestModules.hpp"
@@ -3551,7 +3892,7 @@ struct Rig {
 };
 }  // namespace
 
-TEST_CASE("engine renders silence before any commit and audio after", "[engine]") {
+TEST_CASE("engine renders silence before any commit and audio after; only active voices reach the output", "[engine]") {
   Rig rig;
   rig.render();
   REQUIRE(rig.l[0] == 0.f);
@@ -3560,8 +3901,12 @@ TEST_CASE("engine renders silence before any commit and audio after", "[engine]"
   rig.edge("e", "c", "out", "s", "in");
   REQUIRE(rig.engine.commit());
   rig.render();
-  REQUIRE(rig.l[10] == Catch::Approx(0.5f));
+  REQUIRE(rig.l[10] == Catch::Approx(0.5f));   // voice 0 only: voice 1 lanes are masked at voiceCount 1
   REQUIRE(rig.r[10] == Catch::Approx(0.5f));
+  REQUIRE(rig.engine.model().setVoiceCount(2));
+  REQUIRE(rig.engine.commit());
+  rig.render();
+  REQUIRE(rig.l[10] == Catch::Approx(1.0f));   // both voices carry the constant and are summed
 }
 
 TEST_CASE("engine hot-swap keeps DSP state continuous", "[engine]") {
@@ -3573,9 +3918,9 @@ TEST_CASE("engine hot-swap keeps DSP state continuous", "[engine]") {
   rig.render();
   const float last = rig.l[63];
   REQUIRE(rig.l[0] == 1.f);
-  rig.add("unrelated", "test.const");            // graph edit while "playing"
+  rig.add("unrelated", "test.const");
   REQUIRE(rig.engine.commit());
-  rig.render();                                  // swap happens at this block boundary
+  rig.render();
   REQUIRE(rig.l[0] == Catch::Approx(last * 0.5f));
   rig.engine.collectGarbage();
   REQUIRE(rig.engine.retiredCount() == 0);
@@ -3591,8 +3936,8 @@ TEST_CASE("engine param changes bypass the swap and are smoothed", "[engine]") {
   REQUIRE(rig.engine.setParam("g", "gain", 0.f));
   rig.render();
   REQUIRE(rig.l[0] < 1.f);
-  REQUIRE(rig.l[63] < rig.l[0]);                // ramping down
-  for (int i = 0; i < 40; ++i) rig.render();     // > 5 ms of smoothing
+  REQUIRE(rig.l[63] < rig.l[0]);
+  for (int i = 0; i < 40; ++i) rig.render();
   REQUIRE(rig.l[63] == Catch::Approx(0.f).margin(1e-4));
   REQUIRE(rig.engine.setParam("g", "nope", 0.f).code == "E_PARAM_NOT_FOUND");
 }
@@ -3603,8 +3948,7 @@ TEST_CASE("engine commit failure keeps the old program", "[engine]") {
   rig.edge("e", "c", "out", "s", "in");
   REQUIRE(rig.engine.commit());
   const uint64_t rev = rig.engine.revision();
-  // A block size above kMaxBlockSize makes compileGraph fail with E_BLOCK; the engine must keep revision and program.
-  pg::Engine bad{rig.reg, pg::EngineConfig{48000.0, 1000}};
+  pg::Engine bad{rig.reg, pg::EngineConfig{48000.0, 1000}};   // block > kMaxBlockSize -> E_BLOCK
   pg::Result r = bad.commit();
   REQUIRE_FALSE(r);
   REQUIRE(r.code == "E_BLOCK");
@@ -3620,7 +3964,7 @@ TEST_CASE("engine render path is allocation free, including the swap", "[engine]
   REQUIRE(rig.engine.commit());
   rig.render();
   rig.add("g", "test.gain");
-  REQUIRE(rig.engine.commit());                  // pending program waits for the audio thread
+  REQUIRE(rig.engine.commit());
   REQUIRE(rig.engine.setParam("c", "value", 0.1f));
   pg::test::resetRtViolations();
   { pg::test::RtScope scope; for (int i = 0; i < 10; ++i) rig.render(); }
@@ -3641,7 +3985,7 @@ TEST_CASE("engine renders interleaved for arbitrary device periods", "[engine]")
 }
 ```
 
-- [ ] **Step 2: Run to verify failure** — compile error, `core/Engine.hpp` missing.
+- [ ] **Step 2: Run to verify failure** — compile error.
 
 - [ ] **Step 3: Write the engine**
 
@@ -3661,19 +4005,16 @@ TEST_CASE("engine renders interleaved for arbitrary device periods", "[engine]")
 
 namespace pg {
 
+inline constexpr uint32_t kMaxChannelsOut = 2;
+
 struct EngineConfig {
   double sampleRate = 48000.0;
   uint32_t blockSize = kDefaultBlockSize;
 };
 
-struct ParamChange {
-  uint64_t serial;   // ModuleInstance::serial
-  uint32_t param;
-  float norm;
-};
+struct ParamChange { uint64_t serial; uint32_t param; float norm; };
 
 /// Owns the document mirror, compiles Programs, and hands them to the audio thread.
-/// Message-thread methods and audio-thread methods must each be called from a single thread.
 class Engine {
 public:
   Engine(Registry& registry, EngineConfig config);
@@ -3682,9 +4023,9 @@ public:
   // ---- message thread
   GraphModel& model() { return model_; }
   const EngineConfig& config() const { return config_; }
-  Result commit();                                        // compile model_ and publish
+  Result commit();
   Result setParam(const std::string& node, const std::string& param, float value);
-  void collectGarbage();                                  // free retired programs; call periodically
+  void collectGarbage();
   uint64_t revision() const { return revision_; }
   size_t retiredCount() const { return retired_.size_approx(); }
 
@@ -3703,15 +4044,18 @@ private:
   Scheduler scheduler_;
   uint64_t revision_ = 0;
 
-  std::unique_ptr<Program> initial_;                   // empty program used before the first commit
-  Program* current_ = nullptr;                         // audio thread only
+  std::unique_ptr<Program> initial_;
+  Program* current_ = nullptr;
   std::atomic<Program*> pending_{nullptr};
   moodycamel::ReaderWriterQueue<Program*> retired_{256};
   moodycamel::ReaderWriterQueue<ParamChange> params_{4096};
 
-  std::array<std::array<float, kMaxBlockSize>, kMaxChannels> bus_{};
+  Block bus_;
   BlockSplitter splitter_;
-  std::array<float, kMaxBlockSize * kMaxChannels> interleavedScratch_{};
+  BlockSplitter::BlockFn splitterFn_;              // built once in the constructor (no std::function on the audio thread)
+  std::array<float, kMaxBlockSize> scratchL_{}, scratchR_{};
+  uint32_t interleavedChannels_ = 2;
+  const TransportSnapshot* interleavedTransport_ = nullptr;
 };
 
 }  // namespace pg
@@ -3720,18 +4064,27 @@ private:
 `engine/src/core/Engine.cpp`:
 ```cpp
 #include "core/Engine.hpp"
+#include <algorithm>
 #include "core/GraphCompiler.hpp"
+#include "poly_utils.h"
 
 namespace pg {
 
 Engine::Engine(Registry& registry, EngineConfig config) : registry_(registry), config_(config) {
   initial_ = std::make_unique<Program>();
-  initial_->allocBuffer(1);
+  initial_->allocBuffer();
   initial_->allocEventBuffer();
+  initial_->activeVoiceMask.push_back(Program::voiceMaskFor(1, 0));
   initial_->sampleRate = config.sampleRate;
   initial_->blockSize = config.blockSize;
   current_ = initial_.get();
-  splitter_.prepare(config.blockSize, kMaxChannels);
+  splitter_.prepare(config.blockSize, kMaxChannelsOut);
+  splitterFn_ = [this](float* block, uint32_t n) {
+    float* planar[2] = {scratchL_.data(), scratchR_.data()};
+    renderBlock(planar, 2, n, *interleavedTransport_);
+    for (uint32_t i = 0; i < n; ++i)
+      for (uint32_t c = 0; c < interleavedChannels_; ++c) block[i * interleavedChannels_ + c] = planar[c < 2 ? c : 1][i];
+  };
 }
 
 Engine::~Engine() {
@@ -3747,8 +4100,6 @@ Result Engine::commit() {
     return Result::fail(out.error.substr(0, colon), out.error.substr(colon + 2));
   }
   ++revision_;
-  // If the audio thread has not consumed the previous pending program yet, it is safe to delete here:
-  // only this thread ever stores into pending_, and the audio thread takes ownership with exchange().
   if (Program* stale = pending_.exchange(out.program.release(), std::memory_order_acq_rel)) delete stale;
   collectGarbage();
   return {};
@@ -3758,7 +4109,7 @@ Result Engine::setParam(const std::string& node, const std::string& param, float
   Result r = model_.setParam(registry_, node, param, value);
   if (!r) return r;
   const ModuleInstance* inst = instances_.find(node);
-  if (!inst) return {};   // not compiled yet; the value will be applied on the next acquire
+  if (!inst) return {};
   const int32_t idx = inst->type->findParam(param);
   const ParamDesc& d = inst->type->desc->params[idx];
   if (!params_.try_enqueue(ParamChange{inst->serial, static_cast<uint32_t>(idx), paramNormalize(d, value)}))
@@ -3774,10 +4125,7 @@ void Engine::collectGarbage() {
 void Engine::swapIfPending() {
   Program* next = pending_.exchange(nullptr, std::memory_order_acq_rel);
   if (!next) return;
-  if (!retired_.try_enqueue(current_)) {   // retire queue full: put the new one back and try next block
-    pending_.store(next, std::memory_order_release);
-    return;
-  }
+  if (!retired_.try_enqueue(current_)) { pending_.store(next, std::memory_order_release); return; }
   current_ = next;
 }
 
@@ -3785,7 +4133,7 @@ void Engine::drainParams() {
   ParamChange c;
   while (params_.try_dequeue(c)) {
     const int32_t node = current_->findNodeBySerial(c.serial);
-    if (node < 0) continue;   // module no longer in the program
+    if (node < 0) continue;
     current_->nodes[static_cast<size_t>(node)].inst->params[c.param].setTargetNorm(c.norm);
   }
 }
@@ -3793,41 +4141,43 @@ void Engine::drainParams() {
 void Engine::renderBlock(float* const* out, uint32_t channels, uint32_t numFrames, const TransportSnapshot& t) {
   swapIfPending();
   drainParams();
-  AudioBus bus;
-  bus.channels = channels < kMaxChannels ? channels : kMaxChannels;
-  bus.frames = numFrames;
-  for (uint32_t c = 0; c < bus.channels; ++c) { bus.ch[c] = bus_[c].data(); std::fill_n(bus.ch[c], numFrames, 0.f); }
+  for (uint32_t i = 0; i < numFrames; ++i) bus_.data[i] = Sample(0.f);
+  AudioBus bus{bus_.data.data(), numFrames};
   scheduler_.run(*current_, numFrames, t, &bus);
-  for (uint32_t c = 0; c < channels; ++c) std::copy_n(bus_[c < kMaxChannels ? c : kMaxChannels - 1].data(), numFrames, out[c]);
+  // Fold voice pairs: L = v0.L + v1.L, R = v0.R + v1.R, masked by the active voices (M1: one pair).
+  const Mask mask = current_->activeVoiceMask.empty() ? Mask(-1) : current_->activeVoiceMask[0];
+  for (uint32_t i = 0; i < numFrames; ++i) {
+    const Sample masked = bus_.data[i] & mask;
+    const Sample folded = masked + vital::utils::swapVoices(masked);   // lanes 0,1 now hold L,R sums
+    if (channels > 0) out[0][i] = folded[0];
+    if (channels > 1) out[1][i] = folded[1];
+    for (uint32_t c = 2; c < channels; ++c) out[c][i] = folded[1];
+  }
 }
 
 void Engine::renderInterleaved(float* out, uint32_t frames, uint32_t channels, const TransportSnapshot& t) {
-  splitter_.render(out, frames, [&](float* block, uint32_t n) {
-    std::array<float*, kMaxChannels> planar{};
-    for (uint32_t c = 0; c < kMaxChannels; ++c) planar[c] = interleavedScratch_.data() + static_cast<size_t>(c) * kMaxBlockSize;
-    renderBlock(planar.data(), kMaxChannels, n, t);
-    for (uint32_t i = 0; i < n; ++i)
-      for (uint32_t c = 0; c < channels; ++c) block[i * channels + c] = planar[c < kMaxChannels ? c : kMaxChannels - 1][i];
-  });
+  interleavedChannels_ = channels;
+  interleavedTransport_ = &t;
+  if (channels != kMaxChannelsOut) { std::fill_n(out, static_cast<size_t>(frames) * channels, 0.f); return; }   // other counts wired in phase 4
+  splitter_.render(out, frames, splitterFn_);
 }
 
 }  // namespace pg
 ```
+`vital::utils::swapVoices(poly_float)` comes from the vendored `poly_utils.h`.
 
-Note on `renderInterleaved`: the splitter was prepared with `kMaxChannels` interleaved channels; when the device has more than 2 channels the extra channels duplicate the last one. `BlockSplitter::prepare` must be called with the device's channel count in phase 4's device wiring; for this task, tests use 2 channels. The lambda captures by reference and is a `std::function` constructed per call, which allocates only if the closure exceeds the small-buffer size. Three references fit in libc++'s small buffer, so the RT test stays clean; if the `[rt]` test reports violations here, hoist the lambda into a member `BlockSplitter::BlockFn` built once in the constructor.
-
-- [ ] **Step 4: Run the tests** — `npm run engine:test`: all `[engine]` tests pass, including the `[rt]` one.
+- [ ] **Step 4: Run the tests** — all `[engine]` tests pass, including `[rt]`.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add engine
-git commit -m "feat(engine): Engine with atomic program swap, retire queue and lock-free param changes"
+git commit -m "feat(engine): Engine with atomic program swap, retire queue, param queue and voice-pair bus fold"
 ```
 
 ---
 
-### Task 14: `io.audioOut` module, JSON patch loader, offline renderer, `--render`
+### Task 15: `io.audioOut` module, JSON patch loader, offline renderer, `--render`
 
 **Files:**
 - Create: `engine/src/modules/AudioOut.cpp`, `engine/src/modules/builtin.hpp`, `engine/src/modules/builtin.cpp`
@@ -3837,22 +4187,10 @@ git commit -m "feat(engine): Engine with atomic program swap, retire queue and l
 - Test: `engine/tests/test_render.cpp`
 
 **Interfaces:**
-- Produces: module `io.audioOut` (inputs `inL`, `inR` continuous mono; param `gain` [0,2] def 1 modulatable; flag `kModuleTerminal`), `void pg::registerBuiltinModules(Registry&)`.
-- `pg::Result pg::loadPatchJson(const nlohmann::json&, const Registry&, GraphModel&)`; patch schema below. `pg::Result pg::loadPatchFile(const std::string& path, const Registry&, GraphModel&)`.
-- `pg::RenderOptions { double seconds; uint32_t channels = 2; }`, `std::vector<float> pg::renderInterleaved(Engine&, const RenderOptions&)`, `bool pg::writeWav(const std::string& path, const std::vector<float>& interleaved, uint32_t channels, double sampleRate, std::string& error)`.
+- Produces: module `io.audioOut` (inputs `inL`, `inR`; param `gain` [0,2] def 1 modulatable; flag `kModuleTerminal`). Rule: `inL` supplies the L lanes, `inR` supplies the R lanes; an unconnected `inR` mirrors `inL`'s L lanes. `void pg::registerBuiltinModules(Registry&)`.
+- `pg::Result pg::loadPatchJson(const nlohmann::json&, const Registry&, GraphModel&)`, `pg::Result pg::loadPatchFile(path, registry, model)`; patch schema `{schemaVersion:1, voiceCount, feedbackMode:"sample"|"block", modules:[{id,type,params,...}], edges:[{id,from:{module,port},to:{module,port}}]}`, unknown keys ignored.
+- `pg::RenderOptions { double seconds; uint32_t channels = 2; }`, `std::vector<float> pg::renderInterleaved(Engine&, const RenderOptions&)`, `bool pg::writeWav(path, interleaved, channels, sampleRate, std::string& error)`.
 - CLI: `phasegrid-engine --render <patch.json> --seconds <n> --out <file.wav> [--sr 48000] [--block 64]`.
-
-Patch JSON schema (identical to what the frontend will write in phase 11):
-```json
-{
-  "schemaVersion": 1,
-  "voiceCount": 1,
-  "feedbackMode": "sample",
-  "modules": [ { "id": "c", "type": "test.const", "params": { "value": 0.25 } } ],
-  "edges": [ { "id": "e1", "from": { "module": "c", "port": "out" }, "to": { "module": "out", "port": "inL" } } ]
-}
-```
-Unknown top-level keys (e.g. `x`, `y` positions inside modules) are ignored.
 
 - [ ] **Step 1: Write the failing test and golden patch**
 
@@ -3897,12 +4235,26 @@ TEST_CASE("loadPatchFile + renderInterleaved produce the expected samples", "[re
   REQUIRE(out[0] == Catch::Approx(0.25f));
   REQUIRE(out[1] == Catch::Approx(0.25f));
   REQUIRE(out[out.size() - 1] == Catch::Approx(0.25f));
-
   const std::string wav = (std::filesystem::temp_directory_path() / "pg_render_test.wav").string();
   std::string err;
   REQUIRE(pg::writeWav(wav, out, 2, 48000.0, err));
   REQUIRE(std::filesystem::file_size(wav) > 44);
   std::remove(wav.c_str());
+}
+
+TEST_CASE("io.audioOut mirrors inL when inR is unconnected and applies gain", "[render]") {
+  pg::Registry reg;
+  pg::registerBuiltinModules(reg);
+  pg::test::registerTestModules(reg);
+  pg::Engine engine{reg, pg::EngineConfig{48000.0, 64}};
+  REQUIRE(engine.model().addNode(reg, {"c", "test.const", {{"value", 0.5f}}}));
+  REQUIRE(engine.model().addNode(reg, {"out", "io.audioOut", {{"gain", 0.5f}}}));
+  REQUIRE(engine.model().addEdge(reg, {"e", "c", "out", "out", "inL"}));
+  REQUIRE(engine.commit());
+  std::vector<float> l(64), r(64); float* planar[2] = {l.data(), r.data()};
+  engine.renderBlock(planar, 2, 64, pg::TransportSnapshot{});
+  REQUIRE(l[5] == Catch::Approx(0.25f));
+  REQUIRE(r[5] == Catch::Approx(0.25f));
 }
 
 TEST_CASE("loadPatchJson reports schema errors", "[render]") {
@@ -3915,7 +4267,7 @@ TEST_CASE("loadPatchJson reports schema errors", "[render]") {
 }
 ```
 
-- [ ] **Step 2: Run to verify failure** — compile errors (headers missing).
+- [ ] **Step 2: Run to verify failure** — compile errors.
 
 - [ ] **Step 3: Write the module and registration list**
 
@@ -3934,11 +4286,10 @@ void registerBuiltinModules(Registry& registry);
 #include "core/Module.hpp"
 
 namespace pg::modules {
-
 namespace {
 const PortDesc kIn[] = {
-  {"inL", "In L", PortKind::Continuous, 1, SignalRole::Audio, "Left channel"},
-  {"inR", "In R", PortKind::Continuous, 1, SignalRole::Audio, "Right channel"},
+  {"inL", "In L", PortKind::Continuous, 1, SignalRole::Audio, "Left channel (L lanes). If inR is unconnected, also used for R."},
+  {"inR", "In R", PortKind::Continuous, 1, SignalRole::Audio, "Right channel (R lanes)"},
 };
 const ParamDesc kParams[] = {
   {"gain", "Gain", 0.f, 2.f, 1.f, ParamUnit::Ratio, ParamCurve::Linear, kParamModulatable, nullptr, 0, "slider", nullptr, "Output gain"},
@@ -3947,12 +4298,17 @@ const ParamDesc kParams[] = {
 class AudioOut final : public VoicedModule<int> {
   void process(ProcessContext& c) override {
     if (!c.outputBus) return;
-    const float* l = c.in(0).read(0);
-    const float* r = c.in(1).read(0);
+    const SignalView& l = c.in(0);
+    const SignalView& r = c.in(1);
     const ParamView g = c.param(0);
-    float* outL = c.outputBus->ch[0];
-    float* outR = c.outputBus->channels > 1 ? c.outputBus->ch[1] : c.outputBus->ch[0];
-    for (uint32_t i = 0; i < c.numFrames; ++i) { outL[i] += l[i] * g.at(i); outR[i] += r[i] * g.at(i); }
+    const Mask leftMask = lanes::left(), rightMask = lanes::right();
+    for (uint32_t i = 0; i < c.numFrames; ++i) {
+      const Sample left = l.readOr()[i] & leftMask;                               // v0.L, v1.L
+      Sample right;
+      if (r.empty()) right = vital::utils::swapStereo(left);                      // mirror L into R lanes
+      else right = r.data[i] & rightMask;
+      c.outputBus->data[i] += (left + right) * g.at(i);
+    }
   }
 };
 }  // namespace
@@ -3960,9 +4316,9 @@ class AudioOut final : public VoicedModule<int> {
 const ModuleDescriptor kAudioOut{kModuleAbiVersion, "io.audioOut", "Audio Out", "io",
   "Sends stereo audio to the engine output. Voices are summed.",
   kIn, countOf(kIn), nullptr, 0, kParams, countOf(kParams), kModuleTerminal, 0, [] () -> Module* { return new AudioOut(); }};
-
 }  // namespace pg::modules
 ```
+Add `#include "poly_utils.h"` for `vital::utils::swapStereo`. `r.empty()` is true when `inR` has no incoming edge (Task 11's scheduler rule); `l.data` is read directly because `inL` is expected to be connected (an unconnected `inL` reads `l.readOr()` — use that instead of `l.data[i]`).
 
 `engine/src/modules/builtin.cpp`:
 ```cpp
@@ -3973,9 +4329,7 @@ namespace pg {
 namespace modules { extern const ModuleDescriptor kAudioOut; }
 
 void registerBuiltinModules(Registry& r) {
-  const ModuleDescriptor* all[] = {
-    &modules::kAudioOut,
-  };
+  const ModuleDescriptor* all[] = { &modules::kAudioOut };
   for (const ModuleDescriptor* d : all)
     if (auto err = r.add(*d)) throw std::runtime_error("registerBuiltinModules: " + *err);
 }
@@ -3990,9 +4344,7 @@ void registerBuiltinModules(Registry& r) {
 #include <nlohmann/json.hpp>
 #include <string>
 #include "core/GraphModel.hpp"
-
 namespace pg {
-/// Replaces the model's contents with the patch. Ignores unknown keys.
 Result loadPatchJson(const nlohmann::json& j, const Registry& registry, GraphModel& model);
 Result loadPatchFile(const std::string& path, const Registry& registry, GraphModel& model);
 }
@@ -4012,11 +4364,9 @@ Result loadPatchJson(const nlohmann::json& j, const Registry& registry, GraphMod
   const std::string mode = j.value("feedbackMode", "sample");
   if (mode != "sample" && mode != "block") return Result::fail("E_SCHEMA", "feedbackMode must be sample|block");
   fresh.feedbackMode = mode == "block" ? FeedbackMode::Block : FeedbackMode::Sample;
-
   for (const auto& m : j.value("modules", nlohmann::json::array())) {
     NodeModel n;
-    n.id = m.value("id", "");
-    n.type = m.value("type", "");
+    n.id = m.value("id", ""); n.type = m.value("type", "");
     if (n.id.empty() || n.type.empty()) return Result::fail("E_SCHEMA", "module needs id and type");
     for (const auto& [k, v] : m.value("params", nlohmann::json::object()).items()) {
       if (!v.is_number()) return Result::fail("E_SCHEMA", "param " + k + " must be a number");
@@ -4027,10 +4377,9 @@ Result loadPatchJson(const nlohmann::json& j, const Registry& registry, GraphMod
   for (const auto& e : j.value("edges", nlohmann::json::array())) {
     EdgeModel edge;
     edge.id = e.value("id", "");
-    edge.fromNode = e.value("from", nlohmann::json::object()).value("module", "");
-    edge.fromPort = e.value("from", nlohmann::json::object()).value("port", "");
-    edge.toNode = e.value("to", nlohmann::json::object()).value("module", "");
-    edge.toPort = e.value("to", nlohmann::json::object()).value("port", "");
+    const auto from = e.value("from", nlohmann::json::object()), to = e.value("to", nlohmann::json::object());
+    edge.fromNode = from.value("module", ""); edge.fromPort = from.value("port", "");
+    edge.toNode = to.value("module", ""); edge.toPort = to.value("port", "");
     if (edge.id.empty()) return Result::fail("E_SCHEMA", "edge needs id");
     if (Result r = fresh.addEdge(registry, std::move(edge)); !r) return r;
   }
@@ -4057,13 +4406,8 @@ Result loadPatchFile(const std::string& path, const Registry& registry, GraphMod
 #include <string>
 #include <vector>
 #include "core/Engine.hpp"
-
 namespace pg {
-struct RenderOptions {
-  double seconds = 1.0;
-  uint32_t channels = 2;
-};
-/// Renders with a stopped transport at the engine's sample rate. Interleaved output.
+struct RenderOptions { double seconds = 1.0; uint32_t channels = 2; };
 std::vector<float> renderInterleaved(Engine& engine, const RenderOptions& options);
 bool writeWav(const std::string& path, const std::vector<float>& interleaved, uint32_t channels, double sampleRate, std::string& error);
 }
@@ -4072,6 +4416,7 @@ bool writeWav(const std::string& path, const std::vector<float>& interleaved, ui
 `engine/src/render/OfflineRenderer.cpp`:
 ```cpp
 #include "render/OfflineRenderer.hpp"
+#include <algorithm>
 #include <cmath>
 #include "miniaudio.h"
 
@@ -4081,17 +4426,15 @@ std::vector<float> renderInterleaved(Engine& engine, const RenderOptions& o) {
   const uint32_t block = engine.config().blockSize;
   const uint64_t total = static_cast<uint64_t>(std::llround(o.seconds * engine.config().sampleRate));
   std::vector<float> out(static_cast<size_t>(total) * o.channels);
-  std::vector<float> planar(static_cast<size_t>(kMaxChannels) * block);
-  float* ptrs[kMaxChannels];
-  for (uint32_t c = 0; c < kMaxChannels; ++c) ptrs[c] = planar.data() + static_cast<size_t>(c) * block;
+  std::vector<float> l(block), r(block);
+  float* planar[2] = {l.data(), r.data()};
   TransportSnapshot t;
   for (uint64_t pos = 0; pos < total; pos += block) {
     const uint32_t n = static_cast<uint32_t>(std::min<uint64_t>(block, total - pos));
     t.samplePos = pos;
-    engine.renderBlock(ptrs, kMaxChannels, n, t);
+    engine.renderBlock(planar, 2, n, t);
     for (uint32_t i = 0; i < n; ++i)
-      for (uint32_t c = 0; c < o.channels; ++c)
-        out[(pos + i) * o.channels + c] = ptrs[c < kMaxChannels ? c : kMaxChannels - 1][i];
+      for (uint32_t c = 0; c < o.channels; ++c) out[(pos + i) * o.channels + c] = planar[c < 2 ? c : 1][i];
   }
   return out;
 }
@@ -4113,7 +4456,7 @@ bool writeWav(const std::string& path, const std::vector<float>& interleaved, ui
 
 - [ ] **Step 6: Add `--render` to main.cpp**
 
-Add includes `"core/Engine.hpp"`, `"modules/builtin.hpp"`, `"render/OfflineRenderer.hpp"`, `"render/PatchFile.hpp"`, `<string>`, and this function plus its dispatch line:
+Add includes `"core/Engine.hpp"`, `"modules/builtin.hpp"`, `"render/OfflineRenderer.hpp"`, `"render/PatchFile.hpp"`, `<string>`, `<vector>` and:
 ```cpp
 static int runRender(int argc, char** argv) {
   std::string patch, out; double seconds = 2.0, sr = 48000.0; uint32_t block = 64;
@@ -4146,12 +4489,10 @@ Update `usage()` to list `--render`.
 
 ```bash
 npm run engine:test
-cat > /tmp/sine_patch.json <<'EOF'
-{ "schemaVersion": 1, "modules": [ { "id": "out", "type": "io.audioOut" } ], "edges": [] }
-EOF
-./build/engine/phasegrid-engine --render /tmp/sine_patch.json --seconds 1 --out /tmp/silence.wav
+printf '{ "schemaVersion": 1, "modules": [ { "id": "out", "type": "io.audioOut" } ], "edges": [] }\n' > /tmp/silence.json
+./build/engine/phasegrid-engine --render /tmp/silence.json --seconds 1 --out /tmp/silence.wav
 ```
-Expected: tests pass; the render prints `rendered 48000 frames`. (An audible patch needs the oscillator from the next plan; test modules are not registered in the CLI.)
+Expected: tests pass; `rendered 48000 frames`.
 
 - [ ] **Step 8: Commit**
 
@@ -4162,11 +4503,11 @@ git commit -m "feat(engine): io.audioOut, JSON patch loader, offline WAV rendere
 
 ---
 
-### Task 15: Engine documentation and module walkthrough
+### Task 16: Engine documentation and module walkthrough
 
 **Files:**
 - Create: `docs/engine.md`, `docs/adding-a-module.md`
-- Modify: `README.md` (link the docs)
+- Modify: `README.md`, `CLAUDE.md`
 
 - [ ] **Step 1: Write docs/engine.md**
 
@@ -4175,39 +4516,43 @@ git commit -m "feat(engine): io.audioOut, JSON patch loader, offline WAV rendere
 
 C++20 process. One message thread (socket/commands, compiles), one audio thread (device callback).
 
+## Signal type
+The wire signal is `pg::Sample = vital::poly_float`: four float lanes `[voice0.L, voice0.R, voice1.L, voice1.R]`
+(SSE2 on x86-64, NEON on arm64). Every continuous port carries `Sample[numFrames]`; stereo everywhere; mono sources write L = R.
+Voices run in pairs: `Program.voicePairs = ceil(voiceCount / 2)`, unused voice lanes are masked at the output fold.
+Helpers in `core/Signal.hpp` (`lanes::voice/left/right/mono/stereo/lane`). `kMaxBlockSize = 128`.
+
 ## Threads and RT rules
 Audio-thread code = `Module::process`, `Scheduler::run`, `Engine::renderBlock`, param drain, program swap.
-In that code: no `new`/`delete`/containers that grow, no locks, no syscalls, no exceptions, no logging, no `std::function` construction.
-Allocate in `Module::prepare` only. `engine/tests/test_rt_alloc.cpp` and every `[rt]` test fail on any global allocation.
+No `new`/`delete`/growing containers, no locks, no syscalls, no exceptions, no logging, no `std::function` construction.
+Allocate in `Module::prepare` only. `[rt]` tests fail on any global allocation inside an `RtScope`.
 
-## Signals
-- Continuous ports: planar float, nominal ±1, 1 or 2 channels. Mono broadcasts on read. Any output connects to any input; fan-in sums.
-- Event ports: `EventBuffer` of frame-ordered `Event {frame, type, channel, noteId, a, b, c}`. Fan-in merges by frame.
-- Conventions (`core/Conventions.hpp`): pitch `hz = 261.6256 * 2^(v*10)`, gate `> 0`, phase 0..1.
+## Vendored Vital DSP
+`engine/vendor/vital` (GPL-3.0-or-later, see NOTICE.md) provides the SIMD types, fast math, oscillators, filters,
+effects, modulators and the wavetable authoring layer. JUCE is replaced by `engine/vendor/vital/shim`. Never edit vendored files;
+never use the names "Vital"/"Tytel" in ids, UI or binaries.
 
 ## Params
-Each `ParamDesc` has min/max/default in display units and a curve. `ParamState` stores the normalized target and a 5 ms one-pole smoother.
-Modulatable params get an implicit input port `param:<id>`; effective value = `denormalize(clamp(knobNorm + signal))`.
-Modules read `ctx.param(i).at(frame)` and never see whether the value is constant, ramping or modulated.
+`ParamDesc` has min/max/default in display units and a curve. `ParamState` stores the normalized target and a 5 ms smoother.
+Modulatable params get an implicit input port `param:<id>`; effective value = `denormalize(clamp(knobNorm + signal))`, lane-wise.
+Modules read `ctx.param(i).at(frame)` as a `Sample`.
 
 ## Program and hot-swap
-`GraphModel` → `compileGraph` → `Program` (buffers, event buffers, ops, feedback states) on the message thread.
-`Engine::commit` publishes with one atomic exchange; the audio thread adopts it at the next block and retires the old one to an SPSC queue that the message thread frees.
-`InstanceTable` reuses a `ModuleInstance` when `(id, type)` is unchanged, so DSP state and params survive edits. Feedback delay memory is reused by edge id.
-Param changes never trigger a compile: `Engine::setParam` enqueues `{serial, param, norm}`; the audio thread applies it by binary-searching the current program.
+`GraphModel` → `compileGraph` → `Program` (Block buffers, event buffers, ops, feedback states) on the message thread.
+`Engine::commit` publishes with one atomic exchange; the audio thread adopts it at the next block and retires the old one.
+`InstanceTable` reuses a `ModuleInstance` when `(id, type)` is unchanged; feedback memory is reused by edge id.
+Param changes never compile: `Engine::setParam` enqueues `{serial, param, norm}`; the audio thread applies it by binary search.
 
 ## Feedback
-Tarjan SCCs. Nodes in an SCC (or with a self loop) form a cluster: `ClusterBegin … ClusterEnd`.
-Inside a cluster the scheduler runs every op once per sample (`feedbackMode: sample`) or once per block (`block`).
-Back edges (edge from a later to an earlier node in the cluster's DFS order) read from and write to a `FeedbackState`, giving an exact one-sample (or one-block) delay.
+Tarjan SCCs. Nodes in an SCC (or with a self loop) form a cluster run once per sample (`feedbackMode: sample`) or per block (`block`).
+Back edges read from / write to a `FeedbackState`: an exact one-sample (or one-block) delay.
 
 ## Ops
 `Sum{dst, argsStart, count}`, `Merge{dstEvt, argsStart, count}`, `FillParam{node, param, modBuf}`, `FeedbackRead{fb, dst}`,
 `FeedbackWrite{fb, src}`, `ClearEvents{evt}`, `Process{node}`, `ClusterBegin{count}`, `ClusterEnd`.
 
 ## Tests
-`npm run engine:test`. Suites: signal/event/param/registry/model (unit), scheduler (hand-built programs), graph (compiler), feedback, hotswap (Engine), render (JSON → WAV), rt (allocation guard).
-Headless render: `./build/engine/phasegrid-engine --render patch.json --seconds 2 --out out.wav`.
+`npm run engine:test`. Headless render: `./build/engine/phasegrid-engine --render patch.json --seconds 2 --out out.wav`.
 ```
 
 - [ ] **Step 2: Write docs/adding-a-module.md**
@@ -4215,10 +4560,13 @@ Headless render: `./build/engine/phasegrid-engine --render patch.json --seconds 
 ```markdown
 # Adding a module
 
-1. Create `engine/src/modules/<Name>.cpp`. Declare ports and params as static C-layout arrays, a class deriving `VoicedModule<State>` with all mutable state in `State`, and a `const ModuleDescriptor k<Name>` in namespace `pg::modules`.
-2. Add `&modules::k<Name>` to the list in `engine/src/modules/builtin.cpp` (and an `extern` line).
-3. Run `npm run engine:test`. Add a null test (silence in → silence out) and, for oscillators, a spectral test.
-4. No TypeScript changes: the catalog is generated from the descriptor and the UI renders from it.
+1. Create `engine/src/modules/<Name>.cpp`: static C-layout port/param arrays, a class deriving `VoicedModule<State>` with all
+   mutable state in `State`, and `const ModuleDescriptor k<Name>` in namespace `pg::modules`.
+2. Add `&modules::k<Name>` to the list in `engine/src/modules/builtin.cpp` (plus an `extern` line).
+3. `npm run engine:test`. Add a null test (silence in → silence out) and, for oscillators, a spectral test.
+4. No TypeScript changes: the catalog is generated from the descriptor.
+
+Signals are `Sample` (poly_float) frames: write the same value to all lanes for mono, use `lanes::left()/right()` masks for stereo.
 
 Template:
 ```cpp
@@ -4228,11 +4576,12 @@ namespace {
 const PortDesc kIn[]  = {{"in", "In", PortKind::Continuous, 1, SignalRole::Any, ""}};
 const PortDesc kOut[] = {{"out", "Out", PortKind::Continuous, 1, SignalRole::Any, ""}};
 const ParamDesc kParams[] = {{"amount", "Amount", 0.f, 1.f, 0.5f, ParamUnit::None, ParamCurve::Linear, kParamModulatable, nullptr, 0, "slider", nullptr, ""}};
-struct State { float z = 0.f; };
+struct State { Sample z = Sample(0.f); };
 class Example final : public VoicedModule<State> {
   void process(ProcessContext& c) override {
     State& s = st(c);
-    const float* in = c.in(0).read(0); float* out = c.out(0).write(0); const ParamView amt = c.param(0);
+    const Sample* in = c.in(0).readOr();
+    Sample* out = c.out(0).data; const ParamView amt = c.param(0);
     for (uint32_t i = 0; i < c.numFrames; ++i) { s.z += amt.at(i) * (in[i] - s.z); out[i] = s.z; }
   }
 };
@@ -4241,41 +4590,51 @@ const ModuleDescriptor kExample{kModuleAbiVersion, "fx.example", "Example", "fx"
   kIn, countOf(kIn), kOut, countOf(kOut), kParams, countOf(kParams), 0, 0, [] () -> Module* { return new Example(); }};
 }  // namespace pg::modules
 ```
-
 Rules: no statics for state, no allocation in `process`, params are numeric only, `numFrames` can be 1 (feedback clusters).
+Vital-backed modules are added through the adapter described in the `vital-modules` plan, not this template.
 ```
 
-- [ ] **Step 3: Link from README and commit**
+- [ ] **Step 3: Update README.md and CLAUDE.md, commit**
 
 Append to `README.md`:
 ```markdown
 ## Docs
-- `docs/engine.md` — engine architecture and RT rules
+- `docs/engine.md` — engine architecture, signal type and RT rules
 - `docs/adding-a-module.md` — how to add a module
-- `docs/superpowers/specs/` — design spec
+- `docs/superpowers/specs/` — design spec and amendments
+- `engine/vendor/vital/NOTICE.md` — vendored DSP provenance and licensing
+```
+In `CLAUDE.md` Rules, add:
+```markdown
+- Signals are `pg::Sample` (vital::poly_float, lanes v0.L v0.R v1.L v1.R). Never add channel counts to ports.
+- `engine/vendor/vital` is vendored GPL code: never edit it (shims only), never use the names "Vital"/"Tytel" in ids, UI or binaries.
 ```
 
 ```bash
-git add docs README.md
-git commit -m "docs: engine architecture and adding-a-module guide"
+git add docs README.md CLAUDE.md
+git commit -m "docs: engine architecture (poly_float core, vendored DSP) and adding-a-module guide"
 ```
 
 ---
 
-## Self-review against the spec (phases 0–2)
+## Self-review against the spec + amendment (phases 0–2, v2)
 
-| Spec item | Task |
+| Requirement | Task |
 |---|---|
-| Scaffold, toolchain, CI, `/shared` skeleton, docs stubs, LICENSE, CLAUDE.md | 1, 2, 15 |
-| MiniaudioBackend, NullBackend, block splitter, `--tone`, NewGuard + `test_rt_alloc`, rtsan preset | 3, 4, 5, 2 |
-| Signal / Event / Descriptor / Module / Registry (implicit param ports) | 6, 7, 8 |
-| GraphModel mirror | 9 |
-| Program / Scheduler / swap + retire / ParamQueue + Smoother | 10, 13, 7 |
-| Compiler with SCC, per-sample clusters, one-sample delay, `feedbackMode` | 11, 12 |
-| Instance reuse by `(id, type)`, FeedbackState reuse by edge id | 10, 12 |
-| OfflineRenderer + `--render`, JSON patch format | 14 |
-| `test_graph`, `test_feedback`, `test_hotswap`, `test_rt_alloc`, JSON → WAV | 11, 12, 13, 5, 14 |
+| Scaffold, toolchain, CI, `/shared`, LICENSE, CLAUDE.md | 1, 2, 16 |
+| MiniaudioBackend, NullBackend, block splitter, `--tone`, RT guard | 3, 4, 5 |
+| Vendored Vital + shim + NOTICE + `vital_dsp`; standalone spike; trademark lint | 6 |
+| `Sample` = poly_float, lanes, `kMaxBlockSize = 128`, events | 7 |
+| Descriptors, lane-wise params, `ParamView` | 8 |
+| Module interface (poly), Registry with implicit ports, test modules | 9 |
+| GraphModel mirror | 10 |
+| Program (`Block` buffers, voice pairs, `activeVoiceMask`), InstanceTable, Scheduler | 11 |
+| Compiler acyclic; per-sample feedback clusters; `feedbackMode` | 12, 13 |
+| Instance reuse by `(id,type)`, feedback reuse by edge id | 11, 13 |
+| Engine: swap, retire, param queue, bus fold with voice mask | 14 |
+| `io.audioOut` (L/R lanes rule), JSON patch, offline WAV, `--render` | 15 |
+| Docs: lanes, vendoring, trademark rules | 16 |
 
-Deferred to the next plan (phase 3+): the 14 DSP modules on DaisySP, `Oversampler`, `--catalog`, spectral tests, Storybook config, the N-API addon stub, telemetry slots (`ProcessContext::telemetry` is intentionally absent until phase 5).
+Deferred to the `vital-modules` plan: the adapter, descriptor generation from `vital::Parameters`, the 14 Vital-backed modules, `WavetableBank`, `note.toCv`, own modules (`phase.clock`, `math.scaleOffset`, `mix.mixer`, `amp.vca`, `io.midiIn`, `display.*`), `--catalog`, spectral tests, golden synth render. Deferred to later phases: telemetry slots, N-API addon, Storybook config.
 
-Known limitations recorded for the next plans: events inside feedback clusters are passed whole-block; MIDI timing is block-quantized; `renderInterleaved` duplicates channel 2 onto extra device channels.
+Known limitations recorded: buffers are shared across voice pairs (fine at one pair; a per-pair buffer dimension arrives with polyphony); events inside feedback clusters are passed whole-block; `renderInterleaved` handles exactly two device channels until phase 4 wires the device channel count.
