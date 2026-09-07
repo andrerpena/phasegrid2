@@ -59,11 +59,6 @@ export const ParamSetOpSchema = z.object({
   module: z.string().min(1),
   param: z.string().min(1),
   value: z.number(),
-  /**
-   * Mid-gesture. The value is heading for the audio thread's param queue and the document, but the
-   * gesture is not over, so history should coalesce rather than record an entry.
-   */
-  transient: z.boolean().optional(),
 });
 
 /** User-interface only: layout, not signal. `isEngineOp` is false for this and only this op. */

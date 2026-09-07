@@ -1,4 +1,5 @@
 import { useCatalogStore } from "@renderer/catalog/catalog-store";
+import { sendTransientParam } from "@renderer/patch/engine-sync";
 import { usePatchStore } from "@renderer/patch/patch-store";
 import { useProjectStore } from "@renderer/project/project-store";
 import { useThemeStore } from "@renderer/theming/theme-store";
@@ -100,14 +101,18 @@ export const GridView = () => {
             );
           },
           onParamChange: (module, param, value, done) => {
-            // Every intermediate value reaches the engine, so the sound follows the knob; only the
-            // release is labelled, so the whole gesture is one step back rather than a hundred.
+            // While the knob is moving, the value goes to the engine and nowhere else, so the sound
+            // follows the pointer. The document is written once, on release: one undo entry for the
+            // gesture, and undo returns to where the knob was before it started, not to the last frame.
+            if (!done) {
+              sendTransientParam(module, param, value);
+              return;
+            }
             usePatchStore
               .getState()
-              .apply(
-                [{ op: "paramSet", module, param, value, transient: !done }],
-                done ? { label: "Set parameter" } : {},
-              );
+              .apply([{ op: "paramSet", module, param, value }], {
+                label: "Set parameter",
+              });
           },
         },
         // An example demonstrates a module: its wiring is fixed and its knobs are live. Read once,
