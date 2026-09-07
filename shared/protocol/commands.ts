@@ -208,6 +208,18 @@ export const COMMANDS = {
     result: TransportPositionSchema,
   },
 
+  /**
+   * The master output level, 0 to 1.
+   *
+   * The way to make a patch stop. A modular graph is not gated by the transport, so an oscillator
+   * wired to the output keeps sounding whether or not the clock is running; this is the control that
+   * silences it.
+   */
+  "audio.setOutputGain": {
+    args: z.object({ gain: z.number().min(0).max(1) }),
+    result: z.object({ gain: z.number() }),
+  },
+
   "device.list": { args: NoArgs, result: DeviceListResultSchema },
   /** Empty id selects the system default. Reopens the device, so the audio stream stops and restarts. */
   "device.select": {

@@ -606,3 +606,21 @@ TEST_CASE("telemetry commands are refused when there is no segment", "[protocol]
   const json& caps = hello["result"]["capabilities"];
   REQUIRE(std::find(caps.begin(), caps.end(), "telemetry") == caps.end());
 }
+
+TEST_CASE("the master output level silences a patch the transport does not gate", "[protocol]") {
+  Fixture f;
+  // The situation this exists for: an oscillator wired to the output. Nothing gates it, so stopping
+  // the transport does not stop it, and without a master level there is no way to make it stop.
+  REQUIRE(f.call("audio.setOutputGain", {{"gain", 0.0}})["ok"] == true);
+  REQUIRE(f.ctx.engine.outputGain() == 0.f);
+  REQUIRE(f.call("audio.setOutputGain", {{"gain", 1.0}})["result"]["gain"] == 1.0);
+}
+
+TEST_CASE("the master output level refuses a value outside its range", "[protocol]") {
+  Fixture f;
+  // Above one would amplify rather than attenuate, which is not what a master control is for and is a
+  // good way to damage speakers by typo.
+  REQUIRE(errorCode(f.call("audio.setOutputGain", {{"gain", 4.0}})) == "E_SCHEMA");
+  REQUIRE(errorCode(f.call("audio.setOutputGain", {{"gain", -1.0}})) == "E_SCHEMA");
+  REQUIRE(errorCode(f.call("audio.setOutputGain", {{"gain", "loud"}})) == "E_SCHEMA");
+}

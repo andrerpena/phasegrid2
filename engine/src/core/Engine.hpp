@@ -39,6 +39,17 @@ public:
   size_t retiredCount() const { return retired_.size_approx(); }
 
   // ---- audio thread
+  /**
+   * The master output level, applied after everything else.
+   *
+   * A patch is a modular: an oscillator wired to the output drones whether or not the transport is
+   * rolling, because nothing gates it. That is correct, and it leaves no way to make it stop. This is
+   * that way — the panic control every modular environment needs. Message thread writes, audio thread
+   * reads, so it is atomic.
+   */
+  void setOutputGain(float gain) noexcept { outputGain_.store(gain, std::memory_order_relaxed); }
+  float outputGain() const noexcept { return outputGain_.load(std::memory_order_relaxed); }
+
   void setTelemetry(TelemetryWriter* t) { telemetry_ = t; }
   TelemetryWriter* telemetry() const { return telemetry_; }
   /// Message thread. Points a module at a slot, or `kNoTelemetrySlot` to stop it publishing.
@@ -61,6 +72,7 @@ private:
   /// Not owned. Set once by whoever built the segment, before rendering starts, and read by the audio
   /// thread thereafter; a null writer simply means telemetry is off and every display module is a no-op.
   TelemetryWriter* telemetry_ = nullptr;
+  std::atomic<float> outputGain_{1.f};
   uint64_t revision_ = 0;
 
   std::unique_ptr<Program> initial_;

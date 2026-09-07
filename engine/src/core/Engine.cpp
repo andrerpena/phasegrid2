@@ -103,12 +103,15 @@ void Engine::renderBlock(float* const* out, uint32_t channels, uint32_t numFrame
   // Fold voice pairs: L = v0.L + v1.L, R = v0.R + v1.R. No mask here: the bus already holds the sum of
   // every pair, so there is no one mask that fits it. Terminal modules apply `ctx.voiceMask` as they add,
   // which is the only point at which the pair the lanes belong to is still known.
+  // Read once per block rather than per frame: it changes at human speed, and a per-frame atomic load
+  // in the innermost loop of the render is a cost paid a million times a second for nothing.
+  const float gain = outputGain_.load(std::memory_order_relaxed);
   for (uint32_t i = 0; i < numFrames; ++i) {
     const Sample& summed = bus_.data[i];
     const Sample folded = summed + vital::utils::swapVoices(summed);   // lanes 0,1 now hold L,R sums
-    if (channels > 0) out[0][i] = folded[0];
-    if (channels > 1) out[1][i] = folded[1];
-    for (uint32_t c = 2; c < channels; ++c) out[c][i] = folded[1];
+    if (channels > 0) out[0][i] = folded[0] * gain;
+    if (channels > 1) out[1][i] = folded[1] * gain;
+    for (uint32_t c = 2; c < channels; ++c) out[c][i] = folded[1] * gain;
   }
 }
 

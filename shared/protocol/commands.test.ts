@@ -90,6 +90,7 @@ const cases: Record<CommandName, { valid: unknown; invalid: unknown }> = {
     invalid: { numerator: 4, denominator: 3 },
   },
   "transport.seek": { valid: { ppq: 16 }, invalid: { ppq: -1 } },
+  "audio.setOutputGain": { valid: { gain: 0 }, invalid: { gain: 4 } },
   "device.list": { valid: {}, invalid: "all" },
   "device.select": { valid: { id: "" }, invalid: { id: 3 } },
 };
@@ -118,6 +119,7 @@ describe("command table", () => {
       "transport.setTempo",
       "transport.setTimeSignature",
       "transport.seek",
+      "audio.setOutputGain",
       "device.list",
       "device.select",
     ]);

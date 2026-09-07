@@ -417,6 +417,17 @@ json dispatchCommand(const std::string& cmd, const json& id, const json& args, P
 
   // ---- transport
   if (cmd == "transport.play") { ctx.transport.play(); return okResponse(id, positionJson(ctx.transport)); }
+  // The master output level: the way to make a patch stop, since a modular graph is not gated by the
+  // transport and an oscillator wired to the output drones whether or not the clock is running.
+  if (cmd == "audio.setOutputGain") {
+    ArgReader a(args);
+    const double gain = a.num("gain");
+    if (!a) return errorResponse(id, a.result());
+    if (!(gain >= 0.0 && gain <= 1.0))
+      return errorResponse(id, "E_SCHEMA", "gain must be between 0 and 1");
+    ctx.engine.setOutputGain(static_cast<float>(gain));
+    return okResponse(id, json{{"gain", ctx.engine.outputGain()}});
+  }
   if (cmd == "transport.stop") { ctx.transport.stop(); return okResponse(id, positionJson(ctx.transport)); }
   if (cmd == "transport.setTempo") {
     ArgReader a(args);

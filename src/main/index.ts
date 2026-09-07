@@ -98,6 +98,15 @@ app.on("before-quit", (event) => {
   void running.stop().finally(() => app.quit());
 });
 
+/**
+ * Closing the window quits, on every platform including macOS.
+ *
+ * The usual macOS convention is to keep the application alive with no windows, and for most
+ * applications that is right. This one owns a separate process that holds the audio device and is
+ * making sound: leaving it running with nothing on screen means noise from an application you cannot
+ * see, with no way to stop it short of finding it in the dock. Quitting stops the engine, because
+ * `before-quit` closes the socket and the engine exits when its client goes away.
+ */
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
+  app.quit();
 });
