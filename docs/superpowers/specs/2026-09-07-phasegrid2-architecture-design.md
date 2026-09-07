@@ -287,6 +287,7 @@ Two tracks run in parallel after phase 0: **Engine** (1→2→3→4→5) and **F
 8. Implicit param jacks clutter → show on hover/connected only.
 9. Storybook browser-mode vitest is heavy → `unit` project only in M1.
 10. Params stay numeric; strings (script/asset paths) go through the assets concept, not params.
+11. **Open question, meter beyond one signature.** The transport carries one time signature for the whole project (`timeSigNumerator`/`timeSigDenominator`, read by every module through `ProcessContext::transport`). Two incompatible designs extend it, and the choice should be made before either is built. A *meter map* is Bitwig's answer: a list of signatures with bar positions and an audio-thread lookup, which suits a linear timeline. *Per-clip meter* is the generative answer: a clip in 7/8 and a clip in 4/4 running at once against a shared pulse, which is polyrhythm rather than meter change and puts the signature on `notes.clip` instead of on the transport. Decide which problem is actually being solved first; they pull in opposite directions. Until then, tempo and meter are project state and belong in `project.json` at phase 11, not in the patch document, because one project holds many patches that must not disagree about the tempo.
 
 ## Verification (end-to-end, after phase 12)
 1. Fresh clone: `npm install` (builds engine + addon), `npm run typecheck && npm run lint && npm test && npm run engine:test`.
