@@ -1,5 +1,6 @@
 #pragma once
 #include <algorithm>
+#include <cassert>
 #include <cstdint>
 #include <functional>
 #include <vector>
@@ -12,12 +13,14 @@ public:
   using BlockFn = std::function<void(float* interleavedOut, uint32_t frames)>;  // frames == blockSize
 
   void prepare(uint32_t blockSize, uint32_t channels) {
+    assert(blockSize > 0 && channels > 0);
     blockSize_ = blockSize; channels_ = channels;
     carry_.assign(static_cast<size_t>(blockSize) * channels, 0.f);
     carryPos_ = 0; carryCount_ = 0;
   }
 
   void render(float* out, uint32_t frames, const BlockFn& block) {
+    assert(!carry_.empty());
     uint32_t written = 0;
     while (written < frames) {
       if (carryCount_ == 0) { block(carry_.data(), blockSize_); carryPos_ = 0; carryCount_ = blockSize_; }
