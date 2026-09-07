@@ -55,8 +55,15 @@ export const HelloResultSchema = z.object({
 export const TransportPositionSchema = z.object({
   playing: z.boolean(),
   tempo: z.number().positive(),
+  /** Quarter notes since the start, which is meter-independent: bars come from the time signature. */
   ppq: z.number(),
+  /** Engine time. Free-runs whether or not the transport is rolling, so a stopped patch still moves. */
   samplePos: z.number().int().nonnegative(),
+  timeSigNumerator: z.number().int().min(1).max(64),
+  timeSigDenominator: z.number().int().min(1).max(64),
+  /** Derived from `ppq` and the meter, for a display that would otherwise redo the arithmetic. */
+  bar: z.number().int().nonnegative(),
+  beat: z.number(),
 });
 
 export const AudioDeviceSchema = z.object({
@@ -164,6 +171,22 @@ export const COMMANDS = {
   "transport.stop": { args: NoArgs, result: TransportPositionSchema },
   "transport.setTempo": {
     args: z.object({ tempo: z.number().min(1).max(999) }),
+    result: TransportPositionSchema,
+  },
+  /** The project's meter. The denominator is a note value, so it has to be a power of two. */
+  "transport.setTimeSignature": {
+    args: z.object({
+      numerator: z.number().int().min(1).max(64),
+      denominator: z
+        .number()
+        .int()
+        .min(1)
+        .max(64)
+        .refine((d) => (d & (d - 1)) === 0, {
+          message:
+            "a time signature denominator is a note value: 1, 2, 4, 8, 16...",
+        }),
+    }),
     result: TransportPositionSchema,
   },
   "transport.seek": {

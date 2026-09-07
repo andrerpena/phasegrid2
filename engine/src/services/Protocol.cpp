@@ -1,4 +1,5 @@
 #include "services/Protocol.hpp"
+#include <cmath>
 #include <utility>
 #include "core/Version.hpp"
 #include "render/PatchFile.hpp"
@@ -224,7 +225,18 @@ json editGraph(ProtocolContext& ctx, const json& id, Edit&& edit) {
 
 json positionJson(const Transport& transport) {
   const TransportSnapshot t = transport.state();
-  return json{{"playing", t.playing}, {"tempo", t.tempo}, {"ppq", t.ppq}, {"samplePos", t.samplePos}};
+  // `bar` and `beat` are derived rather than stored: `ppq` plus the meter is the whole truth, and two
+  // fields that can disagree with it would be two more chances to be wrong.
+  const double quartersPerBar = t.quartersPerBar();
+  const double bars = quartersPerBar > 0.0 ? t.ppq / quartersPerBar : 0.0;
+  return json{{"playing", t.playing},
+              {"tempo", t.tempo},
+              {"ppq", t.ppq},
+              {"samplePos", t.samplePos},
+              {"timeSigNumerator", t.timeSigNumerator},
+              {"timeSigDenominator", t.timeSigDenominator},
+              {"bar", static_cast<uint64_t>(bars < 0.0 ? 0.0 : bars)},
+              {"beat", (t.ppq - std::floor(bars) * quartersPerBar) / t.quartersPerBeat()}};
 }
 
 json deviceListJson(DeviceHost& host) {
@@ -352,6 +364,15 @@ json dispatchCommand(const std::string& cmd, const json& id, const json& args, P
     const double tempo = a.num("tempo");
     if (!a) return errorResponse(id, a.result());
     if (Result r = ctx.transport.setTempo(tempo); !r) return errorResponse(id, r);
+    return okResponse(id, positionJson(ctx.transport));
+  }
+  if (cmd == "transport.setTimeSignature") {
+    ArgReader a(args);
+    const double numerator = a.num("numerator");
+    const double denominator = a.num("denominator");
+    if (!a) return errorResponse(id, a.result());
+    if (Result r = ctx.transport.setTimeSignature(static_cast<uint32_t>(numerator), static_cast<uint32_t>(denominator)); !r)
+      return errorResponse(id, r);
     return okResponse(id, positionJson(ctx.transport));
   }
   if (cmd == "transport.seek") {

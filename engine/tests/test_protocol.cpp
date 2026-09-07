@@ -142,7 +142,8 @@ TEST_CASE("every command in the shared table has a handler", "[protocol]") {
   for (const char* cmd : {"hello", "engine.ping", "engine.shutdown", "catalog.get", "patch.load",
                           "patch.clear", "patch.batch", "patch.setVoiceCount", "patch.setFeedbackMode",
                           "module.add", "module.remove", "edge.add", "edge.remove", "param.set",
-                          "transport.play", "transport.stop", "transport.setTempo", "transport.seek",
+                          "transport.play", "transport.stop", "transport.setTempo", "transport.setTimeSignature",
+                          "transport.seek",
                           "device.list", "device.select"}) {
     const json response = f.call(cmd);
     if (response["ok"] == false) {
@@ -377,6 +378,38 @@ TEST_CASE("transport commands move the transport and report where it is", "[prot
   REQUIRE(errorCode(f.call("transport.seek", json{{"ppq", -1}})) == "E_SCHEMA");
   REQUIRE(errorCode(f.call("transport.seek", json::object())) == "E_SCHEMA");
   REQUIRE(f.call("transport.stop")["result"]["tempo"] == Catch::Approx(90.0));
+}
+
+TEST_CASE("the transport carries the project's meter, and modules read it", "[protocol]") {
+  Fixture f;
+  const json fourFour = f.call("transport.play")["result"];
+  REQUIRE(fourFour["timeSigNumerator"] == 4);
+  REQUIRE(fourFour["timeSigDenominator"] == 4);
+
+  const json sixEight = f.call("transport.setTimeSignature", json{{"numerator", 6}, {"denominator", 8}});
+  REQUIRE(sixEight["ok"] == true);
+  REQUIRE(sixEight["result"]["timeSigNumerator"] == 6);
+  REQUIRE(sixEight["result"]["timeSigDenominator"] == 8);
+
+  // 6/8 is three quarter notes to the bar, so nine quarters in is bar 3, beat 0 (eighth notes).
+  const json seeked = f.call("transport.seek", json{{"ppq", 9}});
+  REQUIRE(seeked["result"]["bar"] == 3);
+  REQUIRE(seeked["result"]["beat"] == Catch::Approx(0.0));
+  REQUIRE(f.call("transport.seek", json{{"ppq", 10}})["result"]["beat"] == Catch::Approx(2.0));
+
+  // A denominator is a note value, so it has to be a power of two, and the meter survives a refusal.
+  REQUIRE(errorCode(f.call("transport.setTimeSignature", json{{"numerator", 4}, {"denominator", 3}})) == "E_SCHEMA");
+  REQUIRE(errorCode(f.call("transport.setTimeSignature", json{{"numerator", 0}, {"denominator", 4}})) == "E_SCHEMA");
+  REQUIRE(errorCode(f.call("transport.setTimeSignature", json{{"numerator", 4}})) == "E_SCHEMA");
+  REQUIRE(f.call("transport.play")["result"]["timeSigDenominator"] == 8);
+
+  // And the snapshot the audio thread hands every module carries it too.
+  const pg::TransportSnapshot snapshot = f.transport.advance(64);
+  REQUIRE(snapshot.timeSigNumerator == 6);
+  REQUIRE(snapshot.timeSigDenominator == 8);
+  REQUIRE(snapshot.quartersPerBar() == Catch::Approx(3.0));
+  REQUIRE(snapshot.quartersPerBeat() == Catch::Approx(0.5));
+  REQUIRE(pg::TransportSnapshot{}.quartersPerBar() == Catch::Approx(4.0));
 }
 
 TEST_CASE("device commands say so when this process has no device", "[protocol]") {

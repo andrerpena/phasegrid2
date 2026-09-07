@@ -79,6 +79,11 @@ const cases: Record<CommandName, { valid: unknown; invalid: unknown }> = {
   "transport.play": { valid: {}, invalid: false },
   "transport.stop": { valid: {}, invalid: false },
   "transport.setTempo": { valid: { tempo: 128 }, invalid: { tempo: "128" } },
+  "transport.setTimeSignature": {
+    valid: { numerator: 6, denominator: 8 },
+    // A denominator is a note value, so 3 is not one.
+    invalid: { numerator: 4, denominator: 3 },
+  },
   "transport.seek": { valid: { ppq: 16 }, invalid: { ppq: -1 } },
   "device.list": { valid: {}, invalid: "all" },
   "device.select": { valid: { id: "" }, invalid: { id: 3 } },
@@ -104,6 +109,7 @@ describe("command table", () => {
       "transport.play",
       "transport.stop",
       "transport.setTempo",
+      "transport.setTimeSignature",
       "transport.seek",
       "device.list",
       "device.select",
@@ -188,11 +194,21 @@ describe("command results", () => {
   });
 
   it("answers every transport command with the same position shape", () => {
-    const position = { playing: true, tempo: 120, ppq: 4, samplePos: 96000 };
+    const position = {
+      playing: true,
+      tempo: 120,
+      ppq: 4,
+      samplePos: 96000,
+      timeSigNumerator: 6,
+      timeSigDenominator: 8,
+      bar: 1,
+      beat: 2,
+    };
     for (const name of [
       "transport.play",
       "transport.stop",
       "transport.setTempo",
+      "transport.setTimeSignature",
       "transport.seek",
     ] as const) {
       expect(COMMANDS[name].result.parse(position)).toEqual(position);

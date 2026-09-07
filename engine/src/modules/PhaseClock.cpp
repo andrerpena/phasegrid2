@@ -9,10 +9,13 @@ const PortDesc kOut[] = {
   {"trigger", "Trigger", PortKind::Continuous, 1, SignalRole::Gate, "1 for a single frame at the start of every cycle"},
 };
 const char* const kDivisionLabels[] = {"1/16", "1/8", "1/4", "1/2", "1 bar", "2 bars", "4 bars"};
-/// Quarter notes per cycle, one per label. A bar is four quarters: this module has no meter of its own,
-/// because the transport snapshot does not carry one.
-const double kQuartersPerCycle[] = {0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0};
+/// How long one cycle lasts, per label. The first four are absolute note values in quarter notes; the last
+/// three are counted in BARS, so they follow the project's time signature -- 4/4 makes a bar four quarters,
+/// 6/8 makes it three, and the clock lines up with the meter either way.
+const double kQuartersPerCycle[] = {0.25, 0.5, 1.0, 2.0, 0.0, 0.0, 0.0};
+const double kBarsPerCycle[] = {0.0, 0.0, 0.0, 0.0, 1.0, 2.0, 4.0};
 static_assert(std::size(kQuartersPerCycle) == std::size(kDivisionLabels));
+static_assert(std::size(kBarsPerCycle) == std::size(kDivisionLabels));
 
 const ParamDesc kParams[] = {
   {"division", "Division", 0.f, static_cast<float>(std::size(kDivisionLabels) - 1), 2.f, ParamUnit::None,
@@ -64,7 +67,9 @@ class PhaseClock final : public VoicedModule<State> {
     Sample* triggerOut = c.out(1).data;
 
     const uint32_t index = static_cast<uint32_t>(lanes::lane(c.param(0).at(0), 0));
-    const double quarters = kQuartersPerCycle[index < std::size(kQuartersPerCycle) ? index : 0];
+    const size_t division = index < std::size(kQuartersPerCycle) ? index : 0;
+    const double quarters = kBarsPerCycle[division] > 0.0 ? kBarsPerCycle[division] * t.quartersPerBar()
+                                                          : kQuartersPerCycle[division];
     const double samplesPerQuarter = 60.0 * c.sampleRate / (t.tempo > 0.0 ? t.tempo : 120.0);
     // Stopped, the clock free-runs off the sample position at the transport's tempo, so a patch still moves
     // while nothing is playing. Running, it follows the host's musical position exactly.

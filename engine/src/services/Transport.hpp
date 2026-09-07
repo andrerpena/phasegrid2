@@ -36,6 +36,17 @@ public:
     return {};
   }
 
+  /// The project's meter. The denominator is a note value, so only powers of two are meaningful; anything
+  /// else would make `quartersPerBar` a number no notation can draw.
+  Result setTimeSignature(uint32_t numerator, uint32_t denominator) {
+    if (numerator < 1 || numerator > 64) return Result::fail("E_SCHEMA", "time signature numerator must be 1..64");
+    if (denominator < 1 || denominator > 64 || (denominator & (denominator - 1)) != 0)
+      return Result::fail("E_SCHEMA", "time signature denominator must be a power of two, 1..64");
+    numerator_.store(numerator, std::memory_order_relaxed);
+    denominator_.store(denominator, std::memory_order_relaxed);
+    return {};
+  }
+
   /// Requests a musical position. The audio thread applies it at the top of its next block and
   /// acknowledges by serial, which is how `state()` can answer truthfully before that happens -- and
   /// keeps answering truthfully when there is no audio thread at all, as in `--render` and in tests.
@@ -51,6 +62,8 @@ public:
     TransportSnapshot t;
     t.tempo = tempo_.load(std::memory_order_relaxed);
     t.playing = playing_.load(std::memory_order_relaxed);
+    t.timeSigNumerator = numerator_.load(std::memory_order_relaxed);
+    t.timeSigDenominator = denominator_.load(std::memory_order_relaxed);
     const Published p = published();
     t.samplePos = p.samplePos;
     const uint64_t requested = seekSerial_.load(std::memory_order_relaxed);
@@ -71,6 +84,8 @@ public:
     TransportSnapshot t;
     t.tempo = tempo_.load(std::memory_order_relaxed);
     t.playing = playing_.load(std::memory_order_relaxed);
+    t.timeSigNumerator = numerator_.load(std::memory_order_relaxed);
+    t.timeSigDenominator = denominator_.load(std::memory_order_relaxed);
     t.ppq = ppq_;
     t.samplePos = samplePos_;
 
@@ -117,6 +132,8 @@ private:
   std::atomic<double> tempo_{120.0};
   std::atomic<bool> playing_{false};
   std::atomic<double> sampleRate_{48000.0};
+  std::atomic<uint32_t> numerator_{4};
+  std::atomic<uint32_t> denominator_{4};
   std::atomic<double> seekPpq_{0.0};
   std::atomic<uint64_t> seekSerial_{0};
 

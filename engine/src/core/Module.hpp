@@ -27,11 +27,28 @@ struct PrepareInfo {
   bool operator==(const PrepareInfo&) const = default;
 };
 
+/// The project's global clock, as every module sees it: `ProcessContext::transport`.
+///
+/// `ppq` counts quarter notes, which is the unit the tempo is in, so it is meter-independent on purpose --
+/// a module that wants bars asks the meter for them rather than assuming four. `samplePos` is engine time
+/// and free-runs whether or not the transport is rolling, so a patch still moves while nothing is playing.
 struct TransportSnapshot {
   double tempo = 120.0;
   bool playing = false;
   double ppq = 0.0;
   uint64_t samplePos = 0;
+  /// Time signature: beats per bar over the note value that gets the beat (4/4, 6/8, 7/8...).
+  uint32_t timeSigNumerator = 4;
+  uint32_t timeSigDenominator = 4;
+
+  /// Quarter notes in one bar, which is what turns `ppq` into bars: 4/4 is 4, 6/8 is 3, 7/8 is 3.5.
+  double quartersPerBar() const {
+    return timeSigDenominator == 0 ? 4.0 : 4.0 * static_cast<double>(timeSigNumerator) / static_cast<double>(timeSigDenominator);
+  }
+  /// Quarter notes in one beat: the denominator's note value. 4/4 is 1, 6/8 is 0.5.
+  double quartersPerBeat() const {
+    return timeSigDenominator == 0 ? 1.0 : 4.0 / static_cast<double>(timeSigDenominator);
+  }
 };
 
 /// Engine output for the current block (stereo lanes per voice). Terminal modules ADD into it.
