@@ -24,6 +24,50 @@
 
 ---
 
+## Corrections from Task 2 (authoritative — they override the task text below)
+
+Task 2 was implemented and these were established against the vendored source. Where the task text below
+disagrees with this section, this section wins.
+
+**Naming.** The plan's `Vital*` type names would land in the shipped binary's symbol table, which is exactly what
+the amendment's naming rule forbids, and `scripts/check-trademark.mjs` rejects them. The real names are:
+namespace `pg::vendor`; `WrappedModule` (was `VitalModule`), `ModuleSpec` (was `VitalModuleSpec`), `BindKind`
+(was `VitalPortKind`, renamed to avoid shadowing `pg::PortKind`), `InputMap`, `OutputMap`, `ControlOverride`,
+`ModuleContext`. Files are `engine/src/vital/{Spec,Triggers,Descriptors,WrappedModule}.{hpp,cpp}`. The directory
+stays `engine/src/vital/` — the trademark guard exempts include paths.
+
+**`ModuleSpec::create` takes a context.** It is `std::function<vital::SynthModule*(ModuleContext&)>`. Descriptor
+generation must build a probe `ModuleContext` and declare it *before* the `unique_ptr` so it outlives the module.
+
+**Adapter `Output`s need a stub owner.** `vital::ModulationSum::process` unconditionally dereferences
+`input(i)->source->owner->isControlRate()`. An adapter `Output` with `owner == nullptr` segfaults on the first
+`plugNext` into an audio-rate modulation destination, via `numInputsChanged()` → `setEnabled()` → `process(1)`.
+`AdapterSource`, a stub `vital::Processor` that exists only to answer `isControlRate()`, is already in
+`Spec.hpp`; use it for every adapter Output. Every task from here hits this.
+
+**Enum labels must be length-checked.** Generating `max - min + 1` labels from a `string_lookup` reads out of
+bounds: `filter_1_style` has range 0..9 but `strings::kFilterStyleNames` holds 5 entries, because the style names
+are per-model and the comb, diode and formant families have their own arrays. For every `kIndexed` control, check
+the lookup array's real length against the control's range; when they disagree, set
+`ControlOverride::suppressLabels` and document the control as a plain integer, as `filter.multi`'s `style` is.
+
+**Do not aggregate-initialise `ModuleSpec` positionally.** Build it field by field so it survives the struct
+gaining fields.
+
+**`hidden` lists only controls the module actually creates.** Naming a control that lives in the vendored
+parameter table but that the module never creates (e.g. `osc1_input` for the filter) is a no-op; check
+`getControls()` after `init()` rather than the parameter table.
+
+**Test design.** A test must fail if the thing it claims to prove is unwired. The filter's original modulation
+test passed with modulation entirely disconnected; it was replaced by two tests that read the value the module
+actually saw (mix against a high-pass for the control-rate destination, low-pass settling rate for the
+audio-rate one). Apply the same standard: before keeping a test, break the code it covers and confirm it fails.
+
+**Unconnected inputs** are bound to the instance's own zero block, never to the shared `kSilentBlock`, because
+the adapter drops const on that pointer.
+
+---
+
 ## File map
 
 | Path | Responsibility |
