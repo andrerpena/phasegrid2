@@ -100,7 +100,12 @@ void WrappedModule::process(ProcessContext& c) {
   const Sample* audioIn = nullptr;
   for (uint32_t i = 0; i < inputs_.size(); ++i) {
     BoundInput& b = inputs_[i];
-    const Sample* src = c.in(i).readOr();
+    // An unconnected input reads as silence. Take that silence from this instance's own zero block rather than
+    // from the shared kSilentBlock: the buffer pointer we hand the vendored module loses its const below, and a
+    // stray write through the shared block would be undefined behaviour that corrupts every module at once.
+    // Per instance, the same mistake would be contained and debuggable.
+    const SignalView in = c.in(i);
+    const Sample* src = in.empty() ? zero_.data() : in.data;
     switch (b.kind) {
       case BindKind::Audio:
         b.out->buffer = const_cast<Sample*>(src);
