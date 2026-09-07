@@ -14,11 +14,43 @@ export const MIN_ZOOM = 0.15;
 export const MAX_ZOOM = 4;
 
 export class Viewport {
-  x = 0;
-  y = 0;
-  zoom = 1;
+  private _x = 0;
+  private _y = 0;
+  private _zoom = 1;
 
   constructor(private readonly world: Container) {}
+
+  /**
+   * Accessors rather than fields, so setting one cannot leave the container out of step with it.
+   *
+   * They were plain fields, and assigning `zoom` directly changed every calculation that read it while
+   * never touching the container's scale: the background redrew at the new zoom and the patch stayed
+   * exactly where it was. Making the transform a consequence of the value rather than something a
+   * caller has to remember to apply removes the whole class of that mistake.
+   */
+  get x(): number {
+    return this._x;
+  }
+  set x(value: number) {
+    this._x = value;
+    this.commit();
+  }
+
+  get y(): number {
+    return this._y;
+  }
+  set y(value: number) {
+    this._y = value;
+    this.commit();
+  }
+
+  get zoom(): number {
+    return this._zoom;
+  }
+  set zoom(value: number) {
+    this._zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
+    this.commit();
+  }
 
   /** Where a screen point lands in the patch. */
   toWorld(point: Point): Point {
@@ -30,12 +62,15 @@ export class Viewport {
 
   /** Where a patch point lands on screen. */
   toScreen(point: Point): Point {
-    return { x: point.x * this.zoom + this.x, y: point.y * this.zoom + this.y };
+    return {
+      x: point.x * this._zoom + this._x,
+      y: point.y * this._zoom + this._y,
+    };
   }
 
   panBy(dx: number, dy: number): void {
-    this.x += dx;
-    this.y += dy;
+    this._x += dx;
+    this._y += dy;
     this.commit();
   }
 
@@ -49,10 +84,10 @@ export class Viewport {
     const next = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, this.zoom * factor));
     if (next === this.zoom) return;
     const before = this.toWorld(screen);
-    this.zoom = next;
+    this._zoom = next;
     const after = this.toWorld(screen);
-    this.x += (after.x - before.x) * this.zoom;
-    this.y += (after.y - before.y) * this.zoom;
+    this._x += (after.x - before.x) * this._zoom;
+    this._y += (after.y - before.y) * this._zoom;
     this.commit();
   }
 
@@ -71,14 +106,14 @@ export class Viewport {
       (view.width - margin * 2) / bounds.width,
       (view.height - margin * 2) / bounds.height,
     );
-    this.zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, scale));
-    this.x = view.width / 2 - (bounds.x + bounds.width / 2) * this.zoom;
-    this.y = view.height / 2 - (bounds.y + bounds.height / 2) * this.zoom;
+    this._zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, scale));
+    this._x = view.width / 2 - (bounds.x + bounds.width / 2) * this._zoom;
+    this._y = view.height / 2 - (bounds.y + bounds.height / 2) * this._zoom;
     this.commit();
   }
 
   private commit(): void {
-    this.world.position.set(this.x, this.y);
-    this.world.scale.set(this.zoom);
+    this.world.position.set(this._x, this._y);
+    this.world.scale.set(this._zoom);
   }
 }

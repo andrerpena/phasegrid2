@@ -1,6 +1,7 @@
 import type { ModuleDescriptor } from "@shared/protocol/catalog";
 import { describe, expect, it } from "vitest";
 import {
+  CELL,
   faceParams,
   HEADER_HEIGHT,
   hitControl,
@@ -9,7 +10,6 @@ import {
   intersects,
   KNOB_CELL_HEIGHT,
   measureNode,
-  PORT_SPACING,
   paramFraction,
   rectFromPoints,
   snap,
@@ -65,14 +65,36 @@ const vca: ModuleDescriptor = {
 
 describe("measuring a node", () => {
   it("is as tall as its longer column", () => {
-    // A module with one input and six outputs must be six ports tall, not clipped to one.
+    // A module with one input and six outputs must be six rows tall, not clipped to one.
     const tall: ModuleDescriptor = {
       ...vca,
       params: [],
       inputs: [port("in")],
       outputs: [1, 2, 3, 4, 5, 6].map((n) => port(`o${n}`)),
     };
-    expect(measureNode(tall).height).toBe(HEADER_HEIGHT + 6 * PORT_SPACING + 8);
+    expect(measureNode(tall).rows).toBe(1 + 6);
+    expect(measureNode(tall).height).toBe(HEADER_HEIGHT + 6 * CELL);
+  });
+
+  it("is always a whole number of grid cells", () => {
+    // Every module is N by M cells and sits on cell boundaries, the way a rack unit occupies whole
+    // units. Fractional sizes are what turn a patch of thirty modules into a collage.
+    for (const descriptor of [vca, { ...vca, params: [] }]) {
+      const layout = measureNode(descriptor);
+      expect(layout.width % CELL).toBe(0);
+      expect(layout.height % CELL).toBe(0);
+      expect(layout.width).toBe(layout.cols * CELL);
+      expect(layout.height).toBe(layout.rows * CELL);
+    }
+  });
+
+  it("puts every socket on a half-cell line", () => {
+    // So a cable between two modules an integer number of cells apart runs exactly horizontally
+    // instead of a hair off.
+    const layout = measureNode(vca);
+    for (const p of [...layout.inputs, ...layout.outputs]) {
+      expect((p.y - CELL / 2) % CELL).toBeCloseTo(0, 6);
+    }
   });
 
   it("puts inputs on the left and outputs on the right", () => {
@@ -81,10 +103,10 @@ describe("measuring a node", () => {
     expect(layout.outputs.every((p) => p.x === layout.width)).toBe(true);
   });
 
-  it("spaces ports evenly under the header", () => {
+  it("spaces ports one cell apart under the header", () => {
     const layout = measureNode(vca);
-    expect(layout.inputs[0].y).toBe(HEADER_HEIGHT + PORT_SPACING / 2);
-    expect(layout.inputs[1].y - layout.inputs[0].y).toBe(PORT_SPACING);
+    expect(layout.inputs[0].y).toBe(HEADER_HEIGHT + CELL / 2);
+    expect(layout.inputs[1].y - layout.inputs[0].y).toBe(CELL);
   });
 
   it("never gives an implicit modulation port a socket of its own", () => {

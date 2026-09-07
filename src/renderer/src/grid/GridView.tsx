@@ -18,7 +18,7 @@ import {
   pointerMove,
   pointerUp,
 } from "./interaction";
-import { snap } from "./layout";
+import { CELL, snap } from "./layout";
 
 /**
  * React's entire involvement with the canvas: create it, hand it to the renderer, destroy it.
@@ -148,8 +148,8 @@ export const GridView = () => {
                     {
                       op: "moduleMove" as const,
                       id,
-                      x: snap(from.x + dx, 8),
-                      y: snap(from.y + dy, 8),
+                      x: snap(from.x + dx, CELL),
+                      y: snap(from.y + dy, CELL),
                     },
                   ];
             }),

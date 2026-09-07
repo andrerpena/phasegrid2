@@ -39,13 +39,14 @@ export const DEMO_PATCH: PatchDoc = {
   voiceCount: 4,
   feedbackMode: "sample",
   modules: [
-    moduleNode("clip", "notes.clip", { x: 30, y: 120 }),
-    moduleNode("voices", "note.toPoly", { x: 210, y: 120 }),
-    moduleNode("osc", "osc.wavetable", { x: 380, y: 40 }),
-    moduleNode("env", "env.dahdsr", { x: 380, y: 260 }),
-    moduleNode("flt", "filter.multi", { x: 620, y: 40 }),
-    moduleNode("vca", "amp.vca", { x: 620, y: 260 }),
-    moduleNode("out", "io.audioOut", { x: 850, y: 150 }),
+    // Every position is a multiple of CELL: a module sits on cell boundaries, never between them.
+    moduleNode("clip", "notes.clip", { x: 24, y: 120 }),
+    moduleNode("voices", "note.toPoly", { x: 168, y: 120 }),
+    moduleNode("osc", "osc.wavetable", { x: 336, y: 24 }),
+    moduleNode("env", "env.dahdsr", { x: 336, y: 240 }),
+    moduleNode("flt", "filter.multi", { x: 624, y: 24 }),
+    moduleNode("vca", "amp.vca", { x: 624, y: 240 }),
+    moduleNode("out", "io.audioOut", { x: 936, y: 240 }),
   ],
   edges: [
     {

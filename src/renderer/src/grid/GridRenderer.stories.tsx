@@ -35,7 +35,7 @@ const PatchStage = ({ zoom }: { zoom: number }) => {
 };
 
 export const SynthVoice: StoryObj = {
-  args: { zoom: 0.85 },
+  args: { zoom: 1 },
   argTypes: {
     zoom: { control: { type: "range", min: 0.2, max: 2, step: 0.05 } },
   },

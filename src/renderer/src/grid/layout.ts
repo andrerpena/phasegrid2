@@ -16,19 +16,36 @@ import type {
  * of "where is that knob" is how a click lands next to the control it appears to be on.
  */
 
-export const HEADER_HEIGHT = 20;
-export const PORT_SPACING = 18;
+/**
+ * The grid cell. Everything is measured in these.
+ *
+ * A module is a whole number of cells wide and tall and sits on cell boundaries, the way a rack unit
+ * occupies whole units. That is not decoration: it is what makes a patch of thirty modules line up
+ * instead of drifting into a collage, and it means two modules of the same size are the same size
+ * rather than nearly.
+ */
+export const CELL = 24;
+
+/** The title bar: one cell. */
+export const HEADER_ROWS = 1;
+export const HEADER_HEIGHT = HEADER_ROWS * CELL;
+
+/** One port per cell, sitting at the cell's centre so a cable meets it on a grid line. */
+export const PORT_ROWS_PER_PORT = 1;
 export const PORT_RADIUS = 4;
 /** How far from a socket a click still counts, in patch units at 100% zoom. */
 export const PORT_HIT_RADIUS = 9;
-export const NODE_PADDING = 8;
-export const NODE_MIN_WIDTH = 96;
 
-export const KNOB_RADIUS = 17;
-/** Room for the knob, its value arc and the label beneath it. */
-export const KNOB_CELL_WIDTH = 50;
-export const KNOB_CELL_HEIGHT = 56;
+/** A knob with its label: two cells by two cells. */
+export const KNOB_COLS = 2;
+export const KNOB_ROWS = 2;
+export const KNOB_CELL_WIDTH = KNOB_COLS * CELL;
+export const KNOB_CELL_HEIGHT = KNOB_ROWS * CELL;
+export const KNOB_RADIUS = 16;
 export const KNOB_HIT_RADIUS = KNOB_RADIUS + 4;
+
+/** Narrowest a module gets: enough for a title and a port column either side. */
+export const MIN_COLS = 3;
 
 /**
  * How many controls a node shows on its face.
@@ -65,6 +82,9 @@ export interface ControlLayout {
 }
 
 export interface NodeLayout {
+  /** Size in grid cells. The pixel size is these times `CELL`, and never anything else. */
+  cols: number;
+  rows: number;
   width: number;
   height: number;
   inputs: PortLayout[];
@@ -105,31 +125,37 @@ export function measureNode(
     options.maxControls ?? MAX_FACE_CONTROLS,
   );
 
-  const portRows = Math.max(inputs.length, outputs.length);
-  const portsHeight = portRows * PORT_SPACING;
-  const controlsHeight = controls.length > 0 ? KNOB_CELL_HEIGHT : 0;
-  // The body is as tall as whichever needs more room. A module with six ports and one knob is six ports
-  // tall; one with two ports and four knobs is a knob tall.
-  const bodyHeight = Math.max(portsHeight, controlsHeight) + NODE_PADDING;
+  // Rows: the header, then whichever column needs more. A module with six ports and one knob is six
+  // rows of ports tall; one with two ports and four knobs is a knob tall.
+  const portRows = Math.max(inputs.length, outputs.length) * PORT_ROWS_PER_PORT;
+  const controlRows = controls.length > 0 ? KNOB_ROWS : 0;
+  const bodyRows = Math.max(portRows, controlRows, 1);
+  const rows = HEADER_ROWS + bodyRows;
 
-  // Wide enough for its controls, plus the port columns either side of them.
-  const controlsWidth = controls.length * KNOB_CELL_WIDTH;
-  const width = Math.max(NODE_MIN_WIDTH, controlsWidth + NODE_PADDING * 4);
-  const height = HEADER_HEIGHT + bodyHeight;
+  // Columns: the controls, plus a cell of margin either side so a knob never touches a port.
+  const controlCols = controls.length * KNOB_COLS;
+  const cols = Math.max(MIN_COLS, controlCols + 2);
+
+  const width = cols * CELL;
+  const height = rows * CELL;
 
   const place = (ports: PortDesc[], side: "input" | "output"): PortLayout[] =>
     ports.map((port, i) => ({
       port,
       x: side === "input" ? 0 : width,
-      y: HEADER_HEIGHT + i * PORT_SPACING + PORT_SPACING / 2,
+      // The centre of its cell, so every socket sits on a half-cell line and a cable between two
+      // modules an integer number of cells apart runs exactly horizontally.
+      y: HEADER_HEIGHT + (i + 0.5) * CELL,
       side,
     }));
 
-  // Centred as a group, so a node with one knob has it in the middle rather than pinned left.
-  const controlsLeft = (width - controlsWidth) / 2;
-  const controlsTop = HEADER_HEIGHT + (bodyHeight - controlsHeight) / 2;
+  // Centred as a group so a node with one knob has it in the middle rather than pinned left.
+  const controlsLeft = ((cols - controlCols) / 2) * CELL;
+  const controlsTop = HEADER_HEIGHT + ((bodyRows - controlRows) / 2) * CELL;
 
   return {
+    cols,
+    rows,
     width,
     height,
     inputs: place(inputs, "input"),
@@ -137,10 +163,11 @@ export function measureNode(
     controls: controls.map((param, i) => ({
       param,
       modulationPort: param.flags.modulatable ? `param:${param.id}` : null,
-      x: controlsLeft + i * KNOB_CELL_WIDTH + KNOB_CELL_WIDTH / 2,
-      y: controlsTop + KNOB_RADIUS + 4,
+      x: controlsLeft + (i + 0.5) * KNOB_CELL_WIDTH,
+      // In the upper of its two cells, leaving the lower one for the label.
+      y: controlsTop + CELL * 0.5 + 2,
       radius: KNOB_RADIUS,
-      labelY: controlsTop + KNOB_CELL_HEIGHT - 6,
+      labelY: controlsTop + KNOB_CELL_HEIGHT - 8,
     })),
   };
 }
@@ -208,8 +235,14 @@ export function hitControl(
   return null;
 }
 
-export function snap(value: number, step: number): number {
+/** Snaps to the grid. A module always sits on cell boundaries, so this is how it is placed. */
+export function snap(value: number, step: number = CELL): number {
   return step > 0 ? Math.round(value / step) * step : value;
+}
+
+/** Snaps a point to the cell grid. */
+export function snapPoint(point: Point, step: number = CELL): Point {
+  return { x: snap(point.x, step), y: snap(point.y, step) };
 }
 
 export function intersects(
