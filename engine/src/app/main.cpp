@@ -58,16 +58,20 @@ static int runTone(int seconds) {
 
 static int runRender(int argc, char** argv) {
   std::string patch, out; double seconds = 2.0, sr = 48000.0; uint32_t block = 64;
+  bool badArgs = false;
   for (int i = 2; i < argc; ++i) {
     const std::string a = argv[i];
-    auto next = [&](double& v) { if (i + 1 < argc) v = std::atof(argv[++i]); };
+    // A value must exist and must not itself be a flag: `--seconds --out x.wav` used to swallow
+    // "--out" and silently render 0 seconds.
+    auto hasValue = [&] { return i + 1 < argc && std::strncmp(argv[i + 1], "--", 2) != 0; };
+    auto next = [&](double& v) { if (hasValue()) v = std::atof(argv[++i]); else badArgs = true; };
     if (a == "--seconds") next(seconds);
     else if (a == "--sr") next(sr);
     else if (a == "--block") { double b = 64; next(b); block = static_cast<uint32_t>(b); }
-    else if (a == "--out" && i + 1 < argc) out = argv[++i];
+    else if (a == "--out") { if (hasValue()) out = argv[++i]; else badArgs = true; }
     else if (patch.empty()) patch = a;
   }
-  if (patch.empty() || out.empty()) { std::fprintf(stderr, "usage: --render <patch.json> --out <file.wav> [--seconds N] [--sr N] [--block N]\n"); return 2; }
+  if (badArgs || patch.empty() || out.empty()) { std::fprintf(stderr, "usage: --render <patch.json> --out <file.wav> [--seconds N] [--sr N] [--block N]\n"); return 2; }
   pg::Registry reg;
   pg::registerBuiltinModules(reg);
   pg::Engine engine{reg, pg::EngineConfig{sr, block}};

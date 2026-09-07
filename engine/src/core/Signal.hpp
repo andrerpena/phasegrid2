@@ -7,7 +7,7 @@
 namespace pg {
 
 namespace lanes {
-inline Mask voice(uint32_t v) { return v == 0 ? Mask(-1, -1, 0, 0) : Mask(0, 0, -1, -1); }
+inline Mask voice(uint32_t v) { assert(v < 2); return v == 0 ? Mask(-1, -1, 0, 0) : Mask(0, 0, -1, -1); }   // one pair: v is 0 or 1
 inline Mask left() { return Mask(-1, 0, -1, 0); }
 inline Mask right() { return Mask(0, -1, 0, -1); }
 inline Sample mono(float x) { return Sample(x); }

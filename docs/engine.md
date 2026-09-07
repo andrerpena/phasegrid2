@@ -20,7 +20,16 @@ Allocate in `Module::prepare` only. `[rt]` tests fail on any global allocation i
 
 `engine/vendor/vital` (GPL-3.0-or-later, see NOTICE.md) provides the SIMD types, fast math, oscillators, filters,
 effects, modulators and the wavetable authoring layer. JUCE is replaced by `engine/vendor/vital/shim`. Never edit vendored files;
-never use the names "Vital"/"Tytel" in ids, UI or binaries.
+never use the names "Vital"/"Tytel" in ids, UI or binaries. `npm run lint:trademark` enforces the naming rule over
+`engine/src`, `shared` and `src`.
+
+The JUCE shim (`engine/vendor/vital/shim/JuceHeader.h`) reaches **every** engine translation unit, via
+`core/Conventions.hpp` → `common.h`, and it declares `String`, `MemoryOutputStream`, `Base64`, `ProjectInfo` and the
+`JUCE_*` macros at **global** scope. Those names are therefore effectively taken engine-wide: do not introduce a
+global `String` or `Base64` of your own, and expect an unqualified `String` in engine code to mean the shim's. This
+is inherent to the vendoring decision (the vendored sources use those names unqualified); it is recorded here so a
+collision later is not a surprise. The vendored include directories are marked `SYSTEM` so their warnings are not
+attributed to our sources.
 
 ## Params
 
@@ -68,5 +77,15 @@ Event inputs are always valid buffers (empty when unconnected).
 
 ## Tests
 
-`npm run engine:test` runs 48 Catch2 tests. Headless render: `./build/engine/phasegrid-engine --render patch.json --seconds 2 --out out.wav`.
-Golden patch: `engine/tests/golden/const_to_out.json`.
+`npm run engine:test` runs 55 Catch2 tests. `PG_WERROR=ON npm run engine:test` additionally builds with `-Werror`
+(CI does this; it is off by default because `postinstall` builds the engine on end-user machines).
+
+Headless render, using a patch built from builtin modules only:
+
+```
+./build/engine/phasegrid-engine --render engine/tests/golden/silence.json --seconds 2 --out out.wav
+```
+
+`engine/tests/golden/silence.json` is that patch — a bare `io.audioOut`, so it writes 2 s of silence until the
+oscillator modules land. `engine/tests/golden/const_to_out.json` is a **test-only** fixture: it uses `test.const`,
+which only `pg_tests` registers, so `--render` on it exits 1 with `E_UNKNOWN_TYPE`.

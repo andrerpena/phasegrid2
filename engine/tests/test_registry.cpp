@@ -21,6 +21,25 @@ TEST_CASE("registry derives implicit modulation ports", "[registry]") {
   REQUIRE(reg.find("test.eventGen")->inputs.empty());   // int params are not modulatable
 }
 
+// A stepped (integer/enum) param never gets an implicit `param:<id>` port, so declaring an explicit
+// input by that name is legal. The collision check used to look only at kParamModulatable and
+// rejected it.
+TEST_CASE("registry allows an explicit param: input for a stepped modulatable param", "[registry]") {
+  pg::Registry reg;
+  static const char* const kLabels[] = {"A", "B"};
+  static pg::PortDesc modeInput[] = {{"param:mode", "Mode In", pg::PortKind::Continuous, 1, pg::SignalRole::Cv, ""}};
+  static pg::ParamDesc modeParam{"mode", "Mode", 0.f, 1.f, 0.f, pg::ParamUnit::None, pg::ParamCurve::Linear,
+                                 pg::kParamModulatable | pg::kParamEnum, kLabels, 2, "select", nullptr, ""};
+  static pg::ModuleDescriptor modeDesc{pg::kModuleAbiVersion, "test.enumPort", "EnumPort", "test", "", modeInput, 1,
+                                       nullptr, 0, &modeParam, 1, 0, 0, [] () -> pg::Module* { return nullptr; }};
+  REQUIRE(!reg.add(modeDesc).has_value());
+  const pg::RegisteredModule* m = reg.find("test.enumPort");
+  REQUIRE(m != nullptr);
+  REQUIRE(m->inputs.size() == 1);              // the declared port, and no implicit duplicate
+  REQUIRE(m->findInput("param:mode") == 0);
+  REQUIRE(m->inputParam[0] == -1);             // it is a plain input, not the implicit mod port
+}
+
 TEST_CASE("registry rejects invalid descriptors", "[registry]") {
   pg::Registry reg;
   pg::test::registerTestModules(reg);

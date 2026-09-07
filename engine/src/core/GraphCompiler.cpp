@@ -119,6 +119,13 @@ CompileOutput compileGraph(const GraphModel& model, const Registry& registry, In
   for (uint32_t i = 0; i < N; ++i) {
     NodeSlot& s = p->nodes[i];
     const ModuleDescriptor& d = *types[i]->desc;
+    // NOTE: this mutates the caller's InstanceTable before compilation is known to succeed, and
+    // failures still lie ahead (E_FAN_IN below). The consequence is not a leak but a state reset:
+    // when `info` differs from the table's last one (a sample-rate or voiceCount change) `acquire`
+    // clears the instance map on its first call, so a commit that *fails* after that point has
+    // already thrown away every module's DSP state, and the next successful commit silently starts
+    // from fresh instances. Left as is deliberately; restructuring would mean compiling into a
+    // scratch table and merging on success.
     s.inst = instances.acquire(nodes[i]->id, *types[i], info, nodes[i]->params);
     s.inBuf.assign(d.numInputs, kNone); s.inEvt.assign(d.numInputs, kNone);
     s.outBuf.assign(d.numOutputs, kNone); s.outEvt.assign(d.numOutputs, kNone);

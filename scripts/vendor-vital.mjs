@@ -6,7 +6,17 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const src = process.env.VITAL_SRC ?? "/Users/andrepena/gitp/vital";
+const src = process.env.VITAL_SRC;
+if (!src) {
+  console.error(
+    "[vendor-vital] VITAL_SRC is not set.\n" +
+      "Set it to a checkout of the upstream source tree recorded in engine/vendor/vital/NOTICE.md:\n" +
+      "  https://github.com/mtytel/vital, commit 636ca0ef517a4db087a6a08a6a8a5e704e21f836 (2022-04-20)\n" +
+      "  git clone https://github.com/mtytel/vital /path/to/src && git -C /path/to/src checkout 636ca0e\n" +
+      "  VITAL_SRC=/path/to/src node scripts/vendor-vital.mjs",
+  );
+  process.exit(1);
+}
 const dst = join(root, "engine/vendor/vital");
 
 const EXCLUDE_STEMS = new Set([

@@ -35,7 +35,9 @@ Result Engine::commit() {
   collectGarbage();   // opportunistically drain whatever the last swap retired, success or failure
   CompileOutput out = compileGraph(model_, registry_, instances_, revision_ + 1, config_.sampleRate, config_.blockSize);
   if (!out.program) {
-    const auto colon = out.error.find(':');
+    // compileGraph formats failures as "CODE: message"; without the separator `npos + 2` would wrap.
+    const auto colon = out.error.find(": ");
+    if (colon == std::string::npos) return Result::fail("E_COMPILE", out.error);
     return Result::fail(out.error.substr(0, colon), out.error.substr(colon + 2));
   }
   ++revision_;

@@ -3,6 +3,16 @@
 #include "core/Conventions.hpp"
 
 namespace pg {
+namespace {
+/// A modulatable param gets an implicit `param:<id>` input port -- unless it is stepped, because a
+/// per-sample continuous modulation signal has no meaning for an integer or enum. Registry::add uses
+/// this for BOTH the collision check and the port-creation loop; the two must never drift apart, or a
+/// module declaring an explicit `param:<id>` input for a stepped param is rejected for colliding with
+/// a port that is never created.
+bool hasImplicitPort(const ParamDesc& p) {
+  return (p.flags & kParamModulatable) && !(p.flags & (kParamInteger | kParamEnum));
+}
+}  // namespace
 
 int32_t RegisteredModule::findInput(std::string_view id) const {
   for (size_t i = 0; i < inputs.size(); ++i) if (id == inputs[i].id) return static_cast<int32_t>(i);
@@ -39,7 +49,7 @@ std::optional<std::string> Registry::add(const ModuleDescriptor& d) {
     if (!(p.min < p.max)) return id + ": param " + p.id + " needs min < max";
     if (p.curve == ParamCurve::Log && p.min <= 0.f) return id + ": log param " + p.id + " needs min > 0";
     if ((p.flags & kParamEnum) && (p.enumLabels == nullptr || p.enumCount == 0)) return id + ": enum param " + p.id + " has no labels";
-    if (p.flags & kParamModulatable) {
+    if (hasImplicitPort(p)) {
       const std::string implicitId = "param:" + std::string(p.id);
       for (uint32_t k = 0; k < d.numInputs; ++k) if (implicitId == d.inputs[k].id) return id + ": input collides with implicit port " + implicitId;
     }
@@ -50,7 +60,7 @@ std::optional<std::string> Registry::add(const ModuleDescriptor& d) {
   for (uint32_t i = 0; i < d.numInputs; ++i) { rm->inputs.push_back(d.inputs[i]); rm->inputParam.push_back(-1); }
   for (uint32_t i = 0; i < d.numParams; ++i) {
     const ParamDesc& p = d.params[i];
-    if (!(p.flags & kParamModulatable) || (p.flags & (kParamInteger | kParamEnum))) continue;
+    if (!hasImplicitPort(p)) continue;
     rm->implicitIds.push_back("param:" + std::string(p.id));
     rm->inputs.push_back(PortDesc{rm->implicitIds.back().c_str(), p.name, PortKind::Continuous, 1, SignalRole::Cv, p.doc});
     rm->inputParam.push_back(static_cast<int32_t>(i));

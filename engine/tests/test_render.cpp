@@ -42,6 +42,28 @@ TEST_CASE("io.audioOut mirrors inL when inR is unconnected and applies gain", "[
   REQUIRE(r[5] == Catch::Approx(0.25f));
 }
 
+// golden/silence.json is the patch docs/engine.md prints for `--render`: it must stay loadable with
+// only the builtin registry, because the CLI never registers the test modules.
+TEST_CASE("golden/silence.json loads with builtin modules alone", "[render]") {
+  pg::Registry reg;
+  pg::registerBuiltinModules(reg);
+  pg::Engine engine{reg, pg::EngineConfig{48000.0, 64}};
+  REQUIRE(pg::loadPatchFile(std::string(PG_TEST_DIR) + "/golden/silence.json", reg, engine.model()));
+  REQUIRE(engine.commit());
+  const std::vector<float> out = pg::renderInterleaved(engine, pg::RenderOptions{0.01, 2});
+  REQUIRE(out.size() == 480 * 2);
+  for (float v : out) REQUIRE(v == 0.f);
+}
+
+// golden/const_to_out.json uses test.const, which only pg_tests registers, so it is a test-only
+// fixture: `phasegrid-engine --render` on it exits 1 with E_UNKNOWN_TYPE.
+TEST_CASE("golden/const_to_out.json is a test-only fixture", "[render]") {
+  pg::Registry reg;
+  pg::registerBuiltinModules(reg);   // no test modules: this is what the CLI sees
+  pg::GraphModel m;
+  REQUIRE(pg::loadPatchFile(std::string(PG_TEST_DIR) + "/golden/const_to_out.json", reg, m).code == "E_UNKNOWN_TYPE");
+}
+
 // Guards the ~6 lines that decide which lane reaches which speaker: the out[0]/out[1] fold in
 // Engine::renderBlock, the lanes::left()/right() masks in io.audioOut, and swapVoices vs swapStereo.
 // Every other source in the suite is symmetric, so only an asymmetric signal can fail on a swap.
