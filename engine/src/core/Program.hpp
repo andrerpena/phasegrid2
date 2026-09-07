@@ -31,9 +31,14 @@ struct ModuleInstance {
   std::vector<float> structuralValues;
 };
 
-/// Delay memory for one back edge: z[i] holds the last written frame(s).
+/// Delay memory for one back edge, one slot per voice PAIR: `z[pair].data[i]` holds the last written
+/// frame(s) for that pair. Pairs share the program's signal buffers -- they run the same op list one after
+/// another -- but they must not share delay memory, or pair 0's delayed sample becomes pair 1's input and
+/// the voices bleed into each other. Sized once, on the message thread, by `InstanceTable::acquireFeedback`;
+/// a change of voice count produces a fresh state rather than resizing one the audio thread may be reading.
 struct FeedbackState {
-  std::array<Sample, kMaxBlockSize> z{};
+  explicit FeedbackState(uint32_t voicePairs) : z(voicePairs) {}
+  std::vector<Block> z;
 };
 
 struct Op {

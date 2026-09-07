@@ -27,7 +27,10 @@ public:
   /// No such path exists yet: `--render` builds a fresh Engine per patch.
   std::shared_ptr<ModuleInstance> acquire(const std::string& id, const RegisteredModule& type,
                                           const PrepareInfo& info, const std::map<std::string, float>& params);
-  std::shared_ptr<FeedbackState> acquireFeedback(const std::string& edgeId);
+  /// One state per back edge, holding one delay slot per voice pair. Reused across compiles so a
+  /// hot-swap keeps the loop running; a change of voice count makes a fresh one instead of resizing the
+  /// live one, because the audio thread may still be reading the program that holds it.
+  std::shared_ptr<FeedbackState> acquireFeedback(const std::string& edgeId, uint32_t voicePairs);
   void prune(const std::set<std::string>& liveNodeIds, const std::set<std::string>& liveEdgeIds);
   const ModuleInstance* find(const std::string& id) const;
   size_t size() const { return byId_.size(); }

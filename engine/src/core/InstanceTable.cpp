@@ -45,11 +45,11 @@ std::shared_ptr<ModuleInstance> InstanceTable::acquire(const std::string& id, co
   return inst;
 }
 
-std::shared_ptr<FeedbackState> InstanceTable::acquireFeedback(const std::string& edgeId) {
+std::shared_ptr<FeedbackState> InstanceTable::acquireFeedback(const std::string& edgeId, uint32_t voicePairs) {
   auto it = feedbackById_.find(edgeId);
-  if (it != feedbackById_.end()) return it->second;
-  auto fb = std::make_shared<FeedbackState>();
-  feedbackById_[edgeId] = fb;
+  if (it != feedbackById_.end() && it->second->z.size() == voicePairs) return it->second;
+  auto fb = std::make_shared<FeedbackState>(voicePairs);
+  feedbackById_[edgeId] = fb;   // the old state stays alive through any program still holding it
   return fb;
 }
 

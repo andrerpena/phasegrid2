@@ -59,15 +59,15 @@ void Scheduler::exec(Program& p, const Op& op, uint32_t offset, uint32_t n, uint
       return;
     }
     case Op::FeedbackRead: {
-      const FeedbackState& fb = *p.feedback[op.a];
+      const Sample* z = p.feedback[op.a]->z[pair].data.data();   // one delay slot per voice pair
       Sample* d = p.buffers[op.b].data.data() + offset;
-      for (uint32_t i = 0; i < n; ++i) d[i] = fb.z[i];
+      for (uint32_t i = 0; i < n; ++i) d[i] = z[i];
       return;
     }
     case Op::FeedbackWrite: {
-      FeedbackState& fb = *p.feedback[op.a];
+      Sample* z = p.feedback[op.a]->z[pair].data.data();
       const Sample* s = p.buffers[op.b].data.data() + offset;
-      for (uint32_t i = 0; i < n; ++i) fb.z[i] = s[i];
+      for (uint32_t i = 0; i < n; ++i) z[i] = s[i];
       return;
     }
     case Op::Process: {

@@ -170,6 +170,11 @@ alone. A dropped `E_QUEUE_FULL` enqueue has the same effect until the caller ret
 
 Tarjan SCCs. Nodes in an SCC (or with a self loop) form a cluster run once per sample (`feedbackMode: sample`) or per block (`block`).
 Back edges read from / write to a `FeedbackState`: an exact one-sample (or one-block) delay.
+A `FeedbackState` holds **one delay slot per voice pair** (`z[pair]`), because the pairs share the program's
+signal buffers but must not share memory that crosses from one pair's run to the next -- with a single slot,
+pair 0's delayed sample lands in pair 1's loop. `InstanceTable::acquireFeedback` keeps the state alive across
+compiles, keyed by edge id, and builds a *fresh* one when the voice pair count changes rather than resizing
+one the audio thread may still be reading through an older program.
 
 ## Compilation constraints
 

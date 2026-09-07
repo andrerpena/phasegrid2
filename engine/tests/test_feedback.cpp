@@ -66,9 +66,74 @@ TEST_CASE("feedback: FeedbackState survives recompiles", "[feedback]") {
   REQUIRE(f.out(*p2, "add", "out", 0) == Catch::Approx(last * 0.5f));
 }
 
+// y[n] = x[n] + y[n-1] with x a single impulse: a pure integrator, so anything that leaks from one
+// voice pair into another is a permanent offset rather than something the loop decays away.
+static void buildIntegrator(GraphFixture& f, uint32_t voices) {
+  f.node("add", "test.add");
+  f.node("hold", "test.gain", {{"gain", 1.f}});
+  f.node("x", "test.impulse");
+  f.edge("e_in", "x.out", "add.a");
+  f.edge("e_fwd", "add.out", "hold.in");
+  f.edge("e_back", "hold.out", "add.b");
+  if (!f.model.setVoiceCount(voices)) throw std::runtime_error("voiceCount");
+}
+
+TEST_CASE("feedback: each voice pair has its own delay memory", "[feedback]") {
+  // One FeedbackState per edge means pair 0 writes the delay slot and pair 1 reads it, so voice 2's
+  // loop starts from voice 0's tail. Buffers are shared between pairs, so what a block leaves behind
+  // is the LAST pair's answer -- and that has to be the same answer the loop gives on its own.
+  GraphFixture one; buildIntegrator(one, 2);
+  auto p1 = one.compile();
+  one.run(*p1, 64);
+  REQUIRE(p1->voicePairs == 1);
+  REQUIRE(one.out(*p1, "add", "out", 0) == 1.f);    // the impulse, then held
+  REQUIRE(one.out(*p1, "add", "out", 63) == 1.f);
+
+  GraphFixture two; buildIntegrator(two, 4);
+  auto p2 = two.compile();
+  two.run(*p2, 64);
+  REQUIRE(p2->voicePairs == 2);
+  for (uint32_t i : {0u, 1u, 31u, 63u})
+    for (uint32_t lane : {0u, 1u, 2u, 3u})
+      REQUIRE(two.out(*p2, "add", "out", i, lane) == one.out(*p1, "add", "out", i, lane));
+
+  // Same again across a block boundary: the second block must not inherit the other pair's tail either.
+  one.run(*p1, 64);
+  two.run(*p2, 64);
+  REQUIRE(two.out(*p2, "add", "out", 0) == one.out(*p1, "add", "out", 0));
+  REQUIRE(two.out(*p2, "add", "out", 63) == one.out(*p1, "add", "out", 63));
+}
+
+TEST_CASE("feedback: each voice pair has its own delay memory in block mode", "[feedback]") {
+  GraphFixture one; buildIntegrator(one, 2);
+  one.model.feedbackMode = pg::FeedbackMode::Block;
+  auto p1 = one.compile();
+
+  GraphFixture two; buildIntegrator(two, 4);
+  two.model.feedbackMode = pg::FeedbackMode::Block;
+  auto p2 = two.compile();
+
+  for (int block = 0; block < 3; ++block) {
+    one.run(*p1, 64);
+    two.run(*p2, 64);
+    for (uint32_t i : {0u, 1u, 63u})
+      REQUIRE(two.out(*p2, "add", "out", i) == one.out(*p1, "add", "out", i));
+  }
+}
+
 TEST_CASE("feedback: scheduler run is allocation free", "[feedback][rt]") {
   GraphFixture f; buildIir(f);
   auto p = f.compile();
+  pg::test::resetRtViolations();
+  { pg::test::RtScope scope; for (int i = 0; i < 20; ++i) f.run(*p, 64); }
+  REQUIRE(pg::test::rtViolations() == 0);
+}
+
+TEST_CASE("feedback: scheduler run is allocation free across several voice pairs", "[feedback][rt]") {
+  // Per-pair delay memory is a vector sized on the message thread; indexing it must not touch the heap.
+  GraphFixture f; buildIntegrator(f, 8);
+  auto p = f.compile();
+  REQUIRE(p->voicePairs == 4);
   pg::test::resetRtViolations();
   { pg::test::RtScope scope; for (int i = 0; i < 20; ++i) f.run(*p, 64); }
   REQUIRE(pg::test::rtViolations() == 0);

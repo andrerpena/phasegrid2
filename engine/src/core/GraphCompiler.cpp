@@ -142,7 +142,7 @@ CompileOutput compileGraph(const GraphModel& model, const Registry& registry, In
   for (size_t ei = 0; ei < edges.size(); ++ei) {
     if (!edges[ei].back) continue;
     fbIndexOfEdge[ei] = static_cast<uint32_t>(p->feedback.size());
-    p->feedback.push_back(instances.acquireFeedback(edges[ei].model->id));
+    p->feedback.push_back(instances.acquireFeedback(edges[ei].model->id, p->voicePairs));
     fbBufOfEdge[ei] = p->allocBuffer();
   }
 
