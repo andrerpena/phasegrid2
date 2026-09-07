@@ -15,6 +15,21 @@ class Const : public VoicedModule<int> {
 };
 const ModuleDescriptor kConst{kModuleAbiVersion, "test.const", "Const", "test", "", nullptr, 0, kConstOut, 1, kConstParams, 1, 0, 0, [] () -> Module* { return new Const(); }};
 
+// Deliberately asymmetric source: the only test module whose L lanes differ from its R lanes,
+// so a transposed out[0]/out[1] fold, a swapped lanes::left()/right() mask, or swapStereo used
+// where swapVoices belongs shows up as a failure instead of passing green.
+const PortDesc kStereoOut[] = {{"out", "Out", PortKind::Continuous, 1, SignalRole::Audio, ""}};
+const ParamDesc kStereoParams[] = {
+  {"l", "L", -1.f, 1.f, 0.f, ParamUnit::None, ParamCurve::Linear, kParamModulatable, nullptr, 0, "slider", nullptr, ""},
+  {"r", "R", -1.f, 1.f, 0.f, ParamUnit::None, ParamCurve::Linear, kParamModulatable, nullptr, 0, "slider", nullptr, ""}};
+class Stereo : public VoicedModule<int> {
+  void process(ProcessContext& c) override {
+    const ParamView l = c.param(0), r = c.param(1); Sample* o = c.out(0).data;
+    for (uint32_t i = 0; i < c.numFrames; ++i) o[i] = lanes::stereo(lanes::lane(l.at(i), 0), lanes::lane(r.at(i), 0));
+  }
+};
+const ModuleDescriptor kStereo{kModuleAbiVersion, "test.stereo", "Stereo", "test", "", nullptr, 0, kStereoOut, 1, kStereoParams, 2, 0, 0, [] () -> Module* { return new Stereo(); }};
+
 const PortDesc kGainIn[] = {{"in", "In", PortKind::Continuous, 1, SignalRole::Any, ""}};
 const PortDesc kGainOut[] = {{"out", "Out", PortKind::Continuous, 1, SignalRole::Any, ""}};
 const ParamDesc kGainParams[] = {{"gain", "Gain", 0.f, 2.f, 1.f, ParamUnit::Ratio, ParamCurve::Linear, kParamModulatable, nullptr, 0, "slider", nullptr, ""}};
@@ -85,7 +100,7 @@ const ModuleDescriptor kEventTrace{kModuleAbiVersion, "test.eventTrace", "EventT
 }  // namespace
 
 void registerTestModules(Registry& r) {
-  for (const ModuleDescriptor* d : {&kConst, &kGain, &kAdd, &kImpulse, &kSink, &kEventGen, &kEventTrace})
+  for (const ModuleDescriptor* d : {&kConst, &kStereo, &kGain, &kAdd, &kImpulse, &kSink, &kEventGen, &kEventTrace})
     if (auto err = r.add(*d)) throw std::runtime_error(*err);
 }
 

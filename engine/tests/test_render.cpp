@@ -42,6 +42,45 @@ TEST_CASE("io.audioOut mirrors inL when inR is unconnected and applies gain", "[
   REQUIRE(r[5] == Catch::Approx(0.25f));
 }
 
+// Guards the ~6 lines that decide which lane reaches which speaker: the out[0]/out[1] fold in
+// Engine::renderBlock, the lanes::left()/right() masks in io.audioOut, and swapVoices vs swapStereo.
+// Every other source in the suite is symmetric, so only an asymmetric signal can fail on a swap.
+TEST_CASE("left and right stay distinct through renderBlock", "[render]") {
+  pg::Registry reg;
+  pg::registerBuiltinModules(reg);
+  pg::test::registerTestModules(reg);
+  pg::Engine engine{reg, pg::EngineConfig{48000.0, 64}};
+  REQUIRE(engine.model().addNode(reg, {"s", "test.stereo", {{"l", 0.25f}, {"r", -0.5f}}}));
+  REQUIRE(engine.model().addNode(reg, {"out", "io.audioOut", {{"gain", 1.f}}}));
+  REQUIRE(engine.model().addEdge(reg, {"eL", "s", "out", "out", "inL"}));
+  REQUIRE(engine.model().addEdge(reg, {"eR", "s", "out", "out", "inR"}));
+  REQUIRE(engine.commit());
+  std::vector<float> l(64, 99.f), r(64, 99.f); float* planar[2] = {l.data(), r.data()};
+  engine.renderBlock(planar, 2, 64, pg::TransportSnapshot{});
+  for (uint32_t i = 0; i < 64; ++i) {
+    REQUIRE(l[i] == 0.25f);    // left channel only
+    REQUIRE(r[i] == -0.5f);    // right channel only
+  }
+}
+
+TEST_CASE("left and right stay distinct through renderInterleaved", "[render]") {
+  pg::Registry reg;
+  pg::registerBuiltinModules(reg);
+  pg::test::registerTestModules(reg);
+  pg::Engine engine{reg, pg::EngineConfig{48000.0, 64}};
+  REQUIRE(engine.model().addNode(reg, {"s", "test.stereo", {{"l", 0.25f}, {"r", -0.5f}}}));
+  REQUIRE(engine.model().addNode(reg, {"out", "io.audioOut", {{"gain", 1.f}}}));
+  REQUIRE(engine.model().addEdge(reg, {"eL", "s", "out", "out", "inL"}));
+  REQUIRE(engine.model().addEdge(reg, {"eR", "s", "out", "out", "inR"}));
+  REQUIRE(engine.commit());
+  const std::vector<float> out = pg::renderInterleaved(engine, pg::RenderOptions{0.01, 2});
+  REQUIRE(out.size() == 480 * 2);
+  for (size_t f = 0; f < out.size() / 2; ++f) {
+    REQUIRE(out[f * 2] == 0.25f);        // L of frame f
+    REQUIRE(out[f * 2 + 1] == -0.5f);    // R of frame f
+  }
+}
+
 TEST_CASE("loadPatchJson reports schema errors", "[render]") {
   pg::Registry reg; pg::registerBuiltinModules(reg);
   pg::GraphModel m;
