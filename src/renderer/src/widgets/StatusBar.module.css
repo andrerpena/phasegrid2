@@ -1,0 +1,58 @@
+.root {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--font-size-caption);
+  color: var(--color-muted-foreground);
+  background: var(--color-background);
+}
+
+/*
+ * A dot rather than words alone: the state of the engine is the thing a person glances at, and a
+ * colour is read faster than a sentence. The sentence is still there for anyone who needs it.
+ */
+.indicator {
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: 50%;
+  background: var(--color-muted-foreground);
+  flex: none;
+}
+
+.indicator[data-status="ready"] {
+  background: var(--color-signal-note);
+}
+
+.indicator[data-status="error"] {
+  background: var(--color-destructive);
+}
+
+.status {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.themePicker {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.select {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-input);
+  color: var(--color-foreground);
+  font-size: var(--font-size-caption);
+  padding: 0 var(--space-1);
+}
+
+.version {
+  font-variant-numeric: tabular-nums;
+}

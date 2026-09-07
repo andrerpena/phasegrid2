@@ -1,0 +1,63 @@
+.vertical,
+.horizontal {
+  position: absolute;
+  z-index: 2;
+  padding: 0;
+  border: none;
+  background: transparent;
+  appearance: none;
+}
+
+/*
+ * The visible line is one pixel; the grab area is eight. A divider you can see but not easily hit is
+ * the most common annoyance in a panelled interface, so the two sizes are deliberately different.
+ */
+.vertical {
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  margin-left: -4px;
+  cursor: col-resize;
+}
+
+.horizontal {
+  left: 0;
+  right: 0;
+  height: 8px;
+  margin-top: -4px;
+  cursor: row-resize;
+}
+
+.vertical::after,
+.horizontal::after {
+  content: "";
+  position: absolute;
+  background: var(--color-border);
+  transition: background var(--duration-fast) ease;
+}
+
+.vertical::after {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+}
+
+.horizontal::after {
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+}
+
+.vertical:hover::after,
+.horizontal:hover::after,
+.vertical:focus-visible::after,
+.horizontal:focus-visible::after {
+  background: var(--color-ring);
+}
+
+.vertical:focus-visible,
+.horizontal:focus-visible {
+  outline: none;
+}

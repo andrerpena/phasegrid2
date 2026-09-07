@@ -1,72 +1,103 @@
+import { Dock } from "@renderer/components/dock/Dock";
+import { Panel } from "@renderer/components/panel/Panel";
+import { Tabs } from "@renderer/components/tabs/Tabs";
+import { useConfigStore } from "@renderer/config/config-store";
+import { useEngineStore, watchEngine } from "@renderer/engine/engine-store";
+import { useLayoutStore } from "@renderer/layout/layout-store";
 import { useThemeStore } from "@renderer/theming/theme-store";
-import { THEMES } from "@renderer/theming/themes";
+import { StatusBar } from "@renderer/widgets/StatusBar";
 import { useEffect, useState } from "react";
 import styles from "./App.module.css";
 
 /**
- * The shell, for now: enough to prove the theme reaches CSS and the engine reaches the renderer.
+ * The shell.
  *
- * The dock, widgets and grid replace this in the phases that follow. What is worth keeping from it is
- * the engine status line, because a window that cannot say whether the engine is running is a window
- * that will one day be silent for a reason nobody can see.
+ * The panels are placeholders for now; what is real is the arrangement, the theme reaching both CSS and
+ * the canvas, and the engine connection. The grid, the inspector and the catalogue replace these
+ * contents in the phases that follow, without moving anything around them.
  */
 export const App = () => {
+  const connect = useEngineStore((s) => s.connect);
+  const loadConfig = useConfigStore((s) => s.load);
+  const loadLayout = useLayoutStore((s) => s.load);
   const theme = useThemeStore((s) => s.theme);
-  const setTheme = useThemeStore((s) => s.setTheme);
-  const [status, setStatus] = useState("connecting");
+  const [rightTab, setRightTab] = useState("inspector");
 
   useEffect(() => {
-    let cancelled = false;
-    window.engine
-      .call("hello", { protocolVersion: 1, client: "phasegrid2" })
-      .then((hello) => {
-        if (!cancelled) setStatus(`engine ${hello.engineVersion}`);
-      })
-      .catch((error: Error) => {
-        if (!cancelled) setStatus(error.message);
-      });
-    // Every engine event, including the one that says it restarted after a crash.
-    const stop = window.engine.onEvent((event) => {
-      if (event.event === "engine.ready") setStatus("engine ready");
-      if (event.event === "engine.error")
-        setStatus(`engine error: ${JSON.stringify(event.data)}`);
-    });
-    return () => {
-      cancelled = true;
-      stop();
-    };
-  }, []);
+    void loadConfig();
+    void loadLayout();
+    void connect();
+    return watchEngine();
+  }, [connect, loadConfig, loadLayout]);
 
   return (
-    <div className={styles.root}>
-      <h1 className={styles.title}>phasegrid2</h1>
-      <p className={styles.status}>
-        v{__APP_VERSION__} · {status}
-      </p>
-      <div className={styles.themes}>
-        {THEMES.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            className={styles.themeButton}
-            aria-pressed={t.id === theme.id}
-            onClick={() => setTheme(t.id)}
-          >
-            {t.name}
-          </button>
-        ))}
-      </div>
-      <ul className={styles.legend}>
-        {Object.keys(theme.grid.signal).map((role) => (
-          <li key={role} className={styles.legendItem}>
-            <span
-              className={styles.swatch}
-              style={{ background: `var(--color-signal-${role})` }}
-            />
-            {role}
-          </li>
-        ))}
-      </ul>
-    </div>
+    <Dock
+      top={<div className={styles.transport}>transport</div>}
+      leftTop={
+        <Panel title="Catalog" scope="catalog">
+          <p className={styles.placeholder}>
+            Module catalogue arrives with the grid editor.
+          </p>
+        </Panel>
+      }
+      leftBottom={
+        <Panel title="History" scope="history">
+          <p className={styles.placeholder}>Undo history.</p>
+        </Panel>
+      }
+      center={
+        <div className={styles.grid} data-kb-scope="grid">
+          <p className={styles.placeholder}>The grid renders here.</p>
+          <ul className={styles.legend}>
+            {Object.keys(theme.grid.signal).map((role) => (
+              <li key={role} className={styles.legendItem}>
+                <span
+                  className={styles.swatch}
+                  style={{ background: `var(--color-signal-${role})` }}
+                />
+                {role}
+              </li>
+            ))}
+          </ul>
+        </div>
+      }
+      centerBottom={
+        <Panel title="Log" scope="logs">
+          <p className={styles.placeholder}>Engine log.</p>
+        </Panel>
+      }
+      rightTop={
+        <Tabs
+          activeId={rightTab}
+          onSelect={setRightTab}
+          tabs={[
+            {
+              id: "inspector",
+              label: "Inspector",
+              content: (
+                <p className={styles.placeholder}>
+                  Select a module to edit its parameters.
+                </p>
+              ),
+            },
+            {
+              id: "settings",
+              label: "Settings",
+              content: (
+                <p className={styles.placeholder}>Configuration editor.</p>
+              ),
+            },
+          ]}
+        />
+      }
+      rightBottom={
+        <Panel title="Scope" scope="scope">
+          <p className={styles.placeholder}>
+            Meters and scopes read shared memory directly.
+          </p>
+        </Panel>
+      }
+      bottom={<StatusBar />}
+    />
   );
 };
