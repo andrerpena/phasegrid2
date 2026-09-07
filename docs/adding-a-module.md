@@ -34,4 +34,4 @@ extern const ModuleDescriptor kExample{kModuleAbiVersion, "fx.example", "Example
 
 Rules: no statics for state, no allocation in `process`, params are numeric only, `numFrames` can be 1 (feedback clusters).
 Unconnected continuous inputs are empty `SignalView`s; read through `readOr()`.
-Vital-backed modules are added through the adapter described in the `vital-modules` plan, not this template.
+Modules built on the vendored DSP (`engine/vendor/vital`) are added through the adapter described in the `vital-modules` plan, not this template.
