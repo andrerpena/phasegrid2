@@ -63,6 +63,26 @@ test passed with modulation entirely disconnected; it was replaced by two tests 
 actually saw (mix against a high-pass for the control-rate destination, low-pass settling rate for the
 audio-rate one). Apply the same standard: before keeping a test, break the code it covers and confirm it fails.
 
+**Always construct vendored modules with `pg::vendor::makeModule<T>(...)`, never `new T`.** The vendored router
+keeps two process orders: `plug()` sorts `global_order_`, but `process()` runs `local_order_`, and the rebuild that
+copies one to the other only fires when the router's `local_changes_` differs from the shared counter — which never
+happens on the object that owns the graph, because every mutation bumps both. Upstream never notices because it
+processes per-voice *copies*, whose copy constructor builds `local_order_` from the sorted order; we process the
+router itself. A module that plugs a processor before creating the controls feeding it therefore runs that
+processor first and reads its controls one block late, and reads *zero* on the first block. `EnvelopeModule` does
+exactly that, so a bare `new` gave an instant attack regardless of the knob. `makeModule<T>` wraps the type in
+`pg::vendor::Sorted<T>` and forces the rebuild once after `init()`. `filter.multi` was accidentally safe because it
+adds its filters in `init()`, after its controls — do not read that as evidence the trap is not there.
+
+**Check each exposed output against the vendored `process()` for whether it writes the whole block.** Some outputs
+are full-size but only ever get `buffer[0]` written (`Envelope`'s phase output is written once at the end of the
+block). `isControlRate()` tests `buffer_size == 1`, so it does not catch these, and the adapter would copy 128
+frames the module never wrote. Set `OutputMap::firstFrameOnly` for them.
+
+**`kMaxPortsPerModule` is 32 and `osc.wavetable` already uses 31** (4 inputs + 27 params). A module with a larger
+control surface needs a longer `hidden` list or a wider cap; decide deliberately rather than discovering it as an
+`E_FAN_IN`-style failure.
+
 **Unconnected inputs** are bound to the instance's own zero block, never to the shared `kSilentBlock`, because
 the adapter drops const on that pointer.
 
