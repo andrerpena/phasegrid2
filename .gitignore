@@ -11,3 +11,4 @@ build-*/
 .idea/
 *.wav
 !engine/tests/golden/*.wav
+.cache/
