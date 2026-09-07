@@ -50,3 +50,39 @@ TEST_CASE("loadPatchJson reports schema errors", "[render]") {
   REQUIRE(pg::loadPatchJson(nlohmann::json::parse(R"({"schemaVersion": 1, "modules": [], "edges": [], "feedbackMode": "block"})"), reg, m));
   REQUIRE(m.feedbackMode == pg::FeedbackMode::Block);
 }
+
+// Malformed patches must come back as E_SCHEMA, never as an uncaught nlohmann type_error:
+// phase 4 feeds this loader straight from IPC, where a throw would kill the engine process.
+TEST_CASE("loadPatchJson rejects wrong JSON types instead of throwing", "[render]") {
+  pg::Registry reg; pg::registerBuiltinModules(reg);
+  pg::GraphModel m;
+  auto load = [&](const char* text) { return pg::loadPatchJson(nlohmann::json::parse(text), reg, m); };
+
+  REQUIRE(load(R"({"schemaVersion": 1, "modules": [1, 2, 3]})").code == "E_SCHEMA");
+  REQUIRE(load(R"({"schemaVersion": 1, "modules": "notanarray"})").code == "E_SCHEMA");
+  REQUIRE(load(R"({"schemaVersion": 1, "modules": [], "edges": [7]})").code == "E_SCHEMA");
+  REQUIRE(load(R"({"schemaVersion": 1, "modules": [], "edges": "notanarray"})").code == "E_SCHEMA");
+  REQUIRE(load(R"({"schemaVersion": 1, "modules": [{"id": "a", "type": "io.audioOut", "params": 3}]})").code == "E_SCHEMA");
+  REQUIRE(load(R"({"schemaVersion": 1, "modules": [],
+                   "edges": [{"id": "e", "from": "a.out", "to": {"module": "b", "port": "inL"}}]})").code == "E_SCHEMA");
+  REQUIRE(load(R"({"schemaVersion": 1, "voiceCount": "two", "modules": []})").code == "E_SCHEMA");
+}
+
+TEST_CASE("loadPatchJson surfaces GraphModel errors for bad edges", "[render]") {
+  pg::Registry reg; pg::registerBuiltinModules(reg); pg::test::registerTestModules(reg);
+  pg::GraphModel m;
+  auto load = [&](const char* text) { return pg::loadPatchJson(nlohmann::json::parse(text), reg, m); };
+
+  // Two edges sharing an id: GraphModel::addEdge reports E_DUP_ID.
+  REQUIRE(load(R"({"schemaVersion": 1,
+                   "modules": [{"id": "c", "type": "test.const"}, {"id": "o", "type": "io.audioOut"}],
+                   "edges": [{"id": "e1", "from": {"module": "c", "port": "out"}, "to": {"module": "o", "port": "inL"}},
+                             {"id": "e1", "from": {"module": "c", "port": "out"}, "to": {"module": "o", "port": "inR"}}]})")
+              .code == "E_DUP_ID");
+
+  // An edge endpoint no module declares: GraphModel::addEdge reports E_NODE_NOT_FOUND.
+  REQUIRE(load(R"({"schemaVersion": 1,
+                   "modules": [{"id": "o", "type": "io.audioOut"}],
+                   "edges": [{"id": "e1", "from": {"module": "ghost", "port": "out"}, "to": {"module": "o", "port": "inL"}}]})")
+              .code == "E_NODE_NOT_FOUND");
+}
