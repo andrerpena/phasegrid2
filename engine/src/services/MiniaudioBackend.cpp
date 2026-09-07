@@ -1,4 +1,6 @@
 #include "services/MiniaudioBackend.hpp"
+#include <algorithm>
+#include <cctype>
 #include <cstring>
 #include <vector>
 #include "miniaudio.h"
@@ -50,6 +52,9 @@ bool MiniaudioBackend::open(const DeviceConfig& config, RenderFn render, std::st
   cfg.dataCallback = dataCallback;
   cfg.pUserData = this;
   if (!config.deviceId.empty()) {
+    const bool allDigits = std::all_of(config.deviceId.begin(), config.deviceId.end(),
+                                        [](unsigned char c) { return std::isdigit(c) != 0; });
+    if (!allDigits) { error = "invalid device id " + config.deviceId; return false; }
     if (impl_->playback.empty()) enumerate();
     const size_t idx = std::stoul(config.deviceId);
     if (idx >= impl_->playback.size()) { error = "unknown device id " + config.deviceId; return false; }

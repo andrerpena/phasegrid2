@@ -2,9 +2,6 @@
 #include <memory>
 #include "services/AudioDevice.hpp"
 
-struct ma_context;
-struct ma_device;
-
 namespace pg {
 
 class MiniaudioBackend final : public AudioDeviceBackend {

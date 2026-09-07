@@ -20,13 +20,26 @@ static int runTone(int seconds) {
   pg::ToneGenerator tone;
   pg::BlockSplitter splitter;
   splitter.prepare(64, 2);
-  std::string err;
   pg::DeviceConfig cfg;
-  const bool ok = backend.open(cfg, [&](float* out, uint32_t frames, uint32_t channels) {
-    splitter.render(out, frames, [&](float* block, uint32_t n) { tone.render(block, n, channels); });
-  }, err);
+
+  // Prepared before open() so the audio thread never observes a mid-update tone state.
+  tone.prepare(cfg.sampleRate, 440.0);
+  const uint32_t channels = cfg.channels;
+  // Built once (not per-callback) to keep the RT path free of std::function construction.
+  pg::BlockSplitter::BlockFn block = [&tone, channels](float* b, uint32_t n) { tone.render(b, n, channels); };
+  auto render = [&](float* out, uint32_t frames, uint32_t) { splitter.render(out, frames, block); };
+
+  std::string err;
+  bool ok = backend.open(cfg, render, err);
   if (!ok) { std::fprintf(stderr, "open failed: %s\n", err.c_str()); return 1; }
-  tone.prepare(backend.sampleRate(), 440.0);
+  if (backend.sampleRate() != cfg.sampleRate) {
+    // The device negotiated a different rate; the audio thread is stopped between
+    // close() and open(), so re-preparing tone here is race-free.
+    backend.close();
+    tone.prepare(backend.sampleRate(), 440.0);
+    ok = backend.open(cfg, render, err);
+    if (!ok) { std::fprintf(stderr, "open failed: %s\n", err.c_str()); return 1; }
+  }
   std::printf("playing %d s at %.0f Hz, %u ch\n", seconds, backend.sampleRate(), backend.channels());
   std::this_thread::sleep_for(std::chrono::seconds(seconds));
   backend.close();
