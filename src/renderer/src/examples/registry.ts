@@ -191,6 +191,46 @@ register({
   },
 });
 
+/**
+ * The sine and its folder. Fold starts at zero, where the wave is the one shape with no harmonics at
+ * all, so there is something to hear the moment the knob moves.
+ */
+register({
+  moduleId: "osc.sine",
+  name: "Sine",
+  description:
+    "A sine at middle C. Turn Fold up to drive the wave past full scale and reflect it back on " +
+    "itself: the arch on its face grows lobes, and the tone gains harmonics with no filter involved.",
+  patch: {
+    schemaVersion: 1,
+    voiceCount: 1,
+    feedbackMode: "sample",
+    modules: [
+      {
+        id: "osc",
+        type: "osc.sine",
+        x: col(2),
+        y: col(2),
+        params: { fold: 0 },
+      },
+      {
+        id: "out",
+        type: "io.audioOut",
+        x: col(12),
+        y: col(3),
+        params: { gain: 0.4 },
+      },
+    ],
+    edges: [
+      {
+        id: "e1",
+        from: { module: "osc", port: "out" },
+        to: { module: "out", port: "inL" },
+      },
+    ],
+  },
+});
+
 /** An oscillator, used as the sound source in most of these. Middle C unless told otherwise. */
 function source(id = "osc", params: Record<string, number> = {}) {
   return {

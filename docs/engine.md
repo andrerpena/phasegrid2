@@ -110,10 +110,10 @@ attributed to our sources.
 ## Modules
 
 Built-ins are registered in `engine/src/modules/builtin.cpp`, one line each. Own modules are a single `.cpp` under
-`engine/src/modules`; vendored-backed ones a single `ModuleSpec` under `engine/src/modules/vital`. Today, twenty-four:
+`engine/src/modules`; vendored-backed ones a single `ModuleSpec` under `engine/src/modules/vital`. Today, twenty-five:
 
 - own: `io.audioOut`, `note.toCv`, `note.toPoly`, `notes.clip`, `phase.clock`, `math.scaleOffset`, `mix.mixer`,
-  `amp.vca`, `osc.sawtooth`, `osc.pulse`
+  `amp.vca`, `osc.sawtooth`, `osc.pulse`, `osc.sine`
 - vendored-backed: `osc.wavetable`, `sampler.player`, `filter.multi`, `env.dahdsr`, `mod.lfo`, `mod.random`, and the
   eight effects `fx.reverb`, `fx.delay`, `fx.chorus`, `fx.flanger`, `fx.phaser`, `fx.distortion`, `fx.compressor`,
   `fx.eq`.
@@ -136,13 +136,19 @@ the width. Each module file is then about forty lines. The shape is built afresh
 passes in, so a parameter that shapes the wave (a pulse width, a skew) is modulatable with nothing else changing; it is
 taken by value, so there is no allocation and nothing virtual on the audio thread.
 
-**Two ways to be band-limited, one interface.** A formula declares its steps and the core spreads each one over four
-samples with the integral of a cubic B-spline, which puts aliases about 40 dB down against 12 dB for a naive wave
-(measured at a 2 kHz fundamental in `test_osc_sawtooth.cpp` and `test_osc_pulse.cpp`). An arbitrary wave -- one drawn,
-one written as an expression, one imported -- cannot declare its steps, and is instead read from a table that was
-band-limited per octave when it was built: such a shape returns `jumpCount() == 0`. Sync is the exception belonging to
-neither, because it is the oscillator that throws the wave back to phase zero mid-cycle; the core computes that step
-itself as `at(0) - at(phase it had reached)`, which is as true of a table as of a formula.
+**Three ways to be band-limited, one interface.** A wave that *breaks* declares its steps, and the core spreads each
+one over four samples with the integral of a cubic B-spline: aliases about 40 dB down against 12 dB naive, measured at a
+2 kHz fundamental in `test_osc_sawtooth.cpp` and `test_osc_pulse.cpp`. A wave that *bends* has no steps to declare and
+instead offers `float at(double from, double to)`, its average across the phase interval one sample covers rather than
+its value at a point; `osc.sine`'s folder does this exactly, as the difference of the folding curve's antiderivative
+divided by the interval, which cost it two polynomials and a divide and bought 22 dB to 34 dB at 2 kHz. An arbitrary
+wave -- one drawn, one written as an expression, one imported -- can do neither, and is read instead from a table
+band-limited per octave when it was built. Sync belongs to none of the three, because it is the oscillator that throws
+the wave back to phase zero mid-cycle; the core computes that step itself as `at(0) - at(phase it had reached)`, which
+is as true of a table as of a formula.
+
+`valueAt` picks the averaging overload when a shape has one, with `if constexpr (requires ...)`, so a shape declares
+only what it actually needs.
 
 That is the seam for wavetables the user generates or draws. The pieces are already vendored: `LineGenerator`
 (`getValueAtPhase`, `stateToJson`/`jsonToState`, already used by `mod.lfo`) for a breakpoint curve, `vital::Wavetable`

@@ -1,5 +1,5 @@
 {
-  "catalogHash": "4f489a2280081e01",
+  "catalogHash": "4e2b9ab52e321648",
   "conventions": {
     "blockSize": 128,
     "gateThreshold": 0,
@@ -5085,6 +5085,85 @@
           "max": 48.0,
           "min": 0.0,
           "name": "Sync",
+          "uiWidget": "knob",
+          "unit": "semitones"
+        }
+      ]
+    },
+    {
+      "category": "osc",
+      "doc": "A sine with a wavefolder. At Fold 0 it is the one wave with no harmonics at all; turning Fold up drives it past full scale and reflects it back on itself, filling the spectrum with odd harmonics. Fold is in semitones, so every twelve doubles the drive. The face shows the resulting shape.",
+      "flags": {
+        "needsTransport": false,
+        "previewsWave": true,
+        "terminal": false,
+        "writesTelemetry": false
+      },
+      "id": "osc.sine",
+      "inputs": [
+        {
+          "doc": "A rising edge restarts the cycle from phase 0",
+          "id": "reset",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Reset",
+          "role": "gate"
+        },
+        {
+          "doc": "When connected, drives the cycle in place of the internal ramp: 0 to just under 1, wrapping",
+          "id": "phase",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Phase",
+          "role": "phase"
+        },
+        {
+          "doc": "Pitch to play, 0.1 per octave from middle C",
+          "id": "pitch",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Pitch",
+          "role": "pitch"
+        },
+        {
+          "doc": "How hard the wave is driven past full scale before being reflected back, in semitones: every twelve doubles it, and each doubling folds another pair of lobes into the cycle",
+          "id": "param:fold",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Fold",
+          "param": "fold",
+          "role": "cv"
+        }
+      ],
+      "name": "Sine",
+      "outputs": [
+        {
+          "doc": "The wave, -1 to 1",
+          "id": "out",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Out",
+          "role": "audio"
+        }
+      ],
+      "params": [
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "How hard the wave is driven past full scale before being reflected back, in semitones: every twelve doubles it, and each doubling folds another pair of lobes into the cycle",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "id": "fold",
+          "max": 48.0,
+          "min": 0.0,
+          "name": "Fold",
           "uiWidget": "knob",
           "unit": "semitones"
         }

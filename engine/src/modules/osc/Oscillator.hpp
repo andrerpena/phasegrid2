@@ -31,6 +31,11 @@ struct ShapeJump {
  *   uint32_t jumpCount() const;
  *   ShapeJump jump(uint32_t index) const;
  *
+ * It may also offer `float at(double from, double to) const`, the wave's average across the phase
+ * interval one output sample covers rather than its value at a point. A shape that is bent rather than
+ * broken -- a folded sine has corners and no steps -- has nothing for the step correction below to fix,
+ * and this is how it band-limits itself instead. `valueAt` picks whichever the shape has.
+ *
  * A formula declares its steps so they can be band-limited exactly, which is what the correction below
  * does. A shape read from a wavetable declares none: a table is band-limited when it is built, per
  * octave, because nothing can know analytically where an arbitrary drawn wave steps. Sync is the one
@@ -44,6 +49,7 @@ struct Lane {
   double master = 0.0;     // 0..1, the cycle everything hangs off
   double lastPhaseIn = 0.0;
   float lastGate = 0.f;
+  double lastSlave = 0.0;          // where the wave was on the previous sample, for a shape that averages
   bool seeded = false;             // the held-back outputs still need the wave's starting value
   float pending[2] = {0.f, 0.f};   // the last two outputs, held back so a step can still reach them
   float carry = 0.f;               // correction a step has already promised the next output
@@ -80,6 +86,14 @@ inline void applyStep(Lane& l, float& current, double delta, double since) {
   l.pending[1] += static_cast<float>(delta * residual(since - 1.0));
   current += static_cast<float>(delta * residual(since));
   l.carry += static_cast<float>(delta * residual(since + 1.0));
+}
+
+/// The wave's value for the sample spanning `from` to `to`: its average across the interval when the
+/// shape can say, and its value at the end of the interval when it cannot.
+template <class Shape>
+float valueAt(const Shape& shape, double from, double to) {
+  if constexpr (requires(const Shape& s) { s.at(from, to); }) return shape.at(from, to);
+  else return shape.at(to);
 }
 
 /// The slave's position for a master phase: it runs `ratio` times faster and wraps on its own.
@@ -184,7 +198,9 @@ void render(ProcessContext& c, OscillatorState& state, MakeShape&& makeShape, Sy
       } else {
         crossings(shape, l, current, before * ratio, l.master * ratio, perSample, 0.0);
       }
-      current += shape.at(slaveOf(l.master, ratio));
+      const double slave = slaveOf(l.master, ratio);
+      current += valueAt(shape, l.lastSlave, slave);
+      l.lastSlave = slave;
 
       // The correction reaches two samples back, so the output runs two samples behind the wave.
       lanesOut[k] = l.pending[0];
