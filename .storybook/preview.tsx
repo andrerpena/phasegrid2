@@ -7,8 +7,9 @@ import "../src/renderer/src/css/index.css";
 /**
  * Applies the real theme, the same way the application does.
  *
- * Stories read `var(--color-*)` exactly as the application does, so a component that looks right here
- * looks right there. Switching the toolbar's theme runs the same function the theme store runs.
+ * Stories read the theme through Tailwind's tokens exactly as the application does, so a component
+ * that looks right here looks right there. Switching the toolbar's theme runs the same function the
+ * application runs -- which now only sets `data-theme`, because `css/theme.css` owns the values.
  */
 const withTheme: Decorator = (Story, context) => {
   const themeId = (context.globals.theme as string) ?? "dark";
@@ -29,6 +30,7 @@ const preview: Preview = {
         items: [
           { value: "dark", title: "Dark" },
           { value: "light", title: "Light" },
+          { value: "terminal", title: "Terminal" },
         ],
         dynamicTitle: true,
       },

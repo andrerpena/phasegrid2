@@ -43,7 +43,7 @@ does. Autosave in a tool that makes sound is a way to lose the take you liked.
   "settings": {
     "ui.theme": "dark",
     "grid.snap": 8,
-    "keybindings": [{ "key": "mod+alt+t", "command": "workbench.cycleTheme" }]
+    "keybindings": [{ "key": "mod+alt+t", "command": "workbench.setTheme" }]
   }
 }
 ```

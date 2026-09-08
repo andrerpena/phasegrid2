@@ -14,7 +14,9 @@ coloring hint only: the compiler accepts any output into any input, and roles ne
 is a role on an *event* port (a stream carrying pitch and velocity), not a `PortKind` of its own; an event port
 carrying bare triggers stays `Gate`, so the two read differently in the editor. Roles cross the descriptor ABI
 as `uint8_t`, so new ones are appended. `--catalog` emits the role of every port and
-`src/renderer/src/css/tokens.css` has a `--color-signal-<role>` token for each.
+`src/renderer/src/css/theme.css` has a `--signal-<role>` custom property for each, exposed to
+Tailwind as `--color-signal-<role>` and mirrored in `theming/themes/*.ts` for the canvas — see
+[docs/ui.md](ui.md).
 
 ## Threads and RT rules
 

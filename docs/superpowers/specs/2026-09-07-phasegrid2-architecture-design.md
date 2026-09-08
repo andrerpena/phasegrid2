@@ -1,5 +1,9 @@
 # phasegrid2 — Architecture and Milestone 1 Plan
 
+> **Amended.** The Tailwind decision in this spec is reversed by
+> [2026-09-08-osmc-frontend-amendment.md](2026-09-08-osmc-frontend-amendment.md): the renderer uses
+> Tailwind v4 and has no CSS Modules. Read that alongside this.
+
 ## Context
 
 phasegrid2 is a generative, grid-based modular music platform modeled on Bitwig's The Grid, but aimed at generative music rather than instrument building. It is AGPL3. The frontend is Electron + TypeScript + React 19 + Pixi.js v8 and literally copies the architectural systems of `/Users/andrepena/gitp/osmc` (Pixi main view, Zustand stores, dock/widget/modal system, theme, keybindings, commands, schema + property grid), replacing Tailwind with CSS Modules + CSS custom properties. The backend is a separate C++20 audio engine process. Target UX: `npm install phasegrid2 && npm run dev` spawns Electron, the user picks a project folder, and everything is serialized there.

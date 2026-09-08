@@ -41,23 +41,42 @@ to another.
   "name": "my-workspace",
   "settings": {
     "ui.theme": "dark",
-    "grid.snap": 16
+    "grid.snap": 16,
+    "layout.widgets": {
+      "left-top": ["catalog"],
+      "center": ["grid", "settings"],
+      "right-top": ["mini-map", "inspector"]
+    },
+    "theme": { "grid.gridLine": "#202430", "signal.audio": "#ff5c5c" }
   }
 }
 ```
 
 `settings` contains only what you changed. The defaults live in the application
-(`src/renderer/src/config/config-store.ts`, `DEFAULT_CONFIG`) and your values are merged over them, so a
-key you have not set behaves as it always did — and the Settings panel lists every key with its
-effective value, marking the ones you have overridden.
+(`src/renderer/src/config/defaults.ts`) and your values are merged over them, so a key you have not
+set behaves as it always did — and the Settings panel's Defaults and Calculated tabs show what
+shipped and what is actually in force.
 
-Two things do **not** live here, because they belong to the installation rather than to the folder: the
-dock layout, which is shaped by the screen in front of you, and the pointer to the workspace you were
-last in. Both are under Electron's `userData`.
+Some of what is here is about the window rather than about the sound. `layout.widgets` says which
+panel is in which dock slot, `layout.statusBars` and `layout.controlBars` do the same for the strip
+along the bottom and the controls over the canvas, and `theme` overrides individual colours as flat
+dot-paths (`grid.*` and `signal.*` for the canvas, `ui.*` for everything else). Those are settings
+because they are how you work, and a workspace you copy to another machine should arrive with them.
 
-The Settings panel edits `settings` as text. Text that does not parse stays on screen and is never
-written, so what is on disk always loads. Fields you add to `workspace.json` by hand outside `settings`
-are preserved; whitespace *inside* `settings` is regenerated when the application writes it.
+Two things do **not** live here, because they belong to the display rather than to the folder: the
+dock's *geometry* — column widths and split ratios — and the pointer to the workspace you were last
+in. Both are under Electron's `userData`. So a workspace carries your panels and the machine supplies
+its own proportions.
+
+The Settings panel edits `settings` as text, in a JSON editor that knows the schema: it completes the
+keys, describes each one, shows a swatch beside every colour, and underlines a value that is out of
+range or a key that does not exist. Text that does not parse — or that parses and fails the schema —
+stays on screen and is never written, so what is on disk always loads. Fields you add to
+`workspace.json` by hand outside `settings` are preserved; whitespace *inside* `settings` is
+regenerated when the application writes it.
+
+The full list of what a setting can be is `src/renderer/src/config/defaults.ts`; how the panels and
+colours fit together is [docs/ui.md](ui.md).
 
 ## Keybindings
 
