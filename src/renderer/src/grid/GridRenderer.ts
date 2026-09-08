@@ -375,6 +375,11 @@ export class GridRenderer {
     this.nodes.get(moduleId)?.setWave(samples);
   }
 
+  /** Where modulation has put a knob this frame, 0..1, or null. Ignored for a module not drawn. */
+  setLive(moduleId: string, paramId: string, fraction: number | null): void {
+    this.nodes.get(moduleId)?.setLive(paramId, fraction);
+  }
+
   destroy(): void {
     for (const node of this.nodes.values()) node.destroy();
     for (const cable of this.cables.values()) cable.destroy();

@@ -15,6 +15,7 @@ import { GridInteraction } from "./GridInteraction";
 import { GridRenderer } from "./GridRenderer";
 import styles from "./GridView.module.css";
 import { startPreviewSync } from "./preview-sync";
+import { startTelemetrySync } from "./telemetry-sync";
 
 /**
  * React's entire involvement with the canvas: create it, hand it to the renderer, destroy it.
@@ -71,6 +72,18 @@ export const GridView = () => {
       });
       stop.push(preview.stop);
       preview.refreshAll();
+
+      // The knobs something is modulating: read from the engine's segment on every frame the
+      // canvas draws, so a knob turns as its parameter does rather than sitting on the document's
+      // value while the sound moves.
+      const telemetry = startTelemetrySync(
+        { setLive: (id, param, fraction) => view.setLive(id, param, fraction) },
+        (tick) => {
+          created.ticker.add(tick);
+          return () => created.ticker.remove(tick);
+        },
+      );
+      stop.push(telemetry.stop);
 
       stop.push(usePatchStore.subscribe((state) => view.sync(state.doc)));
       stop.push(useThemeStore.subscribe((state) => view.setTheme(state.theme)));

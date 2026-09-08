@@ -235,7 +235,11 @@ describe("engine supervisor", () => {
     const h = harness();
     await h.supervisor.start();
 
-    expect(h.args).toEqual([["--socket", "/tmp/pg-test.sock"]]);
+    // With a telemetry segment named for this process, so the renderer can map what the engine
+    // writes without the two having to agree on a name after the fact.
+    expect(h.args).toEqual([
+      ["--socket", "/tmp/pg-test.sock", "--shm", `/pg-${process.pid}`],
+    ]);
     expect(h.clients[0]?.calls).toEqual(["hello"]);
     expect(named(h.events, "engine.connected")).toEqual([
       { event: "engine.connected", seq: 1, data: { restarted: false } },

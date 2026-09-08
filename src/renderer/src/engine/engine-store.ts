@@ -2,7 +2,9 @@ import type {
   CommandArgs,
   CommandName,
   CommandResult,
+  HelloResultSchema,
 } from "@shared/protocol/commands";
+import type { z } from "zod";
 import { create } from "zustand";
 
 /**
@@ -20,6 +22,8 @@ interface EngineState {
   detail: string;
   engineVersion: string | null;
   catalogHash: string | null;
+  /** The telemetry segment this engine writes, or null when it has none. Mapped by the grid. */
+  shm: z.infer<typeof HelloResultSchema>["shm"];
   revision: number;
 }
 
@@ -36,6 +40,7 @@ export const useEngineStore = create<EngineState & EngineActions>((set) => ({
   detail: "connecting to the engine",
   engineVersion: null,
   catalogHash: null,
+  shm: null,
   revision: 0,
 
   connect: async () => {
@@ -49,6 +54,7 @@ export const useEngineStore = create<EngineState & EngineActions>((set) => ({
         detail: `engine ${hello.engineVersion}`,
         engineVersion: hello.engineVersion,
         catalogHash: hello.catalogHash,
+        shm: hello.shm,
       });
     } catch (error) {
       set({ status: "error", detail: (error as Error).message });

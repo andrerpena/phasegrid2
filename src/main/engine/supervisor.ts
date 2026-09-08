@@ -178,6 +178,12 @@ export const spawnEngineProcess: SpawnEngine = (binary, args) => {
 export interface SupervisorOptions {
   enginePath: string;
   socketPath: string;
+  /**
+   * The shared-memory segment the engine publishes telemetry into. Named for this process rather
+   * than the engine's, so it is known before the engine exists and survives a restart unchanged: the
+   * engine unlinks whatever a previous life left at the name before creating its own.
+   */
+  shmName?: string;
   /** Injected in tests. */
   spawnEngine?: SpawnEngine;
   createClient?: (socketPath: string) => EngineClient;
@@ -220,6 +226,7 @@ export class EngineSupervisor {
 
   constructor(options: SupervisorOptions) {
     this.options = {
+      shmName: `/pg-${process.pid}`,
       spawnEngine: spawnEngineProcess,
       createClient: (path) => new EngineSocketClient(path),
       connectAttempts: 200,
@@ -314,6 +321,8 @@ export class EngineSupervisor {
     const child = this.options.spawnEngine(this.options.enginePath, [
       "--socket",
       this.options.socketPath,
+      "--shm",
+      this.options.shmName,
     ]);
     this.child = child;
     child.onLog((level, message) =>
