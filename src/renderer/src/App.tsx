@@ -2,27 +2,32 @@ import { useCatalogStore } from "@renderer/catalog/catalog-store";
 import { registerShellCommands } from "@renderer/commands/definitions";
 import { CommandPalette } from "@renderer/components/command-palette/CommandPalette";
 import { Dock } from "@renderer/components/dock/Dock";
-import { useModalStore } from "@renderer/components/floating/modal/modal-store";
-import { Panel } from "@renderer/components/panel/Panel";
-import { Tabs } from "@renderer/components/tabs/Tabs";
+import {
+  ModalRenderer,
+  useModalStore,
+} from "@renderer/components/floating/modal";
+import {
+  registerBuiltInStatusBars,
+  StatusBar,
+} from "@renderer/components/status-bars";
+import {
+  registerBuiltInWidgets,
+  WidgetSlot,
+  watchWidgetLayout,
+} from "@renderer/components/widgets";
 import { useEngineStore, watchEngine } from "@renderer/engine/engine-store";
 import { useKeybindings } from "@renderer/keybindings/use-keybindings";
 import { useLayoutStore } from "@renderer/layout/layout-store";
 import { startEngineSync } from "@renderer/patch/engine-sync";
 import { startDirtyTracking } from "@renderer/project/dirty";
-import { ProjectTabs } from "@renderer/project/ProjectTabs";
-import { CatalogPanel } from "@renderer/widgets/CatalogPanel";
-import { SettingsPanel } from "@renderer/widgets/SettingsPanel";
-import { StatusBar } from "@renderer/widgets/StatusBar";
-import { ProjectsPanel } from "@renderer/workspace/ProjectsPanel";
+import { watchGridTheme } from "@renderer/theming/grid-theme-store";
 import { startProjectCommands } from "@renderer/workspace/project-commands";
 import { SaveAsDialog } from "@renderer/workspace/SaveAsDialog";
 import { startSessionPersistence } from "@renderer/workspace/session";
 import { startCloseGuard } from "@renderer/workspace/unsaved";
 import { WorkspaceGate } from "@renderer/workspace/WorkspaceGate";
 import { useWorkspaceStore } from "@renderer/workspace/workspace-store";
-import { useEffect, useState } from "react";
-import styles from "./App.module.css";
+import { useEffect } from "react";
 
 /**
  * The shell.
@@ -33,6 +38,9 @@ import styles from "./App.module.css";
  *
  * The engine, though, connects behind the gate: it is a separate process that knows nothing about
  * folders, and starting it early means the catalogue is loaded by the time a folder has been picked.
+ *
+ * What goes in each slot is not decided here. The dock asks the widget layout, the widget layout comes
+ * from the workspace's settings, and this file only says which slots exist.
  */
 export const App = () => {
   const connect = useEngineStore((s) => s.connect);
@@ -40,14 +48,17 @@ export const App = () => {
   const loadLayout = useLayoutStore((s) => s.load);
   const boot = useWorkspaceStore((s) => s.boot);
   const workspaceStatus = useWorkspaceStore((s) => s.status);
-  const [leftTab, setLeftTab] = useState("projects");
-  const [rightTab, setRightTab] = useState("inspector");
   const paletteOpen = useModalStore((s) => s.isOpen("command-palette"));
   const hideModal = useModalStore((s) => s.hide);
   useKeybindings();
 
   useEffect(() => {
     registerShellCommands();
+    // Widgets and status bar items first: the layout is a list of names, and normalising it means
+    // checking each name against a registry. Read before this, every panel in the settings file
+    // would look like one this build does not have.
+    registerBuiltInWidgets();
+    registerBuiltInStatusBars();
     // The layout is the installation's, so it loads once and does not wait for a workspace. The
     // settings are the workspace's and are loaded by opening one.
     void loadLayout();
@@ -69,6 +80,10 @@ export const App = () => {
     const stopSession = startSessionPersistence();
     const stopCommands = startProjectCommands();
     const stopClose = startCloseGuard();
+    // Both follow the settings: a panel moved in `workspace.json` moves in the window, and a colour
+    // typed there repaints the canvas.
+    const stopLayout = watchWidgetLayout();
+    const stopGridTheme = watchGridTheme();
     return () => {
       stopStatus();
       stopSync();
@@ -77,6 +92,8 @@ export const App = () => {
       stopSession();
       stopCommands();
       stopClose();
+      stopLayout();
+      stopGridTheme();
     };
   }, [connect, loadCatalog, loadLayout, boot]);
 
@@ -85,65 +102,15 @@ export const App = () => {
   return (
     <>
       <Dock
-        top={<div className={styles.transport}>transport</div>}
-        leftTop={
-          <Panel title="Catalog" scope="catalog">
-            <CatalogPanel />
-          </Panel>
-        }
-        leftBottom={
-          <Tabs
-            activeId={leftTab}
-            onSelect={setLeftTab}
-            tabs={[
-              {
-                id: "projects",
-                label: "Projects",
-                content: <ProjectsPanel />,
-              },
-              {
-                id: "history",
-                label: "History",
-                content: <p className={styles.placeholder}>Undo history.</p>,
-              },
-            ]}
-          />
-        }
-        center={<ProjectTabs />}
-        centerBottom={
-          <Panel title="Log" scope="logs">
-            <p className={styles.placeholder}>Engine log.</p>
-          </Panel>
-        }
-        rightTop={
-          <Tabs
-            activeId={rightTab}
-            onSelect={setRightTab}
-            tabs={[
-              {
-                id: "inspector",
-                label: "Inspector",
-                content: (
-                  <p className={styles.placeholder}>
-                    Select a module to edit its parameters.
-                  </p>
-                ),
-              },
-              {
-                id: "settings",
-                label: "Settings",
-                content: <SettingsPanel />,
-              },
-            ]}
-          />
-        }
-        rightBottom={
-          <Panel title="Scope" scope="scope">
-            <p className={styles.placeholder}>
-              Meters and scopes read shared memory directly.
-            </p>
-          </Panel>
-        }
+        leftTop={<WidgetSlot slotId="left-top" />}
+        leftBottom={<WidgetSlot slotId="left-bottom" />}
+        // Kept mounted: the grid owns a canvas with a graphics context and an engine subscription,
+        // and unmounting it to look at the settings would throw both away and rebuild them on the
+        // way back — visibly, and with the viewport reset.
+        center={<WidgetSlot slotId="center" variant="primary" keepMounted />}
+        centerBottom={<WidgetSlot slotId="center-bottom" />}
+        rightTop={<WidgetSlot slotId="right-top" />}
+        rightBottom={<WidgetSlot slotId="right-bottom" />}
         bottom={<StatusBar />}
       />
       <CommandPalette
@@ -151,6 +118,7 @@ export const App = () => {
         onClose={() => hideModal("command-palette")}
       />
       <SaveAsDialog />
+      <ModalRenderer />
     </>
   );
 };

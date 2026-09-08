@@ -62,8 +62,8 @@ describe("keybindings from the settings", () => {
     expect(
       resolve(
         [
-          { key: "mod+k", command: "workbench.cycleTheme" },
-          { key: "mod+k", command: "workbench.cycleTheme", remove: true },
+          { key: "mod+k", command: "workbench.setTheme" },
+          { key: "mod+k", command: "workbench.setTheme", remove: true },
         ],
         "mod+k",
       ),

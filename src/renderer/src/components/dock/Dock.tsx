@@ -1,7 +1,9 @@
 import { useLayoutStore } from "@renderer/layout/layout-store";
-import { type ReactNode, useRef } from "react";
-import { ResizeHandle } from "../resize-handle/ResizeHandle";
-import styles from "./Dock.module.css";
+import { cn } from "@renderer/utils/cn";
+import { type ReactNode, useCallback, useRef } from "react";
+import { HorizontalResizeHandle } from "../resize-handle/HorizontalResizeHandle";
+import { VerticalResizeHandle } from "../resize-handle/VerticalResizeHandle";
+import { useResize } from "./useResize";
 
 export interface DockProps {
   /** A full-width strip above everything, for the transport. */
@@ -20,9 +22,13 @@ export interface DockProps {
 /**
  * The window layout: a centre surface with columns beside it and strips above and below.
  *
- * Sizes come from the layout store as ratios, so resizing the window rearranges nothing. Every divider
- * is draggable and every panel can be hidden, because a grid editor is mostly used at whatever size
- * leaves the most room for the grid.
+ * A slot with nothing in it takes no space at all, and a column with only one of its two panels gives
+ * that panel the whole column. That is the difference between a dock and a picture of one: emptying a
+ * slot has to actually give the room back, or closing a panel leaves a hole where it was.
+ *
+ * Sizes are stored as fractions rather than pixels, so a layout saved on a large display still makes
+ * sense on a small one. Dragging works in pixels, because that is what a pointer reports; the
+ * conversion happens here, once, at the point where a drag becomes a stored size.
  */
 export const Dock = ({
   top,
@@ -40,122 +46,187 @@ export const Dock = ({
   const rightRef = useRef<HTMLDivElement>(null);
   const centerRef = useRef<HTMLDivElement>(null);
 
-  const showLeft =
-    layout.leftVisible && (leftTop !== undefined || leftBottom !== undefined);
-  const showRight =
-    layout.rightVisible &&
-    (rightTop !== undefined || rightBottom !== undefined);
-  const showCenterBottom =
-    layout.centerBottomVisible && centerBottom !== undefined;
+  const hasLeftTop = leftTop !== undefined && leftTop !== null;
+  const hasLeftBottom = leftBottom !== undefined && leftBottom !== null;
+  const hasRightTop = rightTop !== undefined && rightTop !== null;
+  const hasRightBottom = rightBottom !== undefined && rightBottom !== null;
+  const hasCenterBottom = centerBottom !== undefined && centerBottom !== null;
+
+  const showLeft = layout.leftVisible && (hasLeftTop || hasLeftBottom);
+  const showRight = layout.rightVisible && (hasRightTop || hasRightBottom);
+  const showCenterBottom = layout.centerBottomVisible && hasCenterBottom;
+  // Only when both panels are there is there a divider between them; otherwise the one that is
+  // present owns the column.
+  const splitLeft = hasLeftTop && hasLeftBottom;
+  const splitRight = hasRightTop && hasRightBottom;
+
+  const bodyWidth = useCallback(() => bodyRef.current?.offsetWidth ?? 1, []);
+  const columnHeight = useCallback(
+    (ref: typeof leftRef) => ref.current?.offsetHeight ?? 1,
+    [],
+  );
+
+  // A column's width: pixels in from the pointer, a fraction of the window out to the store.
+  const widthLimits = useCallback(
+    () => ({ min: 0.1 * bodyWidth(), max: 0.9 * bodyWidth() }),
+    [bodyWidth],
+  );
+
+  const leftResize = useResize(
+    (px) => layout.setSize("leftWidth", px / bodyWidth()),
+    () => layout.leftWidth * bodyWidth(),
+    widthLimits,
+  );
+
+  const rightResize = useResize(
+    (px) => layout.setSize("rightWidth", px / bodyWidth()),
+    () => layout.rightWidth * bodyWidth(),
+    widthLimits,
+    true,
+  );
+
+  const leftSplitResize = useResize(
+    (px) => layout.setSize("leftSplit", px / columnHeight(leftRef)),
+    () => layout.leftSplit * columnHeight(leftRef),
+    () => ({
+      min: 0.1 * columnHeight(leftRef),
+      max: 0.9 * columnHeight(leftRef),
+    }),
+    false,
+    true,
+  );
+
+  const rightSplitResize = useResize(
+    (px) => layout.setSize("rightSplit", px / columnHeight(rightRef)),
+    () => layout.rightSplit * columnHeight(rightRef),
+    () => ({
+      min: 0.1 * columnHeight(rightRef),
+      max: 0.9 * columnHeight(rightRef),
+    }),
+    false,
+    true,
+  );
+
+  const centerBottomResize = useResize(
+    (px) => layout.setSize("centerBottomHeight", px / columnHeight(centerRef)),
+    () => layout.centerBottomHeight * columnHeight(centerRef),
+    () => ({
+      min: 0.1 * columnHeight(centerRef),
+      max: 0.9 * columnHeight(centerRef),
+    }),
+    true,
+    true,
+  );
+
+  const column = "relative grid min-h-0 bg-background";
 
   return (
-    <div className={styles.root}>
-      {top !== undefined && <div className={styles.top}>{top}</div>}
+    <div className="flex h-screen w-screen min-h-0 min-w-0 flex-col">
+      {top !== undefined && (
+        <div className="w-full flex-none border-b border-border bg-background">
+          {top}
+        </div>
+      )}
 
-      <div className={styles.body} ref={bodyRef}>
+      <div className="flex min-h-0 flex-1" ref={bodyRef}>
         {showLeft && (
           <div
-            className={styles.column}
+            className={cn(column, "border-r border-border")}
             ref={leftRef}
-            style={{ width: `${layout.leftWidth * 100}%` }}
+            style={{
+              width: `${layout.leftWidth * 100}%`,
+              gridTemplateRows: splitLeft
+                ? `${layout.leftSplit}fr ${1 - layout.leftSplit}fr`
+                : "1fr",
+            }}
           >
-            <div
-              className={styles.panel}
-              style={{ height: `${layout.leftSplit * 100}%` }}
-            >
-              {leftTop}
-            </div>
-            {leftTop !== undefined && leftBottom !== undefined && (
-              <div
-                className={styles.splitAnchor}
-                style={{ top: `${layout.leftSplit * 100}%` }}
-              >
-                <ResizeHandle
-                  orientation="horizontal"
-                  containerRef={leftRef}
-                  onResize={(r) => layout.setSize("leftSplit", r)}
-                  label="Resize the left column split"
-                />
+            {hasLeftTop && (
+              <div className="relative min-h-0 overflow-hidden">{leftTop}</div>
+            )}
+            {hasLeftBottom && (
+              <div className="relative min-h-0 overflow-hidden">
+                {splitLeft && (
+                  <VerticalResizeHandle
+                    onResizeStart={leftSplitResize.onResizeStart}
+                    isDragging={leftSplitResize.isDragging}
+                    align="top"
+                  />
+                )}
+                {leftBottom}
               </div>
             )}
-            <div className={styles.panel}>{leftBottom}</div>
-            <div className={styles.edgeRight}>
-              <ResizeHandle
-                orientation="vertical"
-                containerRef={bodyRef}
-                onResize={(r) => layout.setSize("leftWidth", r)}
-                label="Resize the left column"
-              />
-            </div>
+            <HorizontalResizeHandle
+              onResizeStart={leftResize.onResizeStart}
+              isDragging={leftResize.isDragging}
+              align="right"
+            />
           </div>
         )}
 
-        <div className={styles.center} ref={centerRef}>
-          <div className={styles.surface}>{center}</div>
+        <div
+          className="relative flex min-h-0 min-w-0 flex-1 flex-col"
+          ref={centerRef}
+        >
+          <div className="relative min-h-0 flex-1 overflow-hidden bg-background">
+            {center}
+          </div>
           {showCenterBottom && (
-            <>
-              <div
-                className={styles.splitAnchor}
-                style={{ bottom: `${layout.centerBottomHeight * 100}%` }}
-              >
-                <ResizeHandle
-                  orientation="horizontal"
-                  containerRef={centerRef}
-                  fromEnd
-                  onResize={(r) => layout.setSize("centerBottomHeight", r)}
-                  label="Resize the panel below the grid"
-                />
-              </div>
-              <div
-                className={styles.centerBottom}
-                style={{ height: `${layout.centerBottomHeight * 100}%` }}
-              >
+            <div
+              className="relative overflow-hidden border-t border-border"
+              style={{ height: `${layout.centerBottomHeight * 100}%` }}
+            >
+              <VerticalResizeHandle
+                onResizeStart={centerBottomResize.onResizeStart}
+                isDragging={centerBottomResize.isDragging}
+                align="top"
+              />
+              <div className="h-full min-h-0 overflow-hidden">
                 {centerBottom}
               </div>
-            </>
+            </div>
           )}
         </div>
 
         {showRight && (
           <div
-            className={styles.column}
+            className={cn(column, "border-l border-border")}
             ref={rightRef}
-            style={{ width: `${layout.rightWidth * 100}%` }}
+            style={{
+              width: `${layout.rightWidth * 100}%`,
+              gridTemplateRows: splitRight
+                ? `${layout.rightSplit}fr ${1 - layout.rightSplit}fr`
+                : "1fr",
+            }}
           >
-            <div className={styles.edgeLeft}>
-              <ResizeHandle
-                orientation="vertical"
-                containerRef={bodyRef}
-                fromEnd
-                onResize={(r) => layout.setSize("rightWidth", r)}
-                label="Resize the right column"
-              />
-            </div>
-            <div
-              className={styles.panel}
-              style={{ height: `${layout.rightSplit * 100}%` }}
-            >
-              {rightTop}
-            </div>
-            {rightTop !== undefined && rightBottom !== undefined && (
-              <div
-                className={styles.splitAnchor}
-                style={{ top: `${layout.rightSplit * 100}%` }}
-              >
-                <ResizeHandle
-                  orientation="horizontal"
-                  containerRef={rightRef}
-                  onResize={(r) => layout.setSize("rightSplit", r)}
-                  label="Resize the right column split"
-                />
+            <HorizontalResizeHandle
+              onResizeStart={rightResize.onResizeStart}
+              isDragging={rightResize.isDragging}
+              align="left"
+            />
+            {hasRightTop && (
+              <div className="relative min-h-0 overflow-hidden">{rightTop}</div>
+            )}
+            {hasRightBottom && (
+              <div className="relative min-h-0 overflow-hidden">
+                {splitRight && (
+                  <VerticalResizeHandle
+                    onResizeStart={rightSplitResize.onResizeStart}
+                    isDragging={rightSplitResize.isDragging}
+                    align="top"
+                  />
+                )}
+                {rightBottom}
               </div>
             )}
-            <div className={styles.panel}>{rightBottom}</div>
           </div>
         )}
       </div>
 
-      {bottom !== undefined && <div className={styles.bottom}>{bottom}</div>}
+      {bottom !== undefined && (
+        <div className="w-full flex-none border-t border-border bg-background">
+          {bottom}
+        </div>
+      )}
     </div>
   );
 };

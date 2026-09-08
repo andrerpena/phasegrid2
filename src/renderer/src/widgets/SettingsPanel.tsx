@@ -1,8 +1,8 @@
 import { Button } from "@renderer/components/buttons/Button";
 import { useConfigStore } from "@renderer/config/config-store";
 import { bindingsFromConfig } from "@renderer/keybindings/from-config";
+import { cn } from "@renderer/utils/cn";
 import { useWorkspaceStore } from "@renderer/workspace/workspace-store";
-import styles from "./SettingsPanel.module.css";
 
 /**
  * The settings, as the file they are.
@@ -29,41 +29,58 @@ export const SettingsPanel = () => {
   const bindingError = bindingsFromConfig(computed.keybindings ?? null).error;
 
   return (
-    <div className={styles.root} data-kb-scope="settings">
-      <p className={styles.path}>
-        {root === null ? "No workspace" : `${root}/workspace.json`}
+    <div
+      className="flex h-full min-h-0 flex-col gap-2 overflow-y-auto p-2"
+      data-kb-scope="settings"
+    >
+      {/* Truncated from the left, because the end of a path is the part that identifies it. The
+          `bdi` keeps the string itself left-to-right inside the right-to-left box -- without it the
+          leading slash is reordered to the end and the path reads as nonsense. */}
+      <p className="m-0 overflow-hidden text-ellipsis whitespace-nowrap text-left text-xs text-muted-foreground [direction:rtl]">
+        <bdi dir="ltr">
+          {root === null ? "No workspace" : `${root}/workspace.json`}
+        </bdi>
       </p>
       <textarea
-        className={styles.editor}
+        className="min-h-48 flex-none resize-y rounded-sm border border-border bg-input p-2 text-xs leading-relaxed text-foreground [tab-size:2]"
         value={text}
         spellCheck={false}
         aria-label="Workspace settings"
         onChange={(event) => setOverridesText(event.target.value)}
       />
-      {parseError !== null && <p className={styles.error}>{parseError}</p>}
+      {parseError !== null && (
+        <p className="m-0 text-xs text-destructive">{parseError}</p>
+      )}
       {parseError === null && bindingError !== null && (
-        <p className={styles.error}>keybindings: {bindingError}</p>
+        <p className="m-0 text-xs text-destructive">
+          keybindings: {bindingError}
+        </p>
       )}
 
-      <div className={styles.actions}>
-        <Button size="sm" onClick={reset}>
+      <div className="flex gap-1">
+        <Button variant="outline" size="sm" onClick={reset}>
           Reset
         </Button>
       </div>
 
-      <h3 className={styles.heading}>Effective values</h3>
-      <dl className={styles.values}>
+      <h3 className="mt-2 mb-0 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        Effective values
+      </h3>
+      <dl className="m-0 flex flex-col gap-0.5 text-xs">
         {Object.keys(defaults)
           .sort()
           .map((key) => (
-            <div key={key} className={styles.value}>
-              <dt className={styles.key}>{key}</dt>
+            <div key={key} className="flex justify-between gap-2">
+              <dt className="text-muted-foreground">{key}</dt>
+              {/* What you changed should stand out from what came with the application. */}
               <dd
-                className={styles.current}
-                data-overridden={
+                className={cn(
+                  "m-0 max-w-[55%] overflow-hidden text-ellipsis whitespace-nowrap",
                   JSON.stringify(computed[key]) !==
-                  JSON.stringify(defaults[key])
-                }
+                    JSON.stringify(defaults[key])
+                    ? "text-signal-note"
+                    : "text-muted-foreground",
+                )}
               >
                 {JSON.stringify(computed[key])}
               </dd>

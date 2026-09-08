@@ -14,7 +14,6 @@ import { useSelectionStore } from "@renderer/selection/selection-store";
 import { useEffect, useRef } from "react";
 import { GridInteraction } from "./GridInteraction";
 import { GridRenderer } from "./GridRenderer";
-import styles from "./GridView.module.css";
 import { startPreviewSync } from "./preview-sync";
 import { startTelemetrySync } from "./telemetry-sync";
 
@@ -229,7 +228,8 @@ export const GridView = () => {
   return (
     <div
       ref={host}
-      className={styles.host}
+      // The canvas fills this; the element itself only ever provides the box and the focus scope.
+      className="absolute inset-0 overflow-hidden touch-none [&>canvas]:block"
       data-kb-scope="grid"
       tabIndex={-1}
       onPointerDown={() => host.current?.focus()}

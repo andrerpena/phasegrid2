@@ -1,0 +1,9 @@
+export { catalogWidget } from "./CatalogWidget";
+export { gridWidget } from "./GridWidget";
+export { historyWidget } from "./HistoryWidget";
+export { inspectorWidget } from "./InspectorWidget";
+export { logWidget } from "./LogWidget";
+export { performanceWidget } from "./PerformanceWidget";
+export { projectsWidget } from "./ProjectsWidget";
+export { scopeWidget } from "./ScopeWidget";
+export { settingsWidget } from "./SettingsWidget";

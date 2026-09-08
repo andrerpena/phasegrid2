@@ -4,13 +4,12 @@ import { useHistoryStore } from "@renderer/history/history-store";
 import { useLayoutStore } from "@renderer/layout/layout-store";
 import { deleteSelection } from "@renderer/patch/delete-selection";
 import { emptyProject, useProjectStore } from "@renderer/project/project-store";
-import { useThemeStore } from "@renderer/theming/theme-store";
-import { THEMES } from "@renderer/theming/themes";
 import { SAVE_AS_MODAL } from "@renderer/workspace/SaveAsDialog";
 import { closeProject, resolveUnsaved } from "@renderer/workspace/unsaved";
 import { useWorkspaceStore } from "@renderer/workspace/workspace-store";
 import { commandRegistry } from "../registry";
 import type { CommandDefinition } from "../types";
+import { workbenchSetTheme } from "./workbench.setTheme";
 
 /**
  * Everything the shell can do, by name.
@@ -25,17 +24,7 @@ export const SHELL_COMMANDS: CommandDefinition<never>[] = [
     category: "Workbench",
     execute: () => useModalStore.getState().show("command-palette"),
   },
-  {
-    id: "workbench.cycleTheme",
-    name: "Switch Theme",
-    category: "Workbench",
-    execute: () => {
-      const current = useThemeStore.getState().theme.id;
-      const index = THEMES.findIndex((t) => t.id === current);
-      const next = THEMES[(index + 1) % THEMES.length];
-      if (next !== undefined) useThemeStore.getState().setTheme(next.id);
-    },
-  },
+  workbenchSetTheme,
   {
     id: "edit.undo",
     name: "Undo",

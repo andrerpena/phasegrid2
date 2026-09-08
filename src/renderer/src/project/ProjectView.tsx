@@ -1,6 +1,5 @@
 import { GridView } from "@renderer/grid/GridView";
 import { ProjectHeader } from "./ProjectHeader";
-import styles from "./ProjectView.module.css";
 
 /**
  * One project: its header, and its grid.
@@ -9,9 +8,9 @@ import styles from "./ProjectView.module.css";
  * piece rather than the wiring.
  */
 export const ProjectView = () => (
-  <div className={styles.root}>
+  <div className="flex h-full min-h-0 flex-col">
     <ProjectHeader />
-    <div className={styles.grid}>
+    <div className="relative min-h-0 flex-1">
       <GridView />
     </div>
   </div>

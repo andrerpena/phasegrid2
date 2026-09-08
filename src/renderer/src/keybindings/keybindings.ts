@@ -27,7 +27,7 @@ export interface Keybinding {
    *
    * Needed because a user's bindings are appended to the defaults rather than replacing them, so
    * overriding a key is easy and being rid of one otherwise would not be possible at all. A flag rather
-   * than a sigil on the command name: the file is already objects, and `-workbench.cycleTheme` is a
+   * than a sigil on the command name: the file is already objects, and `-workbench.setTheme` is a
    * thing you have to be told about, where `"remove": true` is a thing you can read.
    */
   remove?: boolean;
@@ -124,6 +124,26 @@ export class KeybindingRegistry {
       // matching everything.
       test: binding.when === undefined ? () => true : safeCompile(binding.when),
     }));
+  }
+
+  /**
+   * The key that runs a command, for showing beside its name.
+   *
+   * The last one registered, because that is the one that wins where two bindings name the same
+   * command, and because a user's file is loaded after the defaults. Unscoped and unconditional
+   * bindings are preferred: a hint next to a command in the palette should be the keystroke that
+   * works from where the palette is, not one that only fires over the canvas.
+   */
+  keyFor(command: string): string | undefined {
+    let fallback: string | undefined;
+    for (let i = this.compiled.length - 1; i >= 0; i--) {
+      const binding = this.compiled[i];
+      if (binding === undefined || binding.command !== command) continue;
+      if (binding.scope === undefined && binding.when === undefined)
+        return binding.key;
+      fallback ??= binding.key;
+    }
+    return fallback;
   }
 
   /**

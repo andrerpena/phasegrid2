@@ -1,14 +1,15 @@
 import { type ReactNode, useEffect, useRef } from "react";
-import styles from "./Modal.module.css";
+import { cn } from "../../../utils/cn";
+import type { ModalAlignment, ModalSize } from "./types";
 
 export interface ModalProps {
   open: boolean;
+  /** Backing out: escape, or a click on the backdrop. */
   onClose: () => void;
-  title: string;
   children: ReactNode;
-  /** Buttons along the bottom. */
-  footer?: ReactNode;
-  size?: "sm" | "md" | "lg" | "full";
+  size?: ModalSize;
+  alignment?: ModalAlignment;
+  showBackdrop?: boolean;
 }
 
 /**
@@ -23,13 +24,27 @@ export interface ModalProps {
  * opens in one of these and owns a canvas with a graphics context, which must be released when it
  * closes rather than kept alive off screen.
  */
+const sizeClasses: Record<ModalSize, string> = {
+  sm: "max-w-sm",
+  md: "max-w-md",
+  lg: "max-w-lg",
+  xl: "max-w-xl",
+  "2xl": "max-w-2xl",
+  full: "max-w-full",
+};
+
+const alignmentClasses: Record<ModalAlignment, string> = {
+  center: "items-center",
+  top: "items-start pt-16",
+};
+
 export const Modal = ({
   open,
   onClose,
-  title,
   children,
-  footer,
   size = "md",
+  alignment = "center",
+  showBackdrop = true,
 }: ModalProps) => {
   const ref = useRef<HTMLDialogElement>(null);
 
@@ -61,7 +76,12 @@ export const Modal = ({
   return (
     <dialog
       ref={ref}
-      className={`${styles.dialog} ${styles[size]}`}
+      className={cn(
+        // The dialog element is the full-screen layer; the card inside it is what is sized.
+        "m-0 h-full max-h-none w-full max-w-none justify-center bg-transparent p-4 open:flex",
+        alignmentClasses[alignment],
+        showBackdrop ? "backdrop:bg-black/50" : "backdrop:bg-transparent",
+      )}
       // Escape fires `cancel`; without this the dialog would close itself while React still believed
       // it was open, and the next open would do nothing.
       onCancel={(event) => {
@@ -69,26 +89,9 @@ export const Modal = ({
         onClose();
       }}
       onClose={onClose}
-      aria-labelledby="modal-title"
     >
-      <div className={styles.frame} data-kb-scope="modal">
-        <header className={styles.header}>
-          <h2 className={styles.title} id="modal-title">
-            {title}
-          </h2>
-          <button
-            type="button"
-            className={styles.close}
-            onClick={onClose}
-            aria-label="Close"
-          >
-            ×
-          </button>
-        </header>
-        <div className={styles.body}>{children}</div>
-        {footer !== undefined && (
-          <footer className={styles.footer}>{footer}</footer>
-        )}
+      <div className={cn("w-full", sizeClasses[size])} data-kb-scope="modal">
+        {children}
       </div>
     </dialog>
   );

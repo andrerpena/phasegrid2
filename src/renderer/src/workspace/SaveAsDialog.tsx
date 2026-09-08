@@ -1,10 +1,14 @@
 import { Button } from "@renderer/components/buttons/Button";
-import { Modal } from "@renderer/components/floating/modal/Modal";
-import { useModalStore } from "@renderer/components/floating/modal/modal-store";
+import {
+  Modal,
+  ModalFrameStructured,
+  useModalStore,
+} from "@renderer/components/floating/modal";
+import { Label } from "@renderer/components/form-controls";
+import { TextInput } from "@renderer/components/form-controls/TextInput";
 import { useProjectStore } from "@renderer/project/project-store";
 import { slugify, uniqueSlug } from "@shared/protocol/workspace";
 import { useEffect, useRef, useState } from "react";
-import styles from "./SaveAsDialog.module.css";
 import { useWorkspaceStore } from "./workspace-store";
 
 export const SAVE_AS_MODAL = "project.saveAs";
@@ -54,40 +58,42 @@ export const SaveAsDialog = () => {
     });
   };
 
+  const close = () => hide(SAVE_AS_MODAL);
+
   return (
-    <Modal
-      open={open}
-      onClose={() => hide(SAVE_AS_MODAL)}
-      title="Save Project As"
-      size="sm"
-      footer={
-        <>
-          <Button onClick={() => hide(SAVE_AS_MODAL)}>Cancel</Button>
-          <Button
-            variant="primary"
-            disabled={trimmed.length === 0}
-            onClick={submit}
-          >
-            Save
-          </Button>
-        </>
-      }
-    >
-      <label className={styles.field}>
-        <span className={styles.caption}>Name</span>
-        <input
-          ref={input}
-          className={styles.input}
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") submit();
-          }}
-        />
-      </label>
-      <p className={styles.folder}>
-        {folder === "" ? " " : `projects/${folder}/`}
-      </p>
+    <Modal open={open} onClose={close} size="sm">
+      <ModalFrameStructured
+        title="Save Project As"
+        onClose={close}
+        data-testid="save-as"
+        footer={
+          <>
+            <Button variant="outline" onClick={close}>
+              Cancel
+            </Button>
+            <Button disabled={trimmed.length === 0} onClick={submit}>
+              Save
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="save-as-name">Name</Label>
+          <TextInput
+            id="save-as-name"
+            ref={input}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") submit();
+            }}
+          />
+        </div>
+        {/* The folder name is shown as you type: it is what you will see in a file manager. */}
+        <p className="mt-2 min-h-4 text-xs text-muted-foreground">
+          {folder === "" ? " " : `projects/${folder}/`}
+        </p>
+      </ModalFrameStructured>
     </Modal>
   );
 };

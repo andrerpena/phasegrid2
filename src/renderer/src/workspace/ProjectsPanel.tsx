@@ -1,5 +1,5 @@
 import { useProjectStore } from "@renderer/project/project-store";
-import styles from "./ProjectsPanel.module.css";
+import { cn } from "@renderer/utils/cn";
 import { useWorkspaceStore } from "./workspace-store";
 
 /**
@@ -22,22 +22,24 @@ export const ProjectsPanel = () => {
 
   if (projects.length === 0)
     return (
-      <p className={styles.empty}>
+      <p className="m-0 p-3 text-xs text-muted-foreground">
         Nothing saved here yet. Make something and press ⌘S.
       </p>
     );
 
   return (
-    <ul className={styles.list}>
+    <ul className="m-0 flex list-none flex-col gap-px overflow-y-auto p-1">
       {projects.map((summary) => {
         const tab = open.find((p) => p.slug === summary.slug);
         return (
-          <li key={summary.slug} className={styles.row}>
+          <li key={summary.slug} className="group flex items-center">
             <button
               type="button"
-              className={styles.name}
-              data-open={tab !== undefined}
-              data-active={tab !== undefined && tab.id === activeId}
+              className={cn(
+                "flex min-w-0 flex-1 cursor-pointer items-center gap-1 overflow-hidden text-ellipsis whitespace-nowrap rounded-sm px-2 py-1 text-left text-xs hover:bg-card",
+                tab === undefined ? "text-muted-foreground" : "text-foreground",
+                tab !== undefined && tab.id === activeId && "bg-card",
+              )}
               title={summary.slug}
               // Already open means bring it forward. Reading it again would replace what is on screen
               // with what is on disk, which for an unsaved tab is a way to lose an afternoon.
@@ -49,14 +51,16 @@ export const ProjectsPanel = () => {
             >
               {summary.name}
               {tab !== undefined && dirtyIds.includes(tab.id) && (
-                <span className={styles.dirty} title="Unsaved changes">
+                <span className="text-signal-note" title="Unsaved changes">
                   •
                 </span>
               )}
             </button>
             <button
               type="button"
-              className={styles.delete}
+              // Hidden until the row is under the pointer: a delete button beside every name is a
+              // delete button that eventually gets pressed by accident.
+              className="cursor-pointer px-1 text-transparent group-hover:text-muted-foreground focus-visible:text-muted-foreground hover:!text-destructive"
               aria-label={`Delete ${summary.name}`}
               title={`Delete ${summary.name}`}
               onClick={() => void removeProject(summary.slug)}

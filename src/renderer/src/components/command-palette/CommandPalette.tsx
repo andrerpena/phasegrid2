@@ -1,9 +1,9 @@
 import { commandRegistry } from "@renderer/commands/registry";
-import { Modal } from "../floating/modal/Modal";
-import {
-  type NavigatorItem,
-  SearchableTreeNavigator,
-} from "./SearchableTreeNavigator";
+import { formatKey } from "@renderer/keybindings/display";
+import { keybindingRegistry } from "@renderer/keybindings/keybindings";
+import type { MenuItem } from "@renderer/menu/types";
+import { Modal, ModalFrame } from "../floating/modal";
+import { SearchableTreeNavigator } from "./SearchableTreeNavigator";
 
 export interface CommandPaletteProps {
   open: boolean;
@@ -14,9 +14,9 @@ export interface CommandPaletteProps {
  * Type to find a command, enter to run it.
  *
  * The list, the search and the keyboard all come from `SearchableTreeNavigator`, which is the same
- * component the module catalogue and the module explorer use. That is deliberate: these are one
- * interaction, and three implementations of it would behave almost identically, which is worse than
- * behaving differently on purpose.
+ * component the module catalogue uses. That is deliberate: these are one interaction, and two
+ * implementations of it would behave almost identically, which is worse than behaving differently
+ * on purpose.
  */
 export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
   if (!open) return null;
@@ -27,27 +27,31 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
   // computed once and cached is empty forever and every command silently unreachable — which is
   // exactly what happened. The registry is a map lookup over a few dozen entries; caching it saved
   // nothing and cost the feature.
-  const items: NavigatorItem[] = commandRegistry.runnable().map((command) => ({
-    id: command.id,
-    label: command.name,
-    hint: command.id,
-    group: command.category,
-    keywords: command.description,
-  }));
+  const items: MenuItem[] = commandRegistry.runnable().map((command) => {
+    const key = keybindingRegistry.keyFor(command.id);
+    return {
+      id: command.id,
+      label: command.name,
+      subtitle: command.id,
+      keywords: command.description,
+      ...(key === undefined ? {} : { trailing: formatKey(key) }),
+      onExecute: () => {
+        onClose();
+        void commandRegistry.dispatch(command.id);
+      },
+    };
+  });
 
   return (
-    <Modal open={open} onClose={onClose} title="Commands" size="md">
-      <SearchableTreeNavigator
-        items={items}
-        autoFocus
-        placeholder="Type a command"
-        ariaLabel="Search commands"
-        emptyMessage="No matching command"
-        onChoose={(item) => {
-          onClose();
-          void commandRegistry.dispatch(item.id);
-        }}
-      />
+    <Modal open={open} onClose={onClose} size="lg" alignment="top">
+      <ModalFrame data-testid="command-palette">
+        <SearchableTreeNavigator
+          items={items}
+          placeHolder="Type a command"
+          autoFocusInput
+          data-testid="command-palette-navigator"
+        />
+      </ModalFrame>
     </Modal>
   );
 };

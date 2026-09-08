@@ -28,6 +28,9 @@ import { fileURLToPath } from "node:url";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 let PORT = 9400;
 const userData = mkdtempSync(join(tmpdir(), "pg-ud-"));
+const SHOTS =
+  process.env.PG_E2E_SHOTS ?? mkdtempSync(join(tmpdir(), "pg-shot-"));
+mkdirSync(SHOTS, { recursive: true });
 const ws = mkdtempSync(join(tmpdir(), "pg-ws-"));
 console.log("userData:", userData, "\nworkspace:", ws, "\n");
 
@@ -151,9 +154,26 @@ async function launch(run) {
         pointerType: "mouse",
       });
 
+    /**
+     * A picture of the window, written next to the build.
+     *
+     * Not a check -- nothing here compares images -- but the fastest way for a person to see what a
+     * change did to a layout, which is the kind of thing a string assertion is bad at.
+     */
+    const screenshot = async (name) => {
+      const reply = await send("Page.captureScreenshot", { format: "png" });
+      const data = reply.result?.data;
+      if (typeof data !== "string") return null;
+      const file = join(SHOTS, `${name}.png`);
+      writeFileSync(file, Buffer.from(data, "base64"));
+      console.log(`      shot  ${file}`);
+      return file;
+    };
+
     await send("Runtime.enable");
+    await send("Page.enable");
     await sleep(1800);
-    await run({ evaluate, text, mouse, sleep });
+    await run({ evaluate, text, mouse, sleep, screenshot });
   } finally {
     try {
       socket?.close();
@@ -203,7 +223,7 @@ try {
   });
 
   // ── Second launch: the pointer is remembered, so the shell opens ──────────
-  await launch(async ({ evaluate, text }) => {
+  await launch(async ({ evaluate, text, screenshot }) => {
     const shell = await text();
     const isShell = await evaluate(
       `return document.querySelector('[data-kb-scope="catalog"]') !== null;`,
@@ -281,7 +301,8 @@ try {
     );
 
     // Settings, and a keybinding taking effect without a relaunch.
-    await evaluate(`click("button", "Settings");`);
+    // A widget's tab, not a button: the dock renders each slot as a tab strip now.
+    await evaluate(`click('[role="tab"]', "Settings");`);
     await sleep(300);
     // The catalogue's own search field: present exactly when the left column is. Matching on the panel
     // title does not work, because the title is uppercased by the stylesheet and `innerText` says so.
@@ -297,6 +318,81 @@ try {
     await evaluate(`press("b", { metaKey: true });`);
     await sleep(300);
     check("6. and toggles it back", await evaluate(`return ${leftShown};`));
+
+    // ── The dock: a panel can be closed, and put back from the slot it left ──
+    await screenshot("shell");
+    const tabNames = () =>
+      evaluate(
+        `return [...document.querySelectorAll('[role="tab"]')].map((t) => t.textContent.trim());`,
+      );
+    const tabs = await tabNames();
+    check(
+      "6. every slot renders its panels as tabs",
+      [
+        "Catalog",
+        "Projects",
+        "History",
+        "Grid",
+        "Settings",
+        "Log",
+        "Inspector",
+        "Scope",
+        "Performance",
+      ].every((name) => tabs.includes(name)),
+      JSON.stringify(tabs),
+    );
+
+    // Closing writes the layout to the workspace, which is the point of it living in the settings.
+    await evaluate(
+      `[...document.querySelectorAll('[aria-label="Close Performance"]')][0].click();`,
+    );
+    await sleep(400);
+    check(
+      "6. closing a panel removes its tab",
+      !(await tabNames()).includes("Performance"),
+    );
+    const savedLayout = JSON.parse(
+      readFileSync(join(ws, "workspace.json"), "utf8"),
+    ).settings["layout.widgets"];
+    check(
+      "6. and the workspace remembers the layout",
+      Array.isArray(savedLayout?.["right-bottom"]) &&
+        !savedLayout["right-bottom"].includes("performance"),
+      JSON.stringify(savedLayout),
+    );
+
+    // The `+` on a slot's strip offers exactly what is missing. Opened with a pointerdown rather
+    // than a click: that is the event the menu listens for.
+    await evaluate(
+      `const add = document.querySelector('[aria-label="Add a panel to right-bottom"]');
+       add.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, button: 0, isPrimary: true, pointerType: "mouse" }));
+       add.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, cancelable: true, button: 0, isPrimary: true, pointerType: "mouse" }));`,
+    );
+    await sleep(400);
+    const offered = await evaluate(
+      `return [...document.querySelectorAll('[role="menuitem"]')].map((i) => i.textContent.trim());`,
+    );
+    check(
+      "6. the add-panel menu offers the one that was closed",
+      offered.includes("Performance"),
+      JSON.stringify(offered),
+    );
+    await evaluate(
+      `[...document.querySelectorAll('[role="menuitem"]')].find((i) => i.textContent.trim() === "Performance").click();`,
+    );
+    await sleep(400);
+    check(
+      "6. and adding it back restores the tab",
+      (await tabNames()).includes("Performance"),
+    );
+
+    // A pinned panel has no close button at all: nothing in the interface could put the grid back.
+    check(
+      "6. the grid cannot be closed",
+      (await evaluate(
+        `return document.querySelector('[aria-label="Close Grid"]') === null;`,
+      )) === true,
+    );
 
     await evaluate(
       `setValue(document.querySelector('textarea[aria-label="Workspace settings"]'), ${JSON.stringify('{"grid.snap": 16, "keybindings": [{"key": "mod+b", "remove": true}]}')});`,
@@ -322,19 +418,42 @@ try {
 
     // And adding one does too, on the same read of the file.
     await evaluate(
-      `setValue(document.querySelector('textarea[aria-label="Workspace settings"]'), ${JSON.stringify('{"grid.snap": 16, "keybindings": [{"key": "mod+b", "remove": true}, {"key": "mod+alt+j", "command": "workbench.cycleTheme"}]}')});`,
+      `setValue(document.querySelector('textarea[aria-label="Workspace settings"]'), ${JSON.stringify('{"grid.snap": 16, "keybindings": [{"key": "mod+b", "remove": true}, {"key": "mod+alt+j", "command": "workbench.setTheme"}]}')});`,
     );
     await sleep(500);
-    // By its label: the header has selects of its own (meter, scale) and they come first in the DOM.
-    const themeSelect = `[...document.querySelectorAll("label")].find((l) => l.textContent.trim().startsWith("Theme")).querySelector("select").value`;
-    const themeBefore = await evaluate(`return ${themeSelect};`);
+    // The document says which theme is on -- the stylesheet keys off it -- so that is what to read.
+    const activeTheme = `document.documentElement.dataset.theme`;
+    const themeBefore = await evaluate(`return ${activeTheme};`);
     await evaluate(`press("j", { metaKey: true, altKey: true });`);
     await sleep(400);
-    const themeAfter = await evaluate(`return ${themeSelect};`);
     check(
       "6. adding a binding takes effect without a relaunch",
-      themeBefore !== themeAfter,
-      `${themeBefore} -> ${themeAfter}`,
+      (await evaluate(
+        `return document.querySelector('[data-testid="theme-picker"]') !== null;`,
+      )) === true,
+      "the theme picker did not open",
+    );
+    // Arrowing through the picker previews each theme, and escape puts back the one you had.
+    // Twice: the list opens with the active theme first, so one press lands back on where you are.
+    await evaluate(
+      `const input = document.querySelector('[data-testid="theme-picker-navigator-search"]');
+       input.focus();
+       for (let i = 0; i < 2; i++) input.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));`,
+    );
+    await sleep(250);
+    const themePreviewed = await evaluate(`return ${activeTheme};`);
+    check(
+      "6. arrowing through the theme picker previews",
+      themePreviewed !== themeBefore,
+      `${themeBefore} -> ${themePreviewed}`,
+    );
+    await evaluate(
+      `document.querySelector("dialog").dispatchEvent(new Event("cancel", { cancelable: true }));`,
+    );
+    await sleep(250);
+    check(
+      "6. and escaping puts the old one back",
+      (await evaluate(`return ${activeTheme};`)) === themeBefore,
     );
 
     // Text that does not parse never reaches the file.
@@ -431,7 +550,7 @@ try {
     ),
   );
 
-  await launch(async ({ evaluate, text, mouse }) => {
+  await launch(async ({ evaluate, text, mouse, screenshot }) => {
     await evaluate(`click("button", "Wiring");`);
     await sleep(1500);
     // The selected tab, not the Projects list: the list shows the name whether or not it opened, which
@@ -448,6 +567,8 @@ try {
       const r = el.getBoundingClientRect();
       return { x: r.x, y: r.y, w: r.width, h: r.height };`);
     check("9. the grid has a canvas", box !== null, JSON.stringify(box));
+    // The one picture worth having: a real patch drawn by the real renderer.
+    await screenshot("grid");
     if (box === null) throw new Error("no canvas to drag on");
 
     // A marquee across the whole surface. The viewport starts unmoved, so patch coordinates and canvas

@@ -16,7 +16,7 @@ export const DEFAULT_KEYBINDINGS: Keybinding[] = [
   { key: "mod+b", command: "view.toggleLeft" },
   { key: "mod+alt+b", command: "view.toggleRight" },
   { key: "mod+j", command: "view.toggleBottom" },
-  { key: "mod+alt+t", command: "workbench.cycleTheme" },
+  { key: "mod+alt+t", command: "workbench.setTheme" },
   { key: "mod+s", command: "project.save" },
   { key: "mod+shift+s", command: "project.saveAs" },
   // Scoped to the grid and conditional on a selection, because a shortcut that deletes with nothing

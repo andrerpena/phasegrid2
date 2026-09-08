@@ -41,6 +41,33 @@ export interface ConfigActions {
 
 export const DEFAULT_CONFIG: ConfigRecord = {
   "ui.theme": "dark",
+  /**
+   * Which panel is in which slot.
+   *
+   * In the settings rather than beside the window geometry, because it is a statement about how you
+   * work rather than about the size of your monitor -- and because it means rearranging the window
+   * and editing this file are the same operation reached two ways. The geometry itself (column
+   * widths, split ratios) stays under `userData`, so a workspace copied to another machine arrives
+   * with your panels and that machine's proportions.
+   */
+  "layout.widgets": {
+    "left-top": ["catalog"],
+    "left-bottom": ["projects", "history"],
+    center: ["grid", "settings"],
+    "center-bottom": ["log"],
+    "right-top": ["inspector"],
+    "right-bottom": ["scope", "performance"],
+  },
+  "layout.statusBars": {
+    left: ["workspace", "engine", "run-command"],
+    right: ["theme", "version"],
+  },
+  /**
+   * Colour overrides, as flat dot-paths: `grid.gridLine`, `signal.audio`, `ui.background`.
+   *
+   * Empty by default -- what ships is the active theme, and this says what you changed about it.
+   */
+  theme: {},
   "grid.snap": 8,
   "grid.showParamPorts": "hover",
   "engine.blockSize": 64,

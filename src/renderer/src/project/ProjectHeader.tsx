@@ -1,9 +1,15 @@
 import { commandRegistry } from "@renderer/commands/registry";
 import { useEngineStore } from "@renderer/engine/engine-store";
 import { useProjectStore } from "@renderer/project/project-store";
+import { cn } from "@renderer/utils/cn";
 import { NOTE_NAMES, SCALE_NAMES, scaleLabel } from "@shared/protocol/project";
 import { useEffect, useState } from "react";
-import styles from "./ProjectHeader.module.css";
+
+/** Every number and picker in the strip shares this: tabular figures so a changing tempo does not
+ *  make the row jitter sideways. */
+const FIELD =
+  "rounded-sm border border-border bg-input px-0.5 font-[inherit] text-xs text-foreground tabular-nums";
+const CAPTION = "text-[10px] uppercase tracking-wide text-muted-foreground";
 
 /**
  * The strip above the grid: transport, tempo, meter, scale.
@@ -72,10 +78,13 @@ export const ProjectHeader = () => {
     }).catch(() => {});
   }, [project, call]);
 
-  if (project === null) return <div className={styles.root} />;
+  const strip =
+    "flex min-h-8 items-center gap-3 border-b border-border bg-card px-2 text-xs";
+
+  if (project === null) return <div className={strip} />;
 
   return (
-    <div className={styles.root}>
+    <div className={strip}>
       {/*
         One control, not two.
 
@@ -92,7 +101,10 @@ export const ProjectHeader = () => {
       */}
       <button
         type="button"
-        className={styles.transport}
+        className={cn(
+          "h-5 w-6 cursor-pointer rounded-sm border border-border bg-secondary leading-none text-foreground",
+          playing && "border-ring text-signal-note",
+        )}
         aria-pressed={playing}
         aria-label={playing ? "Stop" : "Play"}
         title={
@@ -105,10 +117,10 @@ export const ProjectHeader = () => {
         {playing ? "■" : "▶"}
       </button>
 
-      <label className={styles.field}>
-        <span className={styles.caption}>Tempo</span>
+      <label className="flex items-center gap-1">
+        <span className={CAPTION}>Tempo</span>
         <input
-          className={styles.number}
+          className={`${FIELD} w-[68px]`}
           type="number"
           min={20}
           max={400}
@@ -119,11 +131,11 @@ export const ProjectHeader = () => {
         />
       </label>
 
-      <label className={styles.field}>
-        <span className={styles.caption}>Meter</span>
-        <span className={styles.meter}>
+      <label className="flex items-center gap-1">
+        <span className={CAPTION}>Meter</span>
+        <span className="flex items-center gap-0.5 text-muted-foreground">
           <input
-            className={styles.small}
+            className={`${FIELD} w-[34px]`}
             type="number"
             min={1}
             max={64}
@@ -141,7 +153,7 @@ export const ProjectHeader = () => {
           />
           <span aria-hidden>/</span>
           <select
-            className={styles.select}
+            className={FIELD}
             value={project.timeSignature.denominator}
             aria-label="Beat value"
             onChange={(event) =>
@@ -164,15 +176,18 @@ export const ProjectHeader = () => {
 
       {/* A live region: the playhead changes without anyone acting, and a screen reader should be
           able to ask where it is rather than being told twenty times a second. */}
-      <output className={styles.position} aria-label="Position">
+      <output
+        className="min-w-12 tabular-nums text-muted-foreground"
+        aria-label="Position"
+      >
         {position.bar + 1}.{Math.floor(position.beat) + 1}
       </output>
 
-      <label className={styles.field}>
-        <span className={styles.caption}>Scale</span>
-        <span className={styles.meter}>
+      <label className="flex items-center gap-1">
+        <span className={CAPTION}>Scale</span>
+        <span className="flex items-center gap-0.5 text-muted-foreground">
           <select
-            className={styles.select}
+            className={FIELD}
             value={project.scale.root}
             aria-label="Scale root"
             onChange={(event) =>
@@ -189,7 +204,7 @@ export const ProjectHeader = () => {
             ))}
           </select>
           <select
-            className={styles.select}
+            className={FIELD}
             value={project.scale.name}
             aria-label="Scale"
             onChange={(event) =>
@@ -208,9 +223,9 @@ export const ProjectHeader = () => {
         </span>
       </label>
 
-      <span className={styles.spacer} />
+      <span className="flex-1" />
       <span
-        className={styles.name}
+        className="flex items-center gap-1 text-muted-foreground"
         title={
           project.kind === "example"
             ? "An example. Saving it makes it a project of your own."
@@ -219,7 +234,9 @@ export const ProjectHeader = () => {
       >
         {project.name}
         {project.kind === "example" && (
-          <span className={styles.badge}>example</span>
+          <span className="rounded-sm border border-border px-1 text-[10px] uppercase tracking-wide text-signal-note">
+            example
+          </span>
         )}
       </span>
 
@@ -233,7 +250,9 @@ export const ProjectHeader = () => {
       */}
       <button
         type="button"
-        className={styles.save}
+        // Dimmed rather than hidden: the button staying in place is what makes "Saved" a state you
+        // can see rather than a thing you have to remember.
+        className="flex-none cursor-pointer rounded-sm border border-border bg-card px-2 py-1 text-xs text-foreground enabled:hover:border-ring disabled:cursor-default disabled:text-muted-foreground"
         disabled={!dirtyIds.includes(project.id)}
         title={
           dirtyIds.includes(project.id)
