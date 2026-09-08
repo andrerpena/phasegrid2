@@ -1,4 +1,5 @@
 import { resolve } from "node:path";
+import tailwindcss from "@tailwindcss/postcss";
 import react from "@vitejs/plugin-react";
 import { defineConfig, externalizeDepsPlugin } from "electron-vite";
 import pkg from "./package.json";
@@ -18,12 +19,21 @@ export default defineConfig({
         "@shared": resolve(__dirname, "shared"),
       },
     },
-    css: { modules: { localsConvention: "camelCase" } },
+    // Tailwind is the whole styling system; there are no CSS Modules left to configure.
+    css: { postcss: { plugins: [tailwindcss()] } },
     plugins: [react()],
     build: {
       outDir: "out/renderer",
       rollupOptions: {
-        output: { manualChunks: { "react-vendor": ["react", "react-dom"] } },
+        output: {
+          // Naming a package here also pulls it into the graph, so a chunk is only declared
+          // once something actually imports it -- Monaco's entry arrives with the settings
+          // widget in the phase that needs it.
+          manualChunks: {
+            pixi: ["pixi.js"],
+            "react-vendor": ["react", "react-dom"],
+          },
+        },
       },
     },
   },

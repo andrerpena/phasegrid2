@@ -1,6 +1,7 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { StorybookConfig } from "@storybook/react-vite";
+import tailwindcss from "@tailwindcss/postcss";
 import react from "@vitejs/plugin-react";
 
 // This file is ESM, where `__dirname` does not exist.
@@ -28,6 +29,9 @@ const config: StorybookConfig = {
     // built by electron-vite -- so the React plugin has to be added here or JSX compiles without the
     // automatic runtime and every story fails with "React is not defined".
     plugins: [...(config.plugins ?? []), react()],
+    // Same reason: with no root config to inherit from, Tailwind's PostCSS plugin has to be
+    // named here or every story renders with the class names present and none of them defined.
+    css: { ...config.css, postcss: { plugins: [tailwindcss()] } },
     resolve: {
       ...config.resolve,
       alias: {

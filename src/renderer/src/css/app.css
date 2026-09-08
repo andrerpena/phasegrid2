@@ -1,0 +1,50 @@
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* The window is the viewport. Nothing above the dock ever scrolls. */
+    overflow: hidden;
+    height: 100%;
+  }
+
+  /* `data-theme` is written by `theming/apply-theme.ts`. The bare `:root` case is the
+     dark theme, so the window never flashes light before the store has run. */
+  :root,
+  [data-theme="dark"],
+  [data-theme="terminal"] {
+    color-scheme: dark;
+  }
+
+  [data-theme="light"] {
+    color-scheme: light;
+  }
+
+  body {
+    font-family: "Source Code Pro", ui-monospace, Menlo, monospace;
+    background-color: var(--background);
+    color: var(--foreground);
+    /* A grid editor is dragged on constantly; a stray text selection mid-drag is noise. */
+    -webkit-user-select: none;
+    user-select: none;
+    overflow: hidden;
+    height: 100%;
+    margin: 0;
+    /* Pan and pinch on the canvas are handled in JS, so the browser must not claim them. */
+    touch-action: none;
+  }
+
+  #root {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  /* Text that is meant to be read and copied — a path, a log line, an error — opts back in. */
+  .selectable {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+}

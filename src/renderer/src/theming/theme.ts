@@ -1,13 +1,22 @@
 /**
- * The theme, as one JavaScript object.
+ * The theme, twice.
  *
- * This is the single source. `apply-theme.ts` writes it onto the document as custom properties for CSS
- * to read, and the Pixi surfaces read the same object directly. There is deliberately no hand-written
- * stylesheet of colour variables to keep in step: the pattern this project is copied from had one, and
- * the two drifted apart, which is a class of bug that cannot happen if the values only exist once.
+ * Colours exist in two places on purpose. `css/theme.css` declares them as custom properties, which
+ * is what lets Tailwind's `@theme` block turn them into utility classes — `bg-background`,
+ * `text-muted-foreground`, `border-border` — and a utility class is the whole point of using
+ * Tailwind. The objects below hold the same values again, because a Pixi canvas cannot read a
+ * stylesheet and the grid renderer needs them as data.
+ *
+ * Two copies of the same list is a thing that drifts. `theme-parity.test.ts` is the answer: it
+ * parses `theme.css` and fails if any theme's block and its object disagree about a key or a value.
+ * Change one, the test names the other.
+ *
+ * Naming is mechanical, and the test depends on it: a `UIColors` key becomes `--kebab-case`, a
+ * `GridColors` key becomes `--grid-background` / `--grid-line` / `--node-fill` …, and a signal role
+ * becomes `--signal-audio`.
  */
 
-/** Interface colours. Every one becomes `--color-<kebab-name>` on the document element. */
+/** Interface colours. Every one is a custom property and a Tailwind colour of the same name. */
 export interface UIColors {
   background: string;
   foreground: string;
@@ -51,7 +60,13 @@ export interface SignalColors {
   note: string;
 }
 
-/** What the Pixi surfaces read. Hex strings; `hexToNumber` in `lib/color.ts` converts for Pixi. */
+/**
+ * What the Pixi surfaces read.
+ *
+ * Hex, not `oklch`, and not negotiable: `hexToNumber` in `lib/color.ts` is what turns a colour into
+ * the integer Pixi wants, and it parses `#rrggbb` and nothing else. The interface colours above may
+ * be any CSS colour because only CSS reads them; these may not.
+ */
 export interface GridColors {
   background: string;
   gridLine: string;
@@ -80,3 +95,23 @@ export interface PhasegridTheme {
   colors: UIColors;
   grid: GridColors;
 }
+
+/** `cardForeground` → `--card-foreground`. The one rule the parity test and `apply-theme` share. */
+export function cssVarName(key: string): string {
+  return `--${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
+}
+
+/** The custom property every `GridColors` key is declared as. */
+export const GRID_VAR_NAMES: Record<keyof Omit<GridColors, "signal">, string> =
+  {
+    background: "--grid-background",
+    gridLine: "--grid-line",
+    nodeFill: "--node-fill",
+    nodeStroke: "--node-stroke",
+    nodeSelected: "--node-selected",
+    knobBody: "--knob-body",
+    knobPointer: "--knob-pointer",
+    knobLabel: "--knob-label",
+    marquee: "--marquee",
+    playhead: "--playhead",
+  };

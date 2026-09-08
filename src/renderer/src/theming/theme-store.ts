@@ -9,22 +9,23 @@ interface ThemeState {
 }
 
 /**
- * The active theme.
+ * Which theme is on.
  *
- * Both consumers read this one store: CSS through the custom properties `applyTheme` writes, and the
- * Pixi surfaces by subscribing to the object itself. A canvas cannot read a CSS variable, which is why
- * the theme has to exist as data rather than only as a stylesheet.
+ * The store holds the answer and touches nothing else — no document, no stylesheet. `watchTheme`
+ * below is what puts it on the page, the same way `watchEngine` and `startEngineSync` connect a
+ * store to the world elsewhere in this project. Keeping the store pure means a test can switch
+ * themes without a DOM, and means there is exactly one line in the codebase that writes
+ * `data-theme`.
  */
 export const useThemeStore = create<ThemeState>((set) => ({
   theme: themeById(DEFAULT_THEME_ID),
-  setTheme: (id) => {
-    const theme = themeById(id);
-    applyTheme(theme);
-    set({ theme });
-  },
+  setTheme: (id) => set({ theme: themeById(id) }),
 }));
 
-/** Called once at startup, before the first paint, so the window never flashes the wrong ground. */
-export function initTheme(id: string = DEFAULT_THEME_ID): void {
-  useThemeStore.getState().setTheme(id);
+/** Puts the active theme on the document, and keeps it there. Returns the way to stop. */
+export function watchTheme(root?: HTMLElement): () => void {
+  applyTheme(useThemeStore.getState().theme, root);
+  return useThemeStore.subscribe((state, previous) => {
+    if (state.theme !== previous.theme) applyTheme(state.theme, root);
+  });
 }

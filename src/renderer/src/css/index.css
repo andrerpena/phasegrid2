@@ -1,20 +1,4 @@
-@import "./tokens.css";
-
-/* Provisional colors. Phase 6 replaces these with theming/apply-theme.ts writing --color-* at runtime. */
-:root {
-  --color-background: #1e1e1e;
-  --color-foreground: #d4d4d4;
-  --color-muted: #8a8a8a;
-}
-
-html,
-body,
-#root {
-  margin: 0;
-  height: 100%;
-  overflow: hidden;
-  background: var(--color-background);
-  color: var(--color-foreground);
-  font-family: "Source Code Pro", ui-monospace, Menlo, monospace;
-  font-size: var(--font-size-body);
-}
+@import "tailwindcss";
+@import "./fonts.css";
+@import "./theme.css";
+@import "./app.css";

@@ -1,14 +1,28 @@
 import type { PhasegridTheme } from "../theme";
 import { dark } from "./dark";
 import { light } from "./light";
+import { terminal } from "./terminal";
 
-export const THEMES: PhasegridTheme[] = [dark, light];
-export const DEFAULT_THEME_ID = dark.id;
+/** Keyed, because `Set Theme` and the config's `ui.theme` both look a theme up by name. */
+export const themeMap = {
+  dark,
+  light,
+  terminal,
+} as const satisfies Record<string, PhasegridTheme>;
+
+export type AvailableThemeId = keyof typeof themeMap;
+
+export const THEMES: PhasegridTheme[] = Object.values(themeMap);
+export const DEFAULT_THEME_ID: AvailableThemeId = "dark";
+
+export function isThemeId(id: string): id is AvailableThemeId {
+  return id in themeMap;
+}
 
 export function themeById(id: string): PhasegridTheme {
   // Falling back rather than throwing: a config file naming a theme this build removed should open the
   // application in the default theme, not refuse to start.
-  return THEMES.find((t) => t.id === id) ?? dark;
+  return isThemeId(id) ? themeMap[id] : themeMap[DEFAULT_THEME_ID];
 }
 
-export { dark, light };
+export { dark, light, terminal };
