@@ -7,6 +7,7 @@
 #include "core/Registry.hpp"
 #include "core/Result.hpp"
 #include "services/AudioDevice.hpp"
+#include "services/PreviewPublisher.hpp"
 #include "services/Telemetry.hpp"
 #include "services/Transport.hpp"
 
@@ -49,6 +50,9 @@ struct ProtocolContext {
   /// The shared-memory segment, when this process opened one. Null means telemetry is off, and
   /// `hello` and `telemetry.*` say so rather than pretending.
   TelemetryWriter* telemetry = nullptr;
+  /// Publishes watched modules' pictures, when there is a segment to publish into. Ticked by the
+  /// command loop; handlers only hand out its slots.
+  PreviewPublisher* previews = nullptr;
   /// Filled by handlers, drained by the caller after each dispatch.
   std::vector<ProtocolEvent> events;
   /// Set by `engine.shutdown`. The caller answers first, then closes.

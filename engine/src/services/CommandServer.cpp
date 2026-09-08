@@ -169,11 +169,19 @@ bool CommandServer::tickTransport() {
 void CommandServer::run(int timeoutMs) {
   using clock = std::chrono::steady_clock;
   auto nextPosition = clock::now();
+  auto nextPreview = clock::now();
   while (step(timeoutMs)) {
     const auto now = clock::now();
     if (now >= nextPosition) {
       nextPosition = now + std::chrono::milliseconds(50);   // about twenty times a second
       if (!tickTransport()) break;
+    }
+    // The faces: every watched module's picture, redrawn when its values moved. Faster than the
+    // transport because a face is watched the way a knob is, and slower than the display's frame
+    // rate because a picture that changes thirty times a second is already continuous to the eye.
+    if (ctx_.previews != nullptr && now >= nextPreview) {
+      nextPreview = now + std::chrono::milliseconds(33);
+      ctx_.previews->tick();
     }
     // The message thread's other job: free the programs the audio thread retired. `commit` does this too,
     // but a session that stops editing would otherwise hold the last retired program forever.

@@ -35,6 +35,11 @@ export enum TelemetryKind {
    * of its own; it is what lets a knob turn when something is plugged into it.
    */
   Params = 3,
+  /**
+   * One cycle of what a module would draw for the values it is running with: `Module::preview`,
+   * published by the engine's message thread whenever those values move. One channel, `frames` long.
+   */
+  Preview = 4,
 }
 
 export interface TelemetryHeader {
@@ -70,7 +75,19 @@ export interface ParamsReading {
   values: number[];
 }
 
-export type SlotReading = MeterReading | ScopeReading | ParamsReading;
+export interface PreviewReading {
+  kind: TelemetryKind.Preview;
+  /** Counts publishes, so a reader can skip a picture it has already drawn. */
+  blockIndex: bigint;
+  /** One cycle, -1..1. */
+  samples: Float32Array;
+}
+
+export type SlotReading =
+  | MeterReading
+  | ScopeReading
+  | ParamsReading
+  | PreviewReading;
 
 /** Where a slot begins, given its index. */
 export function slotOffset(index: number): number {
@@ -158,6 +175,15 @@ export function decodeSlot(bytes: Uint8Array): SlotReading | null {
       out.push(samples);
     }
     return { kind, blockIndex, channels: out };
+  }
+
+  if (kind === TelemetryKind.Preview) {
+    if (frames === 0 || frames > TELEMETRY_SCOPE_FRAMES) return null;
+    if (payload + frames * 4 > bytes.byteLength) return null;
+    const samples = new Float32Array(frames);
+    for (let i = 0; i < frames; i++)
+      samples[i] = view.getFloat32(payload + i * 4, true);
+    return { kind, blockIndex, samples };
   }
 
   if (kind === TelemetryKind.Params) {

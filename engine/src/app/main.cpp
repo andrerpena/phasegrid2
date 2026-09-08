@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <optional>
 #include <string>
 #include <thread>
 #include <vector>
@@ -17,6 +18,7 @@
 #include "services/CommandServer.hpp"
 #include "services/MiniaudioBackend.hpp"
 #include "services/Protocol.hpp"
+#include "services/PreviewPublisher.hpp"
 #include "services/Telemetry.hpp"
 #include "services/Transport.hpp"
 
@@ -198,11 +200,15 @@ static int runSocket(const std::string& path, const std::string& shmName) {
   }
 
   BackendDeviceHost host{backend, config, render, transport};
+  // The faces' pictures, published into the same segment; nothing to publish into without one.
+  std::optional<pg::PreviewPublisher> previews;
+  if (telemetry.valid()) previews.emplace(engine, telemetry);
   pg::ProtocolContext ctx{.engine = engine,
                           .registry = registry,
                           .transport = transport,
                           .device = &host,
-                          .telemetry = telemetry.valid() ? &telemetry : nullptr};
+                          .telemetry = telemetry.valid() ? &telemetry : nullptr,
+                          .previews = previews ? &*previews : nullptr};
   pg::CommandServer server{ctx};
   if (pg::Result r = server.listen(path); !r) {
     std::fprintf(stderr, "%s: %s\n", r.code.c_str(), r.message.c_str());

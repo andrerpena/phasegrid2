@@ -529,6 +529,7 @@ struct TelemetryFixture {
     ctx.telemetry = &writer;
     REQUIRE(engine.model().addNode(registry, {"m1", "display.meter", {}}));
     REQUIRE(engine.model().addNode(registry, {"m2", "display.scope", {}}));
+    REQUIRE(engine.model().addNode(registry, {"osc", "osc.sine", {}}));
     REQUIRE(engine.commit());
   }
 };
@@ -559,6 +560,27 @@ TEST_CASE("subscribing returns the module to slot map", "[protocol][telemetry]")
   // The order asked for is the order assigned, so a client can predict nothing and must read the map.
   REQUIRE(reply["result"]["slots"]["m2"] == 0);
   REQUIRE(reply["result"]["slots"]["m1"] == 1);
+}
+
+TEST_CASE("a subscription can ask for a module's picture too, from the same pool", "[protocol][telemetry]") {
+  TelemetryFixture f;
+  const json reply = dispatch({{"id", 2},
+                               {"cmd", "telemetry.subscribe"},
+                               {"args", {{"modules", {"m1"}}, {"previews", {"osc"}}}}},
+                              f.ctx);
+  REQUIRE(reply["ok"] == true);
+  REQUIRE(reply["result"]["slots"]["m1"] == 0);
+  REQUIRE(reply["result"]["previewSlots"]["osc"] == 1);
+  // A module with no picture cannot be asked for one, and the answer says why.
+  const json refused = dispatch(
+      {{"id", 3}, {"cmd", "telemetry.subscribe"}, {"args", {{"modules", json::array()}, {"previews", {"m1"}}}}},
+      f.ctx);
+  REQUIRE(refused["ok"] == false);
+  REQUIRE(refused["error"]["code"] == "E_UNSUPPORTED");
+  // Leaving `previews` out is the same as an empty list.
+  const json plain = dispatch({{"id", 4}, {"cmd", "telemetry.subscribe"}, {"args", {{"modules", {"m2"}}}}}, f.ctx);
+  REQUIRE(plain["ok"] == true);
+  REQUIRE(plain["result"]["previewSlots"].empty());
 }
 
 TEST_CASE("a subscription naming an unknown module changes nothing", "[protocol][telemetry]") {

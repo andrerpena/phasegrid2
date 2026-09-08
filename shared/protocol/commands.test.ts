@@ -42,7 +42,7 @@ const cases: Record<CommandName, { valid: unknown; invalid: unknown }> = {
   "engine.shutdown": { valid: {}, invalid: "now" },
   "catalog.get": { valid: {}, invalid: null },
   "telemetry.subscribe": {
-    valid: { modules: ["meter1", "scope1"] },
+    valid: { modules: ["meter1", "scope1"], previews: ["osc1"] },
     invalid: { modules: [1, 2] },
   },
   "telemetry.unsubscribe": { valid: {}, invalid: "all" },

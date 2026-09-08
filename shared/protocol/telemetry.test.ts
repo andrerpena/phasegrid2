@@ -147,6 +147,35 @@ describe("decoding a slot", () => {
     expect(reading.blockIndex).toBe(9n);
   });
 
+  it("reads a preview slot as one cycle of samples", () => {
+    const bytes = buildSlot({
+      seq: 4,
+      kind: TelemetryKind.Preview,
+      channels: 1,
+      frames: 4,
+      blockIndex: 3n,
+      fill: (view, payload) => {
+        for (const [i, v] of [-1, 0, 1, 0].entries())
+          view.setFloat32(payload + i * 4, v, true);
+      },
+    });
+    const reading = decodeSlot(bytes);
+    expect(reading?.kind).toBe(TelemetryKind.Preview);
+    if (reading?.kind !== TelemetryKind.Preview) return;
+    expect(Array.from(reading.samples)).toEqual([-1, 0, 1, 0]);
+    expect(reading.blockIndex).toBe(3n);
+  });
+
+  it("declines a preview longer than a slot can hold", () => {
+    const bytes = buildSlot({
+      seq: 4,
+      kind: TelemetryKind.Preview,
+      channels: 1,
+      frames: TELEMETRY_SCOPE_FRAMES + 1,
+    });
+    expect(decodeSlot(bytes)).toBeNull();
+  });
+
   it("declines a params slot claiming more parameters than a module can have", () => {
     // Sixty-four is the engine's own ceiling; anything past it is a torn header, not a big module.
     const bytes = buildSlot({

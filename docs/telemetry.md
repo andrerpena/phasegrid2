@@ -24,6 +24,12 @@ trips per second per meter.
   the block's last frame, so no module knows it is being watched. It is what lets a knob on the
   interface turn when something modulates it. Inside a sample-level feedback cluster the write happens
   once per sample rather than once per block, which is correct and merely busier.
+- A module with a wave panel (`previewsWave`) can be asked for its picture as well: `telemetry.subscribe`
+  takes `previews` beside `modules` and answers `previewSlots` from the same pool. The engine's message
+  thread (`PreviewPublisher`, ticked from the command loop about thirty times a second) reads the values
+  the audio thread left on the instance, asks `Module::preview` when they have moved, and writes one cycle
+  into a `Preview` slot. That is how a face follows the sound under modulation, under a hand, and while a
+  smoother is still ramping; `module.preview` over the socket remains only for an engine with no segment.
 - The renderer owns the subscription set in one place (`src/renderer/src/grid/telemetry-sync.ts`):
   `telemetry.subscribe` replaces the whole set, so two subscribers would cancel each other.
 - `telemetry.subscribe` decides which module writes into which slot and returns the map.

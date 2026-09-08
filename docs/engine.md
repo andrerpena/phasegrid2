@@ -249,7 +249,9 @@ Modules read `ctx.param(i).at(frame)` as a `Sample`. `ParamView::knob` carries t
 so a module that has to hand the knob and the modulation to a downstream engine separately recovers the modulation
 as `at(i) - knob`. A module someone has subscribed to over `telemetry.subscribe` publishes the effective value of every
 param after `process` (`TelemetryKind::Params`, written by the scheduler; see docs/telemetry.md), which is how the
-interface draws a knob where modulation put it.
+interface draws a knob where modulation put it. The same values are left on the instance
+(`ModuleInstance::liveValues`), where the message thread's `PreviewPublisher` reads them to redraw the
+module's picture (`Module::preview`) whenever they move, so a face follows the sound rather than the document.
 
 **`kParamPrimary` marks a control that belongs on the module's face.** A patching interface draws a
 module the size of a business card, and a wavetable oscillator has twenty-odd parameters, so it can

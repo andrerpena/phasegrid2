@@ -319,31 +319,53 @@ json dispatchCommand(const std::string& cmd, const json& id, const json& args, P
     ArgReader a(args);
     const json& modules = a.arr("modules");
     if (!a) return errorResponse(id, a.result());
+    // `previews` names the modules whose picture is wanted, one slot each from the same pool. Optional,
+    // so a client that only wants meters says nothing about it.
+    static const json kNoPreviews = json::array();
+    const json* previewsArg = args.is_object() && args.contains("previews") ? &args["previews"] : &kNoPreviews;
+    if (!previewsArg->is_array()) return errorResponse(id, "E_SCHEMA", "previews must be an array");
 
     // Assign against a copy and only publish it if every module resolves, so a request naming one bad
     // module leaves every existing subscription exactly as it was.
-    std::vector<std::string> wanted;
+    std::vector<std::string> wanted, previews;
     for (const json& m : modules) {
       if (!m.is_string()) return errorResponse(id, "E_SCHEMA", "modules must be strings");
       wanted.push_back(m.get<std::string>());
     }
-    if (wanted.size() > ctx.telemetry->slotCount())
+    for (const json& m : *previewsArg) {
+      if (!m.is_string()) return errorResponse(id, "E_SCHEMA", "previews must be strings");
+      previews.push_back(m.get<std::string>());
+    }
+    if (wanted.size() + previews.size() > ctx.telemetry->slotCount())
       return errorResponse(id, "E_NO_SLOTS",
-                           "asked for " + std::to_string(wanted.size()) + " slots, segment has " +
+                           "asked for " + std::to_string(wanted.size() + previews.size()) + " slots, segment has " +
                                std::to_string(ctx.telemetry->slotCount()));
     for (const std::string& moduleId : wanted)
       if (!ctx.engine.hasInstance(moduleId))
         return errorResponse(id, "E_NODE_NOT_FOUND", "no module " + moduleId);
+    for (const std::string& moduleId : previews) {
+      if (!ctx.engine.hasInstance(moduleId))
+        return errorResponse(id, "E_NODE_NOT_FOUND", "no module " + moduleId);
+      const auto node = ctx.engine.model().nodes().find(moduleId);
+      const RegisteredModule* type = node == ctx.engine.model().nodes().end() ? nullptr : ctx.registry.find(node->second.type);
+      if (type == nullptr || (type->desc->flags & kModulePreviewsWave) == 0)
+        return errorResponse(id, "E_UNSUPPORTED", "module " + moduleId + " has no waveform to show");
+    }
 
     // Every previous subscription is dropped first: the request is the whole set, not an addition, so a
     // module the interface stopped watching stops writing rather than lingering in a slot forever.
     ctx.engine.clearTelemetrySlots();
-    json slots = json::object();
-    for (uint32_t i = 0; i < wanted.size(); ++i) {
-      ctx.engine.setTelemetrySlot(wanted[i], i);
-      slots[wanted[i]] = i;
+    json slots = json::object(), previewSlots = json::object();
+    uint32_t next = 0;
+    for (const std::string& moduleId : wanted) {
+      ctx.engine.setTelemetrySlot(moduleId, next);
+      slots[moduleId] = next++;
     }
-    return okResponse(id, json{{"slots", std::move(slots)}});
+    for (const std::string& moduleId : previews) {
+      ctx.engine.setPreviewSlot(moduleId, next);
+      previewSlots[moduleId] = next++;
+    }
+    return okResponse(id, json{{"slots", std::move(slots)}, {"previewSlots", std::move(previewSlots)}});
   }
   /// One cycle of a module's waveform at its current values, for the face to draw. Read from the model
   /// and the instance on this thread; the audio thread is not involved, so asking costs no glitch.

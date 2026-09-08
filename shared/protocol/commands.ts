@@ -114,8 +114,15 @@ export const COMMANDS = {
    * Subscribing does not recompile the graph and cannot interrupt the audio.
    */
   "telemetry.subscribe": {
-    args: z.object({ modules: z.array(z.string().min(1)) }),
-    result: z.object({ slots: z.record(z.number().int().nonnegative()) }),
+    args: z.object({
+      modules: z.array(z.string().min(1)),
+      /** Modules whose picture is wanted too (`previewsWave` only); a slot each from the same pool. */
+      previews: z.array(z.string().min(1)).optional(),
+    }),
+    result: z.object({
+      slots: z.record(z.number().int().nonnegative()),
+      previewSlots: z.record(z.number().int().nonnegative()),
+    }),
   },
   "telemetry.unsubscribe": { args: NoArgs, result: z.object({}) },
   /**
