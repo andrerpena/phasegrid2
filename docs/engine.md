@@ -110,13 +110,29 @@ attributed to our sources.
 ## Modules
 
 Built-ins are registered in `engine/src/modules/builtin.cpp`, one line each. Own modules are a single `.cpp` under
-`engine/src/modules`; vendored-backed ones a single `ModuleSpec` under `engine/src/modules/vital`. Today, twenty-five:
+`engine/src/modules`; vendored-backed ones a single `ModuleSpec` under `engine/src/modules/vital`. Today, twenty-seven:
 
 - own: `io.audioOut`, `note.toCv`, `note.toPoly`, `notes.clip`, `phase.clock`, `math.scaleOffset`, `mix.mixer`,
-  `amp.vca`, `osc.sawtooth`, `osc.pulse`, `osc.sine`
-- vendored-backed: `osc.wavetable`, `sampler.player`, `filter.multi`, `env.dahdsr`, `mod.lfo`, `mod.random`, and the
+  `amp.vca`, `osc.sawtooth`, `osc.pulse`, `osc.sine`, `mod.lfo`
+- vendored-backed: `osc.wavetable`, `sampler.player`, `filter.multi`, `env.dahdsr`, `mod.random`, and the
   eight effects `fx.reverb`, `fx.delay`, `fx.chorus`, `fx.flanger`, `fx.phaser`, `fx.distortion`, `fx.compressor`,
   `fx.eq`.
+
+### Modulation, and the LFO built for it
+
+A modulatable param's implicit `param:<id>` input adds its signal to the knob **in normalized units**
+(see Params below): a signal of 0.25 moves any knob a quarter of its range, whatever its unit or curve.
+`mod.lfo` (`engine/src/modules/ModLfo.cpp`) is shaped around that rule. Its output is bipolar,
+`-depth..depth` around zero, so the knob it feeds stays the centre of the movement rather than its
+floor; a unipolar LFO would push every knob upward and the first patch anyone built would subtract a
+half. Rate is in hertz on a log knob across four decades; Shape is one knob that morphs sine, triangle,
+saw, square in thirds, crossfading between neighbours, because a knob is modulatable, drawable on the
+face and reachable without an inspector, none of which a drop-down is. A rising edge on `reset` restarts
+the cycle. Every cycle starts at the bottom like the oscillators' (the square starts high, like
+`osc.pulse`), so a reset gives a rising edge whichever shape is dialled. It is not band-limited: at LFO
+rates there is nothing to alias. It previews (`kModulePreviewsWave`), so its face shows the wave at the
+current Shape and Depth. The vendored LFO it replaced was unipolar and its frequency knob was a power of
+two labelled seconds; nothing else used its line source, which stays vendored for drawn wavetables.
 
 ### Oscillators: one core, many shapes
 
@@ -151,7 +167,7 @@ the sine's folding curve was a triangle and three to five, in the corner that is
 `sin`. It went because no test could tell it was there; commit history has it if a bending shape ever needs it.
 
 That is the seam for wavetables the user generates or draws. The pieces are already vendored: `LineGenerator`
-(`getValueAtPhase`, `stateToJson`/`jsonToState`, already used by `mod.lfo`) for a breakpoint curve, `vital::Wavetable`
+(`getValueAtPhase`, `stateToJson`/`jsonToState`) for a breakpoint curve, `vital::Wavetable`
 and `WavetableBank` for band-limited tables, and `NodeModel::data` to carry either through the patch document with undo
 and save for free.
 

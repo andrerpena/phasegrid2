@@ -461,16 +461,53 @@ for (const [moduleId, name, description, params] of EFFECTS) {
 
 // --- Driving something else --------------------------------------------------------------------
 
-register(
-  modulatedExample({
-    moduleId: "mod.lfo",
-    name: "LFO",
-    description:
-      "An LFO opening and closing the amplifier: tremolo. Turn Frequency for the speed. The " +
-      "amplifier's own knob is at zero, so everything you hear is the LFO.",
-    params: { frequency: 2 },
-  }),
-);
+/**
+ * The LFO driving a knob, which is what it is for.
+ *
+ * Its output goes into the socket under the sine's Fold, so the knob turns on its own: the pointer
+ * follows the engine's effective value while the notch stays where the knob is set. Fold sits at
+ * twelve semitones and the LFO swings it half its range either side, so the sound sweeps from a
+ * plain sine into folded lobes and back twice a second... slowly enough to watch.
+ */
+register({
+  moduleId: "mod.lfo",
+  name: "LFO",
+  description:
+    "An LFO sweeping the sine's Fold through the socket under the knob. Watch Fold turn by itself; " +
+    "turn Rate, Shape and Depth to change how it moves.",
+  patch: {
+    schemaVersion: 1,
+    voiceCount: 1,
+    feedbackMode: "sample",
+    modules: [
+      {
+        id: "lfo",
+        type: "mod.lfo",
+        x: col(2),
+        y: col(9),
+        params: { rate: 0.5, depth: 0.5 },
+      },
+      {
+        id: "osc",
+        type: "osc.sine",
+        x: col(2),
+        y: col(2),
+        params: { fold: 12 },
+      },
+      {
+        id: "out",
+        type: "io.audioOut",
+        x: col(14),
+        y: col(3),
+        params: { gain: 0.4 },
+      },
+    ],
+    edges: [
+      edge("e1", ["lfo", "out"], ["osc", "param:fold"]),
+      edge("e2", ["osc", "out"], ["out", "inL"]),
+    ],
+  },
+});
 
 register(
   modulatedExample({

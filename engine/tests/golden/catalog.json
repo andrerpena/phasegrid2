@@ -1,5 +1,5 @@
 {
-  "catalogHash": "f04032f71dcdeeea",
+  "catalogHash": "a5751307b48d3e53",
   "conventions": {
     "blockSize": 128,
     "gateThreshold": 0,
@@ -3993,431 +3993,122 @@
     },
     {
       "category": "mod",
-      "doc": "Low-frequency oscillator over one of five built-in shapes. Output is 0..1. Frequency is a power of two in hertz (2 = 4 Hz) while Sync is Seconds; the other Sync modes divide the transport tempo or track the pitch input.",
+      "doc": "A low-frequency oscillator for driving knobs. Rate is in hertz; Shape morphs sine, triangle, saw and square; Depth sets the swing. The output is bipolar, so the knob it feeds stays the centre of the movement. A rising edge on Reset restarts the cycle. The face shows the wave.",
       "flags": {
         "needsTransport": false,
-        "previewsWave": false,
+        "previewsWave": true,
         "terminal": false,
         "writesTelemetry": false
       },
       "id": "mod.lfo",
       "inputs": [
         {
-          "doc": "Gate: a rising edge restarts the shape, a falling edge ends the sustain sync modes",
-          "id": "gate",
+          "doc": "A rising edge restarts the cycle from its start",
+          "id": "reset",
           "implicit": false,
           "kind": "continuous",
-          "name": "Gate",
+          "name": "Reset",
           "role": "gate"
         },
         {
-          "doc": "How many notes are held; the phase output encodes it",
-          "id": "count",
-          "implicit": false,
+          "doc": "Cycles per second",
+          "id": "param:rate",
+          "implicit": true,
           "kind": "continuous",
-          "name": "Note Count",
+          "name": "Rate",
+          "param": "rate",
           "role": "cv"
         },
         {
-          "doc": "Pitch the Keytrack sync mode tunes the rate to",
-          "id": "pitch",
-          "implicit": false,
-          "kind": "continuous",
-          "name": "Pitch",
-          "role": "pitch"
-        },
-        {
-          "doc": "LFO 1 Delay",
-          "id": "param:delay_time",
+          "doc": "Morphs through sine, triangle, saw and square, a third of the turn each",
+          "id": "param:shape",
           "implicit": true,
           "kind": "continuous",
-          "name": "Delay",
-          "param": "delay_time",
+          "name": "Shape",
+          "param": "shape",
           "role": "cv"
         },
         {
-          "doc": "LFO 1 Fade In",
-          "id": "param:fade_time",
+          "doc": "How far the output swings either side of zero",
+          "id": "param:depth",
           "implicit": true,
           "kind": "continuous",
-          "name": "Fade In",
-          "param": "fade_time",
-          "role": "cv"
-        },
-        {
-          "doc": "LFO 1 Frequency",
-          "id": "param:frequency",
-          "implicit": true,
-          "kind": "continuous",
-          "name": "Frequency",
-          "param": "frequency",
-          "role": "cv"
-        },
-        {
-          "doc": "LFO 1 Tune",
-          "id": "param:keytrack_tune",
-          "implicit": true,
-          "kind": "continuous",
-          "name": "Tune",
-          "param": "keytrack_tune",
-          "role": "cv"
-        },
-        {
-          "doc": "LFO 1 Phase",
-          "id": "param:phase",
-          "implicit": true,
-          "kind": "continuous",
-          "name": "Phase",
-          "param": "phase",
-          "role": "cv"
-        },
-        {
-          "doc": "LFO 1 Smooth Time",
-          "id": "param:smooth_time",
-          "implicit": true,
-          "kind": "continuous",
-          "name": "Smooth Time",
-          "param": "smooth_time",
-          "role": "cv"
-        },
-        {
-          "doc": "LFO 1 Stereo",
-          "id": "param:stereo",
-          "implicit": true,
-          "kind": "continuous",
-          "name": "Stereo",
-          "param": "stereo",
+          "name": "Depth",
+          "param": "depth",
           "role": "cv"
         }
       ],
       "name": "LFO",
       "outputs": [
         {
-          "doc": "The shape, 0..1",
+          "doc": "The wave, -depth to depth around zero",
           "id": "out",
           "implicit": false,
           "kind": "continuous",
           "name": "Out",
           "role": "cv"
-        },
-        {
-          "doc": "Position in the shape plus the note count, encoded the same way as the envelope's phase: 2.0 is the start of the cycle, 2.5 halfway",
-          "id": "phase",
-          "implicit": false,
-          "kind": "continuous",
-          "name": "Phase",
-          "role": "phase"
-        },
-        {
-          "doc": "The rate the oscillator settled on this block, in hertz",
-          "id": "frequency",
-          "implicit": false,
-          "kind": "continuous",
-          "name": "Frequency",
-          "role": "cv"
         }
       ],
       "params": [
         {
+          "curve": "log",
+          "default": 2.0,
+          "doc": "Cycles per second",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "id": "rate",
+          "max": 100.0,
+          "min": 0.009999999776482582,
+          "name": "Rate",
+          "uiWidget": "knob",
+          "unit": "hz"
+        },
+        {
           "curve": "linear",
           "default": 0.0,
-          "doc": "Wave the oscillator runs over",
-          "enumLabels": [
-            "Sine",
-            "Triangle",
-            "Square",
-            "Saw Up",
-            "Saw Down"
-          ],
+          "doc": "Morphs through sine, triangle, saw and square, a third of the turn each",
           "flags": {
-            "enum": true,
+            "enum": false,
             "hidden": false,
-            "integer": true,
-            "modulatable": false,
-            "noSmooth": true,
-            "primary": false,
-            "structural": true
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
           },
           "id": "shape",
-          "max": 4.0,
+          "max": 1.0,
           "min": 0.0,
           "name": "Shape",
-          "uiWidget": "select",
-          "unit": "none"
-        },
-        {
-          "curve": "linear",
-          "default": 0.0,
-          "doc": "LFO 1 Delay",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": true,
-            "structural": false
-          },
-          "id": "delay_time",
-          "max": 4.0,
-          "min": 0.0,
-          "name": "Delay",
-          "uiWidget": "slider",
-          "unit": "seconds"
-        },
-        {
-          "curve": "linear",
-          "default": 0.0,
-          "doc": "LFO 1 Fade In",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": true,
-            "structural": false
-          },
-          "id": "fade_time",
-          "max": 8.0,
-          "min": 0.0,
-          "name": "Fade In",
-          "uiWidget": "slider",
-          "unit": "seconds"
-        },
-        {
-          "curve": "linear",
-          "default": 1.0,
-          "doc": "LFO 1 Frequency",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": true,
-            "structural": false
-          },
-          "id": "frequency",
-          "max": 9.0,
-          "min": -7.0,
-          "name": "Frequency",
-          "uiWidget": "slider",
-          "unit": "seconds"
-        },
-        {
-          "curve": "linear",
-          "default": -12.0,
-          "doc": "LFO 1 Transpose",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": true,
-            "modulatable": false,
-            "noSmooth": true,
-            "primary": false,
-            "structural": false
-          },
-          "id": "keytrack_transpose",
-          "max": 36.0,
-          "min": -60.0,
-          "name": "Transpose",
-          "uiWidget": "slider",
-          "unit": "none"
-        },
-        {
-          "curve": "linear",
-          "default": 0.0,
-          "doc": "LFO 1 Tune",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": false,
-            "structural": false
-          },
-          "id": "keytrack_tune",
-          "max": 1.0,
-          "min": -1.0,
-          "name": "Tune",
-          "uiWidget": "slider",
-          "unit": "none"
-        },
-        {
-          "curve": "linear",
-          "default": 0.0,
-          "doc": "LFO 1 Phase",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": true,
-            "structural": false
-          },
-          "id": "phase",
-          "max": 1.0,
-          "min": 0.0,
-          "name": "Phase",
-          "uiWidget": "slider",
+          "uiWidget": "knob",
           "unit": "none"
         },
         {
           "curve": "linear",
           "default": 1.0,
-          "doc": "LFO 1 Smooth Mode",
-          "enumLabels": [
-            "Off",
-            "On"
-          ],
+          "doc": "How far the output swings either side of zero",
           "flags": {
-            "enum": true,
+            "enum": false,
             "hidden": false,
-            "integer": true,
-            "modulatable": false,
-            "noSmooth": true,
-            "primary": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
             "structural": false
           },
-          "id": "smooth_mode",
+          "id": "depth",
           "max": 1.0,
           "min": 0.0,
-          "name": "Smooth Mode",
-          "uiWidget": "select",
-          "unit": "none"
-        },
-        {
-          "curve": "linear",
-          "default": -7.5,
-          "doc": "LFO 1 Smooth Time",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": false,
-            "structural": false
-          },
-          "id": "smooth_time",
-          "max": 4.0,
-          "min": -10.0,
-          "name": "Smooth Time",
-          "uiWidget": "slider",
-          "unit": "seconds"
-        },
-        {
-          "curve": "linear",
-          "default": 0.0,
-          "doc": "LFO 1 Stereo",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": false,
-            "structural": false
-          },
-          "id": "stereo",
-          "max": 0.5,
-          "min": -0.5,
-          "name": "Stereo",
-          "uiWidget": "slider",
-          "unit": "none"
-        },
-        {
-          "curve": "linear",
-          "default": 1.0,
-          "doc": "LFO 1 Sync",
-          "enumLabels": [
-            "Seconds",
-            "Tempo",
-            "Tempo Dotted",
-            "Tempo Triplets",
-            "Keytrack"
-          ],
-          "flags": {
-            "enum": true,
-            "hidden": false,
-            "integer": true,
-            "modulatable": false,
-            "noSmooth": true,
-            "primary": false,
-            "structural": false
-          },
-          "id": "sync",
-          "max": 4.0,
-          "min": 0.0,
-          "name": "Sync",
-          "uiWidget": "select",
-          "unit": "none"
-        },
-        {
-          "curve": "linear",
-          "default": 0.0,
-          "doc": "LFO 1 Sync Type",
-          "enumLabels": [
-            "Trigger",
-            "Sync",
-            "Envelope",
-            "Sustain Envelope",
-            "Loop Point",
-            "Loop Hold"
-          ],
-          "flags": {
-            "enum": true,
-            "hidden": false,
-            "integer": true,
-            "modulatable": false,
-            "noSmooth": true,
-            "primary": false,
-            "structural": false
-          },
-          "id": "sync_type",
-          "max": 5.0,
-          "min": 0.0,
-          "name": "Sync Type",
-          "uiWidget": "select",
-          "unit": "none"
-        },
-        {
-          "curve": "linear",
-          "default": 7.0,
-          "doc": "LFO 1 Tempo",
-          "enumLabels": [
-            "Freeze",
-            "32/1",
-            "16/1",
-            "8/1",
-            "4/1",
-            "2/1",
-            "1/1",
-            "1/2",
-            "1/4",
-            "1/8",
-            "1/16",
-            "1/32",
-            "1/64"
-          ],
-          "flags": {
-            "enum": true,
-            "hidden": false,
-            "integer": true,
-            "modulatable": false,
-            "noSmooth": true,
-            "primary": false,
-            "structural": false
-          },
-          "id": "tempo",
-          "max": 12.0,
-          "min": 0.0,
-          "name": "Tempo",
-          "uiWidget": "select",
-          "unit": "none"
+          "name": "Depth",
+          "uiWidget": "knob",
+          "unit": "ratio"
         }
       ]
     },
