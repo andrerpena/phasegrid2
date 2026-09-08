@@ -1,7 +1,12 @@
 import { CELL } from "@renderer/grid/layout";
 import { EMPTY_PATCH, type PatchDoc } from "@shared/protocol/patch";
 import { describe, expect, it } from "vitest";
-import { freePosition, ROW_WIDTH, uniqueModuleId } from "./add-module";
+import {
+  freePosition,
+  ROW_WIDTH,
+  uniqueEdgeId,
+  uniqueModuleId,
+} from "./add-module";
 
 const size = () => ({ width: CELL * 6, height: CELL * 4 });
 
@@ -30,6 +35,30 @@ describe("naming a new module", () => {
       modules: [...doc.modules, { id: "wavetable2", type: "osc.wavetable" }],
     };
     expect(uniqueModuleId(two, "osc.wavetable")).toBe("wavetable3");
+  });
+});
+
+describe("naming a new cable", () => {
+  it("takes the lowest number not in use", () => {
+    // Ids are for the document and the engine, not for people, so short and dense beats unique
+    // forever: a patch that has had a thousand cables should not be on e1000.
+    expect(uniqueEdgeId(EMPTY_PATCH)).toBe("e1");
+    const withTwo: PatchDoc = {
+      ...EMPTY_PATCH,
+      edges: [
+        {
+          id: "e1",
+          from: { module: "a", port: "o" },
+          to: { module: "b", port: "i" },
+        },
+        {
+          id: "e3",
+          from: { module: "a", port: "o" },
+          to: { module: "c", port: "i" },
+        },
+      ],
+    };
+    expect(uniqueEdgeId(withTwo)).toBe("e2");
   });
 });
 

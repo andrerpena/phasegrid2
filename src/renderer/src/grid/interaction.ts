@@ -37,6 +37,11 @@ export type Interaction =
       from: PortRef;
       fromSide: "input" | "output";
       current: Point;
+      /**
+       * The edge this cable was, when it was picked up off a connected input rather than started
+       * fresh. Dropping it on nothing removes that edge; dropping it on another input moves it.
+       */
+      detach?: string;
     };
 
 export const IDLE: Interaction = { kind: "idle" };
@@ -60,8 +65,15 @@ export function beginDragCable(
   from: PortRef,
   fromSide: "input" | "output",
   at: Point,
+  detach?: string,
 ): Interaction {
-  return { kind: "dragCable", from, fromSide, current: at };
+  return {
+    kind: "dragCable",
+    from,
+    fromSide,
+    current: at,
+    ...(detach === undefined ? {} : { detach }),
+  };
 }
 
 /** How far the pointer travels, in screen pixels, to sweep a knob's whole range. */
@@ -162,8 +174,13 @@ export interface EndResult {
     rect: { x: number; y: number; width: number; height: number };
     additive: boolean;
   };
-  /** Where a cable was released, for the caller to hit test. */
-  cableDrop?: { from: PortRef; fromSide: "input" | "output"; at: Point };
+  /** Where a cable was released, for the caller to hit test, and the edge it was if picked up. */
+  cableDrop?: {
+    from: PortRef;
+    fromSide: "input" | "output";
+    at: Point;
+    detach?: string;
+  };
   /**
    * A finished knob drag: the point at which it becomes one undo entry rather than a hundred.
    *
@@ -220,7 +237,12 @@ export function pointerUp(state: Interaction, at: Point): EndResult {
     case "dragCable":
       return {
         next: IDLE,
-        cableDrop: { from: state.from, fromSide: state.fromSide, at },
+        cableDrop: {
+          from: state.from,
+          fromSide: state.fromSide,
+          at,
+          ...(state.detach === undefined ? {} : { detach: state.detach }),
+        },
       };
     case "panning":
     case "idle":

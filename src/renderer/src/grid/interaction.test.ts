@@ -75,6 +75,18 @@ describe("pointer interaction", () => {
     });
   });
 
+  it("carries the cable it picked up through to the drop", () => {
+    // A cable pulled off a connected input is the edge it was, until it lands somewhere else or on
+    // nothing. Whoever handles the drop has to know which edge that was.
+    const from = { module: "osc", port: "out" };
+    const state = beginDragCable(from, "output", at(0, 0), "e7");
+    expect(pointerUp(state, at(30, 30)).cableDrop?.detach).toBe("e7");
+    expect(
+      pointerUp(beginDragCable(from, "output", at(0, 0)), at(1, 1)).cableDrop
+        ?.detach,
+    ).toBeUndefined();
+  });
+
   it("returns to idle after every gesture", () => {
     expect(pointerUp(beginPan(at(0, 0)), at(0, 0)).next).toEqual(IDLE);
     expect(pointerUp(beginMarquee(at(0, 0), false), at(1, 1)).next).toEqual(

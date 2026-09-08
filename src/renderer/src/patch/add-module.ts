@@ -3,7 +3,7 @@ import type { ModuleDescriptor } from "@shared/protocol/catalog";
 import type { PatchDoc, PatchOp } from "@shared/protocol/patch";
 
 /**
- * Putting a new module into a patch: choosing its name and where it goes.
+ * Putting a new module, or a new cable, into a patch: choosing its name and where it goes.
  *
  * Both are small decisions that are irritating when they are wrong. An id that collides silently
  * replaces an existing module, and a position that lands under an existing one makes the new module
@@ -23,6 +23,21 @@ export function uniqueModuleId(doc: PatchDoc, type: string): string {
   if (!taken.has(base)) return base;
   for (let n = 2; ; n++) {
     const candidate = `${base}${n}`;
+    if (!taken.has(candidate)) return candidate;
+  }
+}
+
+/**
+ * The next cable id: the lowest `e<n>` not in use.
+ *
+ * Ids are for the document and the engine, never shown, so short and dense wins over unique forever.
+ * An edge that was removed frees its number, which is fine: nothing outside the document refers to
+ * an edge by id once it is gone.
+ */
+export function uniqueEdgeId(doc: PatchDoc): string {
+  const taken = new Set(doc.edges.map((e) => e.id));
+  for (let n = 1; ; n++) {
+    const candidate = `e${n}`;
     if (!taken.has(candidate)) return candidate;
   }
 }

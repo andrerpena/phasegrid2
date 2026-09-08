@@ -1,18 +1,28 @@
 import type { PortRef } from "@shared/protocol/patch";
 import type { GridRenderer } from "./GridRenderer";
 import {
+  beginDragCable,
   beginDragNodes,
   beginDragParam,
   beginMarquee,
   beginPan,
+  canConnect,
   dragParamTo,
   IDLE,
   type Interaction,
+  orientEdge,
   paramValueAt,
   pointerMove,
   pointerUp,
 } from "./interaction";
-import { CELL, hitControl, paramFraction, snap } from "./layout";
+import {
+  CELL,
+  hitControl,
+  type Point,
+  type PortLayout,
+  paramFraction,
+  snap,
+} from "./layout";
 
 /**
  * Everything a pointer can do on the grid, in one place.
@@ -46,6 +56,14 @@ export interface GridCallbacks {
    * project was opened.
    */
   readParam?: (module: string, param: string) => number;
+  /**
+   * The cables plugged into an input right now, oldest first, each with its id and the output it
+   * comes from. Read from the document for the same reason `readParam` is: the drawing is a copy.
+   */
+  readEdgesInto?: (
+    module: string,
+    port: string,
+  ) => { id: string; from: PortRef }[];
   /** A finished drag. Positions are already snapped to the grid. */
   onNodesMoved?: (moves: { id: string; x: number; y: number }[]) => void;
   /**
@@ -65,7 +83,17 @@ export interface GridCallbacks {
     previous: number;
   }) => void;
   onSelectionChanged?: (ids: string[]) => void;
-  onConnect?: (from: PortRef, to: PortRef) => void;
+  /**
+   * A cable was made. `replaces` names the edge it used to be, when it was picked up off one input
+   * and dropped on another: the caller removes that one and adds this one as a single edit.
+   */
+  onConnect?: (
+    from: PortRef,
+    to: PortRef,
+    options: { replaces?: string },
+  ) => void;
+  /** A cable picked up off an input and dropped on nothing. */
+  onDisconnect?: (edgeId: string) => void;
 }
 
 export class GridInteraction {
@@ -155,6 +183,16 @@ export class GridInteraction {
       return;
     }
 
+    // A socket before anything else: they sit on the borders, where a module's own hit box and the
+    // gap beside it meet, and grabbing one has to work from either side of that line.
+    if (this.options.parametersOnly !== true) {
+      const socket = this.renderer.portAt(point);
+      if (socket !== null) {
+        this.state = this.pickUpCable(socket.module, socket.port, point);
+        return;
+      }
+    }
+
     const hit = this.renderer.nodeAt(point);
     if (hit !== null) {
       const origin = {
@@ -201,6 +239,101 @@ export class GridInteraction {
     if (!event.shiftKey) this.select([]);
   }
 
+  /**
+   * A press on a socket starts a cable.
+   *
+   * From an output, or an input with nothing in it, that is a new cable. From an input that already
+   * has one, it is that cable being picked up: the gesture continues from the output it came from,
+   * and the edge it was travels with it so the drop can move or remove it. With several cables in
+   * one input the most recent one comes off, which is the one still under the hand, as it were.
+   */
+  private pickUpCable(
+    module: string,
+    port: PortLayout,
+    at: Point,
+  ): Interaction {
+    const ref: PortRef = { module, port: port.port.id };
+    if (port.side === "input") {
+      const existing =
+        this.callbacks.readEdgesInto?.(module, port.port.id) ?? [];
+      const last = existing.at(-1);
+      if (last !== undefined)
+        return beginDragCable(last.from, "output", at, last.id);
+    }
+    return beginDragCable(ref, port.side, at);
+  }
+
+  /**
+   * The cable being dragged, drawn from its fixed end to the pointer, or to the socket the pointer
+   * is over so it visibly snaps. Always drawn output to input, whichever end is in the hand, so the
+   * curve leans the way the finished cable will.
+   */
+  private drawPendingCable(
+    state: Extract<Interaction, { kind: "dragCable" }>,
+  ): void {
+    const anchor = this.renderer.portPosition(
+      state.from.module,
+      state.from.port,
+      state.fromSide,
+    );
+    if (anchor === null) return;
+    const over = this.renderer.portAt(state.current, { knobs: true });
+    const loose =
+      over !== null && over.port.side !== state.fromSide
+        ? { x: over.x, y: over.y, edge: over.port.edge }
+        : { x: state.current.x, y: state.current.y, edge: "left" as const };
+    const color = this.renderer.portColor(
+      state.from.module,
+      state.from.port,
+      state.fromSide,
+    );
+    const [from, to] =
+      state.fromSide === "output" ? [anchor, loose] : [loose, anchor];
+    this.renderer.drawOverlay(null, {
+      from,
+      to,
+      color,
+      toEdge: to.edge,
+    });
+  }
+
+  /**
+   * A cable let go. On a socket it can join: a new edge, or the picked-up edge moved there. On
+   * nothing: a picked-up edge is removed, a new one simply never existed. A cable that lands where
+   * an identical one already runs, including back where it was picked up from, changes nothing.
+   */
+  private dropCable(drop: {
+    from: PortRef;
+    fromSide: "input" | "output";
+    at: Point;
+    detach?: string;
+  }): void {
+    const target = this.renderer.portAt(drop.at, { knobs: true });
+    if (target !== null) {
+      const to: PortRef = { module: target.module, port: target.port.port.id };
+      if (canConnect(drop.fromSide, target.port.side, drop.from, to)) {
+        const edge = orientEdge(drop.from, drop.fromSide, to);
+        const existing = (
+          this.callbacks.readEdgesInto?.(edge.to.module, edge.to.port) ?? []
+        ).find(
+          (e) =>
+            e.from.module === edge.from.module &&
+            e.from.port === edge.from.port,
+        );
+        if (existing === undefined) {
+          this.callbacks.onConnect?.(edge.from, edge.to, {
+            ...(drop.detach === undefined ? {} : { replaces: drop.detach }),
+          });
+        } else if (drop.detach !== undefined && existing.id !== drop.detach) {
+          // Moved onto an input that already has this very cable: the moved one is now surplus.
+          this.callbacks.onDisconnect?.(drop.detach);
+        }
+        return;
+      }
+    }
+    if (drop.detach !== undefined) this.callbacks.onDisconnect?.(drop.detach);
+  }
+
   private onMove(event: PointerEvent): void {
     if (this.state.kind === "idle") return;
 
@@ -235,6 +368,11 @@ export class GridInteraction {
     const point = this.renderer.viewport.toWorld(this.screen(event));
     const result = pointerMove(this.state, point);
     this.state = result.next;
+
+    if (this.state.kind === "dragCable") {
+      this.drawPendingCable(this.state);
+      return;
+    }
 
     if (this.state.kind === "dragNodes" && this.state.moved) {
       // Moved on the canvas without telling anyone: the drag is one edit, and it is reported when it
@@ -282,6 +420,11 @@ export class GridInteraction {
           previous: paramValueAt(desc, startFraction),
         });
       }
+      return;
+    }
+
+    if (end.cableDrop !== undefined) {
+      this.dropCable(end.cableDrop);
       return;
     }
 

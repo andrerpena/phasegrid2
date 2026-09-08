@@ -5,7 +5,7 @@ import type { PatchDoc } from "@shared/protocol/patch";
 import { type Application, Container, Graphics } from "pixi.js";
 import { Cable, cableControlPoints } from "./components/Cable";
 import { NodeView } from "./components/NodeView";
-import type { PortEdge } from "./layout";
+import { hitControl, hitPort, type PortEdge, type PortLayout } from "./layout";
 import { Viewport } from "./viewport";
 
 /**
@@ -181,11 +181,58 @@ export class GridRenderer {
 
   /** A cable takes the colour of the port it leaves, so a signal can be followed across a patch. */
   private cableColor(moduleId: string, portId: string): number {
+    return this.portColor(moduleId, portId, "output");
+  }
+
+  /** The colour a port's role gives it, which is also the colour of a cable drawn from it. */
+  portColor(
+    moduleId: string,
+    portId: string,
+    side: "input" | "output",
+  ): number {
     const node = this.nodes.get(moduleId);
-    const port = node?.layout.outputs.find((p) => p.port.id === portId);
-    const role = port?.port.role ?? "any";
+    const list = side === "output" ? node?.layout.outputs : node?.layout.inputs;
+    const role = list?.find((p) => p.port.id === portId)?.port.role ?? "any";
     return hexToNumber(
       this.theme.grid.signal[role] ?? this.theme.grid.signal.any,
+    );
+  }
+
+  /**
+   * The socket under a point, or null.
+   *
+   * Searched across every node rather than through `nodeAt`: sockets sit on a module's borders and
+   * their grab radius reaches outside it, so a point a few pixels past the border can still be on a
+   * socket while being on no node. With `knobs`, a point on a knob counts as its modulation socket:
+   * right for a cable being dropped, where the knob is the thing you aim at, and wrong for a press,
+   * where a knob pressed is a knob to turn.
+   */
+  portAt(
+    point: { x: number; y: number },
+    options: { knobs?: boolean } = {},
+  ): { module: string; port: PortLayout; x: number; y: number } | null {
+    const entries = [...this.nodes.entries()].reverse();
+    for (const [id, node] of entries) {
+      const origin = { x: node.view.position.x, y: node.view.position.y };
+      const port =
+        hitPort(point, origin, node.layout) ??
+        (options.knobs === true
+          ? this.socketOfKnob(node, hitControl(point, origin, node.layout))
+          : null);
+      if (port !== null)
+        return { module: id, port, x: origin.x + port.x, y: origin.y + port.y };
+    }
+    return null;
+  }
+
+  private socketOfKnob(
+    node: NodeView,
+    control: { modulationPort: string | null } | null,
+  ): PortLayout | null {
+    if (control === null || control.modulationPort === null) return null;
+    return (
+      node.layout.inputs.find((p) => p.port.id === control.modulationPort) ??
+      null
     );
   }
 

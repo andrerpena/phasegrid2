@@ -1,4 +1,5 @@
 import { useCatalogStore } from "@renderer/catalog/catalog-store";
+import { uniqueEdgeId } from "@renderer/patch/add-module";
 import { paramValue } from "@renderer/patch/params";
 import { usePatchStore } from "@renderer/patch/patch-store";
 import { useProjectStore } from "@renderer/project/project-store";
@@ -110,6 +111,31 @@ export const GridView = () => {
                     : "Move module",
               },
             );
+          },
+          // Cables, like values, are read from the document and nowhere else.
+          readEdgesInto: (module, port) =>
+            usePatchStore
+              .getState()
+              .doc.edges.filter(
+                (e) => e.to.module === module && e.to.port === port,
+              )
+              .map((e) => ({ id: e.id, from: e.from })),
+          // A cable made or moved is one edit: the removal of what it was and the addition of what
+          // it is, so undo takes the whole gesture back. Engine sync sends both in one batch.
+          onConnect: (from, to, { replaces }) => {
+            const store = usePatchStore.getState();
+            const ops: PatchOp[] = [];
+            if (replaces !== undefined)
+              ops.push({ op: "edgeRemove", id: replaces });
+            ops.push({ op: "edgeAdd", id: uniqueEdgeId(store.doc), from, to });
+            store.apply(ops, {
+              label: replaces === undefined ? "Connect" : "Move cable",
+            });
+          },
+          onDisconnect: (id) => {
+            usePatchStore
+              .getState()
+              .apply([{ op: "edgeRemove", id }], { label: "Disconnect" });
           },
           // The one place a parameter value is read from: the document, through the accessor everything
           // else uses. Nothing on the canvas keeps a copy to answer with.

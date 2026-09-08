@@ -1,9 +1,10 @@
 import type { ModuleDescriptor } from "@shared/protocol/catalog";
+import type { PortRef } from "@shared/protocol/patch";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { descriptor } from "./fixtures";
 import { GridInteraction } from "./GridInteraction";
 import type { GridRenderer } from "./GridRenderer";
-import { CELL, measureNode } from "./layout";
+import { CELL, hitControl, hitPort, measureNode } from "./layout";
 
 /**
  * The interaction controller against a fake renderer.
@@ -65,6 +66,50 @@ function rig(nodes: Map<string, FakeNode>) {
       return null;
     },
     allNodes: () => nodes,
+    // The socket under a point, the way the real renderer finds it: by the same hit test, across
+    // every node, border sockets included.
+    portAt: (
+      point: { x: number; y: number },
+      options: { knobs?: boolean } = {},
+    ) => {
+      for (const [id, node] of nodes) {
+        const knob =
+          options.knobs === true
+            ? hitControl(point, node.view.position, node.layout)
+            : null;
+        const port =
+          hitPort(point, node.view.position, node.layout) ??
+          node.layout.inputs.find(
+            (p) => knob !== null && p.port.id === knob.modulationPort,
+          ) ??
+          null;
+        if (port !== null)
+          return {
+            module: id,
+            port,
+            x: node.view.position.x + port.x,
+            y: node.view.position.y + port.y,
+          };
+      }
+      return null;
+    },
+    portPosition: (
+      moduleId: string,
+      portId: string,
+      side: "input" | "output",
+    ) => {
+      const node = nodes.get(moduleId);
+      const list =
+        side === "output" ? node?.layout.outputs : node?.layout.inputs;
+      const port = list?.find((p) => p.port.id === portId);
+      if (node === undefined || port === undefined) return null;
+      return {
+        x: node.view.position.x + port.x,
+        y: node.view.position.y + port.y,
+        edge: port.edge,
+      };
+    },
+    portColor: () => 0,
     setSelection: (ids: Set<string>) => selection.push([...ids]),
     drawOverlay: vi.fn(),
     drawBackground: vi.fn(),
@@ -491,5 +536,255 @@ describe("an example project, where only the parameters may change", () => {
     d.up(600, 700);
     // The click still clears the selection; it just does not sweep a rectangle.
     expect((onSelectionChanged.mock.calls.at(-1) as [string[]])[0]).toEqual([]);
+  });
+});
+
+describe("patching a cable", () => {
+  /** A socket's centre in patch coordinates. */
+  function socket(id: string, portId: string, side: "input" | "output") {
+    const node = nodes.get(id);
+    if (node === undefined) throw new Error(id);
+    const list = side === "output" ? node.layout.outputs : node.layout.inputs;
+    const port = list.find((p) => p.port.id === portId);
+    if (port === undefined) throw new Error(`${id}.${portId}`);
+    return {
+      x: node.view.position.x + port.x,
+      y: node.view.position.y + port.y,
+    };
+  }
+
+  /** What the document says is plugged into each input, for the interaction to ask. */
+  let edges: { id: string; from: PortRef; to: PortRef }[] = [];
+  const readEdgesInto = (module: string, port: string) =>
+    edges
+      .filter((e) => e.to.module === module && e.to.port === port)
+      .map((e) => ({ id: e.id, from: e.from }));
+
+  beforeEach(() => {
+    edges = [];
+  });
+
+  it("connects an output dragged onto an input", () => {
+    const onConnect = vi.fn();
+    const { renderer, canvas } = rig(nodes);
+    const d = driver(
+      new GridInteraction(renderer, canvas, { onConnect, readEdgesInto }),
+    );
+    const out = socket("env", "out", "output");
+    const gain = socket("vca", "gain", "input");
+    d.down(out.x, out.y);
+    d.move(gain.x - 40, gain.y + 20);
+    expect(onConnect).not.toHaveBeenCalled();
+    d.up(gain.x, gain.y);
+    expect(onConnect).toHaveBeenCalledWith(
+      { module: "env", port: "out" },
+      { module: "vca", port: "gain" },
+      {},
+    );
+  });
+
+  it("orients the edge the right way when drawn from the input end", () => {
+    const onConnect = vi.fn();
+    const { renderer, canvas } = rig(nodes);
+    const d = driver(
+      new GridInteraction(renderer, canvas, { onConnect, readEdgesInto }),
+    );
+    const out = socket("env", "out", "output");
+    const gain = socket("vca", "gain", "input");
+    d.down(gain.x, gain.y);
+    d.up(out.x, out.y);
+    expect(onConnect).toHaveBeenCalledWith(
+      { module: "env", port: "out" },
+      { module: "vca", port: "gain" },
+      {},
+    );
+  });
+
+  it("plugs into the socket under a knob, which is the knob's modulation input", () => {
+    const onConnect = vi.fn();
+    const { renderer, canvas } = rig(nodes);
+    const d = driver(
+      new GridInteraction(renderer, canvas, { onConnect, readEdgesInto }),
+    );
+    const out = socket("env", "out", "output");
+    const under = socket("vca", "param:gain", "input");
+    d.down(out.x, out.y);
+    d.up(under.x, under.y + 2); // a hair below the border: the socket sits on it
+    expect(onConnect).toHaveBeenCalledWith(
+      { module: "env", port: "out" },
+      { module: "vca", port: "param:gain" },
+      {},
+    );
+  });
+
+  it("also takes a cable dropped on the knob itself", () => {
+    // The socket is small; the knob is the thing you are aiming at. Dropping on it means the same.
+    const onConnect = vi.fn();
+    const { renderer, canvas } = rig(nodes);
+    const d = driver(
+      new GridInteraction(renderer, canvas, { onConnect, readEdgesInto }),
+    );
+    const out = socket("env", "out", "output");
+    const node = nodes.get("vca");
+    if (node === undefined) throw new Error("vca");
+    const knob = node.layout.controls[0];
+    d.down(out.x, out.y);
+    d.up(node.view.position.x + knob.x, node.view.position.y + knob.y);
+    expect(onConnect).toHaveBeenCalledWith(
+      { module: "env", port: "out" },
+      { module: "vca", port: "param:gain" },
+      {},
+    );
+  });
+
+  it("connects nothing when the cable is dropped on empty canvas", () => {
+    const onConnect = vi.fn();
+    const onDisconnect = vi.fn();
+    const { renderer, canvas } = rig(nodes);
+    const d = driver(
+      new GridInteraction(renderer, canvas, {
+        onConnect,
+        onDisconnect,
+        readEdgesInto,
+      }),
+    );
+    const out = socket("env", "out", "output");
+    d.down(out.x, out.y);
+    d.up(30, 700);
+    expect(onConnect).not.toHaveBeenCalled();
+    expect(onDisconnect).not.toHaveBeenCalled();
+  });
+
+  it("pulls a cable off a connected input and drops it on nothing to remove it", () => {
+    edges = [
+      {
+        id: "e1",
+        from: { module: "env", port: "out" },
+        to: { module: "vca", port: "gain" },
+      },
+    ];
+    const onConnect = vi.fn();
+    const onDisconnect = vi.fn();
+    const { renderer, canvas } = rig(nodes);
+    const d = driver(
+      new GridInteraction(renderer, canvas, {
+        onConnect,
+        onDisconnect,
+        readEdgesInto,
+      }),
+    );
+    const gain = socket("vca", "gain", "input");
+    d.down(gain.x, gain.y);
+    d.up(30, 700);
+    expect(onDisconnect).toHaveBeenCalledWith("e1");
+    expect(onConnect).not.toHaveBeenCalled();
+  });
+
+  it("re-routes a picked-up cable onto another input as one edit", () => {
+    edges = [
+      {
+        id: "e1",
+        from: { module: "env", port: "out" },
+        to: { module: "vca", port: "gain" },
+      },
+    ];
+    const onConnect = vi.fn();
+    const onDisconnect = vi.fn();
+    const { renderer, canvas } = rig(nodes);
+    const d = driver(
+      new GridInteraction(renderer, canvas, {
+        onConnect,
+        onDisconnect,
+        readEdgesInto,
+      }),
+    );
+    const gain = socket("vca", "gain", "input");
+    const input = socket("vca", "in", "input");
+    d.down(gain.x, gain.y);
+    d.up(input.x, input.y);
+    expect(onConnect).toHaveBeenCalledWith(
+      { module: "env", port: "out" },
+      { module: "vca", port: "in" },
+      { replaces: "e1" },
+    );
+    expect(onDisconnect).not.toHaveBeenCalled();
+  });
+
+  it("changes nothing when a picked-up cable is dropped back where it was", () => {
+    edges = [
+      {
+        id: "e1",
+        from: { module: "env", port: "out" },
+        to: { module: "vca", port: "gain" },
+      },
+    ];
+    const onConnect = vi.fn();
+    const onDisconnect = vi.fn();
+    const { renderer, canvas } = rig(nodes);
+    const d = driver(
+      new GridInteraction(renderer, canvas, {
+        onConnect,
+        onDisconnect,
+        readEdgesInto,
+      }),
+    );
+    const gain = socket("vca", "gain", "input");
+    d.down(gain.x, gain.y);
+    d.up(gain.x + 1, gain.y);
+    expect(onConnect).not.toHaveBeenCalled();
+    expect(onDisconnect).not.toHaveBeenCalled();
+  });
+
+  it("refuses a cable that already exists", () => {
+    edges = [
+      {
+        id: "e1",
+        from: { module: "env", port: "out" },
+        to: { module: "vca", port: "gain" },
+      },
+    ];
+    const onConnect = vi.fn();
+    const { renderer, canvas } = rig(nodes);
+    const d = driver(
+      new GridInteraction(renderer, canvas, { onConnect, readEdgesInto }),
+    );
+    const out = socket("env", "out", "output");
+    const gain = socket("vca", "gain", "input");
+    d.down(out.x, out.y);
+    d.up(gain.x, gain.y);
+    expect(onConnect).not.toHaveBeenCalled();
+  });
+
+  it("does not move the module a socket belongs to", () => {
+    const onNodesMoved = vi.fn();
+    const { renderer, canvas } = rig(nodes);
+    const d = driver(
+      new GridInteraction(renderer, canvas, { onNodesMoved, readEdgesInto }),
+    );
+    const out = socket("env", "out", "output");
+    d.down(out.x, out.y);
+    d.move(out.x + 100, out.y + 100);
+    d.up(out.x + 100, out.y + 100);
+    expect(onNodesMoved).not.toHaveBeenCalled();
+    expect(nodes.get("env")?.view.position.x).toBe(480);
+  });
+
+  it("starts no cable in an example project", () => {
+    // Wiring is what makes an example an example; only the knobs are live there.
+    const onConnect = vi.fn();
+    const { renderer, canvas } = rig(nodes);
+    const d = driver(
+      new GridInteraction(
+        renderer,
+        canvas,
+        { onConnect, readEdgesInto },
+        { parametersOnly: true },
+      ),
+    );
+    const out = socket("env", "out", "output");
+    const gain = socket("vca", "gain", "input");
+    d.down(out.x, out.y);
+    d.up(gain.x, gain.y);
+    expect(onConnect).not.toHaveBeenCalled();
   });
 });
