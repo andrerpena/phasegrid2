@@ -141,6 +141,27 @@ not five. Note the specifiers omit `esm/vs/` — the package's `exports` map alr
 The colour provider offers hex presentations only: the canvas reads those with `hexToNumber`, so
 offering `rgb()` would let the picker write a colour the grid renders as black.
 
+## The inspector
+
+The selected module's parameters, as a form built from `ModuleDescriptor` — the label, the range, the
+unit and the enum labels all come from what the engine prints, so a module added to the engine gets a
+working inspector with no change here. `patch/module-schema.ts` is the whole of it.
+
+Edits go through `patchStore.apply` with a `paramSet` op carrying its own inverse, which is the path
+a knob drag on the canvas already takes. That is what makes an edit here undoable, reach the engine,
+and turn the knob on the canvas without any of it being wired twice. The push compares against the
+document rather than against the last value pushed, so a parameter the canvas is moving does not look
+like an edit to send back.
+
+Parameter keys are prefixed `param:`. A module is free to name a parameter `id` or `name`, and a
+collision with the identity fields would silently show the wrong value in one of the two places.
+
+A structural parameter is shown but not editable — the engine rebuilds the node to change one, which
+is not something to offer behind a field that looks like every other field. A hidden one is left out.
+
+It defaults to `center-bottom` rather than a sidebar: the form is label-and-value rows, and a sidebar
+wide enough for the values is a sidebar that has taken the room the grid wanted.
+
 ## The canvas
 
 `grid/viewport.ts` is the transform. `grid/viewport-store.ts` holds the one live viewport so panels
