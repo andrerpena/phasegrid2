@@ -116,9 +116,10 @@ void Scheduler::exec(Program& p, const Op& op, uint32_t offset, uint32_t n, uint
       // inside a sample-level cluster this runs once per sample, which is correct and merely busier.
       // The values land on the instance for the message thread's preview, and in the Params slot for
       // the knobs; a module that publishes a kind of its own (the displays) keeps its slot for that.
+      if (telemetry == nullptr || pair != 0 || d.numParams == 0) return;
       const bool previewed = slot.inst->previewSlot.load(std::memory_order_relaxed) != kNoTelemetrySlotCtx;
       const bool watched = ctx.telemetrySlot != kNoTelemetrySlotCtx && (d.flags & kModuleWritesTelemetry) == 0;
-      if (telemetry != nullptr && pair == 0 && (previewed || watched) && d.numParams > 0) {
+      if (previewed || watched) {
         for (uint32_t i = 0; i < d.numParams; ++i) {
           paramValues_[i] = lanes::lane(params_[i].at(n - 1), 0);
           slot.inst->liveValues[i].store(paramValues_[i], std::memory_order_relaxed);
