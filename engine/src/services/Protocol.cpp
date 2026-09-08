@@ -267,6 +267,9 @@ json helloJson(ProtocolContext& ctx) {
   json capabilities = json::array({"patch", "transport"});
   if (ctx.device != nullptr) capabilities.push_back("device");
   if (ctx.telemetry != nullptr && ctx.telemetry->valid()) capabilities.push_back("telemetry");
+  // Pictures are published by a service the segment alone does not imply; say so separately, so a
+  // client on a newer protocol never assumes them from an engine that predates them.
+  if (ctx.previews != nullptr) capabilities.push_back("previews");
   // Still no "midi": that command has no handler, and a capability for a command the engine cannot
   // answer is worse than no capability at all.
   json result;

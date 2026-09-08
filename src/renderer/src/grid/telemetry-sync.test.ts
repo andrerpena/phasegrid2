@@ -188,6 +188,28 @@ describe("telemetry sync", () => {
     sync.stop();
   });
 
+  it("keeps the knobs live against an engine that answers without preview slots", async () => {
+    // A renderer hot-reloaded against an engine still running the older protocol. Nothing about the
+    // knobs changed between the two, so they must not go with the pictures.
+    useEngineStore.setState({
+      call: vi.fn(async (cmd: string, args: { modules?: string[] }) => {
+        if (cmd === "telemetry.subscribe")
+          return { slots: { [args.modules?.[0] ?? ""]: 0 } } as never;
+        return {} as never;
+      }) as never,
+    });
+    const sync = startTelemetrySync(target, schedule);
+    await flush();
+    readings.set(0, {
+      kind: TelemetryKind.Params,
+      blockIndex: 1n,
+      values: [12],
+    });
+    tick?.();
+    expect(live).toEqual([["osc", "fold", 0.25]]);
+    sync.stop();
+  });
+
   it("skips a frame whose slot was torn or not yet written", async () => {
     const sync = startTelemetrySync(target, schedule);
     await flush();

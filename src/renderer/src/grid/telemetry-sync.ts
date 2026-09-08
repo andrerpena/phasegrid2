@@ -137,7 +137,8 @@ export function startTelemetrySync(
           .getState()
           .call("telemetry.subscribe", { modules, previews });
         slots = new Map(Object.entries(answer.slots));
-        previewSlots = new Map(Object.entries(answer.previewSlots));
+        // An engine from before pictures answers without this field. Its knobs still work.
+        previewSlots = new Map(Object.entries(answer.previewSlots ?? {}));
       } catch {
         // An engine with no segment, or a module gone between the ask and the answer. Nothing to
         // read either way; the knobs stay where the document has them.

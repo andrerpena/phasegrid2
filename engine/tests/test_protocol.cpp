@@ -550,6 +550,21 @@ TEST_CASE("hello reports the segment once there is one", "[protocol][telemetry]"
   REQUIRE(shm["size"] == f.writer.byteLength());
   const json& caps = reply["result"]["capabilities"];
   REQUIRE(std::find(caps.begin(), caps.end(), "telemetry") != caps.end());
+  // No publisher wired into this fixture, so no pictures: a client must not assume one from the segment.
+  REQUIRE(std::find(caps.begin(), caps.end(), "previews") == caps.end());
+}
+
+TEST_CASE("hello says when the engine publishes pictures, so a client can tell an older engine apart",
+          "[protocol][telemetry]") {
+  // A renderer that assumed the reply shape from a newer protocol was left with no wave at all when
+  // it hot-reloaded against an engine still running the older one. Capabilities are the answer to
+  // "can it?"; the picture path is one more thing to ask about.
+  TelemetryFixture f;
+  pg::PreviewPublisher publisher{f.engine, f.writer};
+  f.ctx.previews = &publisher;
+  const json reply = dispatch({{"id", 1}, {"cmd", "hello"}, {"args", {{"protocolVersion", 1}}}}, f.ctx);
+  const json& caps = reply["result"]["capabilities"];
+  REQUIRE(std::find(caps.begin(), caps.end(), "previews") != caps.end());
 }
 
 TEST_CASE("subscribing returns the module to slot map", "[protocol][telemetry]") {

@@ -29,7 +29,9 @@ trips per second per meter.
   thread (`PreviewPublisher`, ticked from the command loop about thirty times a second) reads the values
   the audio thread left on the instance, asks `Module::preview` when they have moved, and writes one cycle
   into a `Preview` slot. That is how a face follows the sound under modulation, under a hand, and while a
-  smoother is still ramping; `module.preview` over the socket remains only for an engine with no segment.
+  smoother is still ramping. `hello` lists `previews` among the capabilities when this is on; a renderer
+  falls back to `module.preview` over the socket when it is not, which is also what keeps a hot-reloaded
+  renderer working against an engine that predates pictures.
 - The renderer owns the subscription set in one place (`src/renderer/src/grid/telemetry-sync.ts`):
   `telemetry.subscribe` replaces the whole set, so two subscribers would cancel each other.
 - `telemetry.subscribe` decides which module writes into which slot and returns the map.

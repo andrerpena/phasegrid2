@@ -24,6 +24,8 @@ interface EngineState {
   catalogHash: string | null;
   /** The telemetry segment this engine writes, or null when it has none. Mapped by the grid. */
   shm: z.infer<typeof HelloResultSchema>["shm"];
+  /** What this engine can do, by name. Absence is the answer to "can it?", never an error. */
+  capabilities: string[];
   revision: number;
 }
 
@@ -41,6 +43,7 @@ export const useEngineStore = create<EngineState & EngineActions>((set) => ({
   engineVersion: null,
   catalogHash: null,
   shm: null,
+  capabilities: [],
   revision: 0,
 
   connect: async () => {
@@ -55,6 +58,7 @@ export const useEngineStore = create<EngineState & EngineActions>((set) => ({
         engineVersion: hello.engineVersion,
         catalogHash: hello.catalogHash,
         shm: hello.shm,
+        capabilities: hello.capabilities,
       });
     } catch (error) {
       set({ status: "error", detail: (error as Error).message });
