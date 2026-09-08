@@ -152,6 +152,14 @@ void TelemetryWriter::writeScope(uint32_t slot, const float* interleaved, uint32
   });
 }
 
+void TelemetryWriter::writeParams(uint32_t slot, const float* values, uint32_t count,
+                                  uint64_t blockIndex) noexcept PG_RT_NONBLOCKING {
+  const uint32_t n = std::min(count, kTelemetryMaxParams);
+  publish(slot, TelemetryKind::Params, n, 1, blockIndex, [&](float* out) noexcept {
+    for (uint32_t i = 0; i < n; ++i) out[i] = values[i];
+  });
+}
+
 void TelemetryWriter::beat() noexcept PG_RT_NONBLOCKING {
   if (base_ == nullptr) return;
   header()->heartbeat.fetch_add(1, std::memory_order_relaxed);

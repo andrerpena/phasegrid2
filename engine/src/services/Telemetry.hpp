@@ -36,7 +36,10 @@ inline constexpr uint32_t kTelemetryMaxChannels = 2;
 /// Enough for every display module a milestone-1 patch is likely to hold, and only 512 KiB of memory.
 inline constexpr uint32_t kTelemetryMaxSlots = 64;
 
-enum class TelemetryKind : uint32_t { None = 0, Meter = 1, Scope = 2 };
+/// `Params` is written by the scheduler for any subscribed module that does not publish a kind of its
+/// own: the effective value of every parameter, in display units, after modulation. It is how a knob
+/// on the interface turns when something is plugged into it.
+enum class TelemetryKind : uint32_t { None = 0, Meter = 1, Scope = 2, Params = 3 };
 
 /// "nobody is watching this module". Not a valid slot index, and the default for every instance.
 inline constexpr uint32_t kNoTelemetrySlot = 0xFFFFFFFFu;
@@ -61,6 +64,8 @@ static_assert(std::atomic<uint32_t>::is_always_lock_free,
 
 /// Meter payload: peak, RMS and clip count per channel, in that order.
 inline constexpr uint32_t kMeterFloatsPerChannel = 3;
+/// Params payload: one float per parameter. Matches `kMaxParamsPerModule`, and a slot holds far more.
+inline constexpr uint32_t kTelemetryMaxParams = 64;
 
 /**
  * The segment header. Written once, when the segment is created, and read by anyone attaching.
@@ -117,6 +122,10 @@ public:
                   uint64_t blockIndex) noexcept PG_RT_NONBLOCKING;
   void writeScope(uint32_t slot, const float* interleaved, uint32_t channels, uint32_t frames,
                   uint64_t blockIndex) noexcept PG_RT_NONBLOCKING;
+  /// Audio thread. `count` parameter values, one float each, in descriptor order; `channels` carries
+  /// the count and `frames` is 1. Capped at `kTelemetryMaxParams`.
+  void writeParams(uint32_t slot, const float* values, uint32_t count, uint64_t blockIndex) noexcept
+      PG_RT_NONBLOCKING;
   /// Audio thread. One increment per rendered block, so a reader can tell fresh data from stale.
   void beat() noexcept PG_RT_NONBLOCKING;
 

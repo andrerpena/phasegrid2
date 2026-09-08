@@ -247,7 +247,9 @@ grid param ids `level`, `loop`, `pan` rather than `sample_level` and friends.
 Modulatable params get an implicit input port `param:<id>`; effective value = `denormalize(clamp(knobNorm + signal))`, lane-wise.
 Modules read `ctx.param(i).at(frame)` as a `Sample`. `ParamView::knob` carries the *unmodulated* value for the block,
 so a module that has to hand the knob and the modulation to a downstream engine separately recovers the modulation
-as `at(i) - knob`.
+as `at(i) - knob`. A module someone has subscribed to over `telemetry.subscribe` publishes the effective value of every
+param after `process` (`TelemetryKind::Params`, written by the scheduler; see docs/telemetry.md), which is how the
+interface draws a knob where modulation put it.
 
 **`kParamPrimary` marks a control that belongs on the module's face.** A patching interface draws a
 module the size of a business card, and a wavetable oscillator has twenty-odd parameters, so it can

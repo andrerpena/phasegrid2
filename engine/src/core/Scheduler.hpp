@@ -21,6 +21,10 @@ private:
   std::array<const EventBuffer*, kMaxPortsPerModule> evIn_{};
   std::array<EventBuffer*, kMaxPortsPerModule> evOut_{};
   std::array<ParamView, kMaxParamsPerModule> params_{};
+  /// Scratch for the values a subscribed module publishes; sized once so publishing allocates nothing.
+  std::array<float, kMaxParamsPerModule> paramValues_{};
+  /// Blocks run so far, stamped on every params slot so a reader can tell fresh from stale.
+  uint64_t blockIndex_ = 0;
   EventBuffer emptyEvents_;
 };
 

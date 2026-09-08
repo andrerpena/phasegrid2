@@ -22,11 +22,19 @@ export const TELEMETRY_SLOT_BYTES = 16384;
 export const TELEMETRY_SLOT_HEADER_BYTES = 32;
 export const TELEMETRY_SCOPE_FRAMES = 1024;
 export const METER_FLOATS_PER_CHANNEL = 3;
+/** The most parameters a module can have, and so the most floats a params slot carries. */
+export const TELEMETRY_MAX_PARAMS = 64;
 
 export enum TelemetryKind {
   None = 0,
   Meter = 1,
   Scope = 2,
+  /**
+   * The effective value of every parameter of a subscribed module, after modulation, in display
+   * units and descriptor order. Written by the scheduler for any module that does not publish a kind
+   * of its own; it is what lets a knob turn when something is plugged into it.
+   */
+  Params = 3,
 }
 
 export interface TelemetryHeader {
@@ -55,7 +63,14 @@ export interface ScopeReading {
   channels: Float32Array[];
 }
 
-export type SlotReading = MeterReading | ScopeReading;
+export interface ParamsReading {
+  kind: TelemetryKind.Params;
+  blockIndex: bigint;
+  /** One per parameter, in the module descriptor's order. */
+  values: number[];
+}
+
+export type SlotReading = MeterReading | ScopeReading | ParamsReading;
 
 /** Where a slot begins, given its index. */
 export function slotOffset(index: number): number {
@@ -109,8 +124,10 @@ export function decodeSlot(bytes: Uint8Array): SlotReading | null {
   const blockIndex = view.getBigUint64(16, true);
 
   // Bounds before indexing. These numbers came from another process; a channel count of four billion is
-  // not a thing that should be able to throw here, let alone read past the buffer.
-  if (channels === 0 || channels > 8) return null;
+  // not a thing that should be able to throw here, let alone read past the buffer. A params slot counts
+  // parameters in the same field and is bounded on its own branch below.
+  if (channels === 0) return null;
+  if (kind !== TelemetryKind.Params && channels > 8) return null;
 
   const payload = TELEMETRY_SLOT_HEADER_BYTES;
   if (kind === TelemetryKind.Meter) {
@@ -141,6 +158,16 @@ export function decodeSlot(bytes: Uint8Array): SlotReading | null {
       out.push(samples);
     }
     return { kind, blockIndex, channels: out };
+  }
+
+  if (kind === TelemetryKind.Params) {
+    // `channels` carries the count. Bounded like everything else: it came from another process.
+    if (channels > TELEMETRY_MAX_PARAMS) return null;
+    if (payload + channels * 4 > bytes.byteLength) return null;
+    const values: number[] = [];
+    for (let i = 0; i < channels; i++)
+      values.push(view.getFloat32(payload + i * 4, true));
+    return { kind, blockIndex, values };
   }
 
   return null; // kind None, or one this build does not know

@@ -18,6 +18,14 @@ trips per second per meter.
   caller mid-decode.
 - `display.meter` and `display.scope` are the modules that publish. They have no outputs, so tapping a
   wire cannot change what it sounds like.
+- Any other subscribed module publishes a `Params` slot: the effective value of every one of its
+  parameters, in display units and descriptor order, after whatever is plugged into its `param:` inputs
+  has been added. The scheduler writes it after the module's `process`, from voice pair 0's lane 0 and
+  the block's last frame, so no module knows it is being watched. It is what lets a knob on the
+  interface turn when something modulates it. Inside a sample-level feedback cluster the write happens
+  once per sample rather than once per block, which is correct and merely busier.
+- The renderer owns the subscription set in one place (`src/renderer/src/grid/telemetry-sync.ts`):
+  `telemetry.subscribe` replaces the whole set, so two subscribers would cancel each other.
 - `telemetry.subscribe` decides which module writes into which slot and returns the map.
 
 ## Why a seqlock

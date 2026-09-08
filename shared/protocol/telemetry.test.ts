@@ -127,6 +127,37 @@ describe("decoding a slot", () => {
     expect(Array.from(reading.channels[1])).toEqual([-1, -2, -3]);
   });
 
+  it("reads a params slot as one value per parameter, in order", () => {
+    const bytes = buildSlot({
+      seq: 2,
+      kind: TelemetryKind.Params,
+      channels: 3,
+      frames: 1,
+      blockIndex: 9n,
+      fill: (view, payload) => {
+        view.setFloat32(payload, 1.25, true);
+        view.setFloat32(payload + 4, 0, true);
+        view.setFloat32(payload + 8, -6, true);
+      },
+    });
+    const reading = decodeSlot(bytes);
+    expect(reading?.kind).toBe(TelemetryKind.Params);
+    if (reading?.kind !== TelemetryKind.Params) return;
+    expect(reading.values).toEqual([1.25, 0, -6]);
+    expect(reading.blockIndex).toBe(9n);
+  });
+
+  it("declines a params slot claiming more parameters than a module can have", () => {
+    // Sixty-four is the engine's own ceiling; anything past it is a torn header, not a big module.
+    const bytes = buildSlot({
+      seq: 2,
+      kind: TelemetryKind.Params,
+      channels: 65,
+      frames: 1,
+    });
+    expect(decodeSlot(bytes)).toBeNull();
+  });
+
   it("declines a slot nobody has written yet", () => {
     expect(
       decodeSlot(
