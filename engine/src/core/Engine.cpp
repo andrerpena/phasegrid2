@@ -81,6 +81,27 @@ bool Engine::setTelemetrySlot(const std::string& node, uint32_t slot) {
   return true;
 }
 
+bool Engine::setPreviewSlot(const std::string& node, uint32_t slot) {
+  const ModuleInstance* inst = instances_.find(node);
+  if (inst == nullptr) return false;
+  const_cast<ModuleInstance*>(inst)->previewSlot.store(slot, std::memory_order_relaxed);
+  return true;
+}
+
+ParamValues Engine::paramValuesFor(const std::string& node) const {
+  ParamValues values;
+  const auto it = model_.nodes().find(node);
+  if (it == model_.nodes().end()) return values;
+  const RegisteredModule* type = registry_.find(it->second.type);
+  if (type == nullptr) return values;
+  for (uint32_t i = 0; i < type->desc->numParams; ++i) {
+    const ParamDesc& d = type->desc->params[i];
+    const auto pv = it->second.params.find(d.id);
+    values[d.id] = pv == it->second.params.end() ? d.def : pv->second;
+  }
+  return values;
+}
+
 Result Engine::setParam(const std::string& node, const std::string& param, float value) {
   Result r = model_.setParam(registry_, node, param, value);
   if (!r) return r;
@@ -111,15 +132,7 @@ Result Engine::preview(const std::string& node, float* out, uint32_t count) {
   if (inst == nullptr) return Result::fail("E_NODE_NOT_FOUND", "module " + node + " is not built yet");
   if ((inst->type->desc->flags & kModulePreviewsWave) == 0)
     return Result::fail("E_UNSUPPORTED", "module " + node + " has no waveform to show");
-  // The model's values with the descriptor's defaults filled in, so a module reads every param by name
-  // and never has to know which ones the document happened to mention.
-  ParamValues values;
-  for (uint32_t i = 0; i < inst->type->desc->numParams; ++i) {
-    const ParamDesc& d = inst->type->desc->params[i];
-    const auto pv = it->second.params.find(d.id);
-    values[d.id] = pv == it->second.params.end() ? d.def : pv->second;
-  }
-  if (!inst->module->preview(values, out, count))
+  if (!inst->module->preview(paramValuesFor(node), out, count))
     return Result::fail("E_UNSUPPORTED", "module " + node + " has no waveform to show");
   return {};
 }

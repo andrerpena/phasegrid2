@@ -33,13 +33,16 @@ inline constexpr uint32_t kTelemetryHeaderBytes = 64;
 inline constexpr uint32_t kTelemetrySlotBytes = 16384;
 inline constexpr uint32_t kTelemetryScopeFrames = 1024;
 inline constexpr uint32_t kTelemetryMaxChannels = 2;
-/// Enough for every display module a milestone-1 patch is likely to hold, and only 512 KiB of memory.
-inline constexpr uint32_t kTelemetryMaxSlots = 64;
+/// One slot per watched module plus one per visible wave panel: a patch of forty oscillators still
+/// fits, and the segment is 2 MiB.
+inline constexpr uint32_t kTelemetryMaxSlots = 128;
 
 /// `Params` is written by the scheduler for any subscribed module that does not publish a kind of its
 /// own: the effective value of every parameter, in display units, after modulation. It is how a knob
 /// on the interface turns when something is plugged into it.
-enum class TelemetryKind : uint32_t { None = 0, Meter = 1, Scope = 2, Params = 3 };
+/// `Preview` is one cycle of what a module would draw for the values it is running with, written by
+/// `PreviewPublisher` on the message thread: `channels` is 1 and `frames` is the cycle's length.
+enum class TelemetryKind : uint32_t { None = 0, Meter = 1, Scope = 2, Params = 3, Preview = 4 };
 
 /// "nobody is watching this module". Not a valid slot index, and the default for every instance.
 inline constexpr uint32_t kNoTelemetrySlot = 0xFFFFFFFFu;
@@ -126,6 +129,9 @@ public:
   /// the count and `frames` is 1. Capped at `kTelemetryMaxParams`.
   void writeParams(uint32_t slot, const float* values, uint32_t count, uint64_t blockIndex) noexcept
       PG_RT_NONBLOCKING;
+  /// Message thread (it is the preview publisher's), but built the same way so a reader cannot tell.
+  /// One channel of `count` samples, capped at `kTelemetryScopeFrames`; `index` counts publishes.
+  void writePreview(uint32_t slot, const float* samples, uint32_t count, uint64_t index) noexcept;
   /// Audio thread. One increment per rendered block, so a reader can tell fresh data from stale.
   void beat() noexcept PG_RT_NONBLOCKING;
 

@@ -2,6 +2,7 @@
 #include <array>
 #include <atomic>
 #include <memory>
+#include <utility>
 #include <readerwriterqueue.h>
 #include "core/GraphModel.hpp"
 #include "core/InstanceTable.hpp"
@@ -57,7 +58,16 @@ public:
   TelemetryWriter* telemetry() const { return telemetry_; }
   /// Message thread. Points a module at a slot, or `kNoTelemetrySlot` to stop it publishing.
   bool setTelemetrySlot(const std::string& node, uint32_t slot);
+  /// Message thread. Where a module's picture is published, or `kNoTelemetrySlot`.
+  bool setPreviewSlot(const std::string& node, uint32_t slot);
   void clearTelemetrySlots() { instances_.clearTelemetrySlots(); }
+  /// Every live instance, for the preview publisher. Message thread.
+  template <class F>
+  void forEachInstance(F&& f) { instances_.forEach(std::forward<F>(f)); }
+  /// The model's values for `node` with the descriptor's defaults filled in, in descriptor order, or
+  /// empty when there is no such node: what a module reads by name and never has to know which the
+  /// document mentioned.
+  ParamValues paramValuesFor(const std::string& node) const;
   bool hasInstance(const std::string& node) const { return instances_.find(node) != nullptr; }
 
   void renderBlock(float* const* out, uint32_t channels, uint32_t numFrames, const TransportSnapshot& t) noexcept PG_RT_NONBLOCKING;

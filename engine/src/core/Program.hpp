@@ -21,12 +21,26 @@ inline constexpr uint32_t kSilentBuffer = 0;   // buffers[0] is never written
 inline constexpr uint32_t kEmptyEvents = 0;    // eventBufs[0] is never written
 
 /// One per module id in the patch. Owned by InstanceTable, shared with every Program that uses it.
+static_assert(std::atomic<float>::is_always_lock_free, "the audio thread stores live values without a lock");
+
 struct ModuleInstance {
   std::string id;
   /// Which telemetry slot this module publishes into, or `kNoTelemetrySlot`. Written by the message
   /// thread on subscribe, read by the audio thread every block, so it is atomic; it lives here rather
   /// than in `Program` because a subscription must outlive a recompile and must not cause one.
   std::atomic<uint32_t> telemetrySlot{0xFFFFFFFFu};
+  /// Where this module's picture goes (`Module::preview`, published by `PreviewPublisher` on the
+  /// message thread), or `kNoTelemetrySlot`. Same lifetime and threading as `telemetrySlot`.
+  std::atomic<uint32_t> previewSlot{0xFFFFFFFFu};
+  /**
+   * The effective value of every param at the last frame of the last block the module ran, voice 0,
+   * in display units: what the module actually used, after modulation. Written by the scheduler
+   * whenever anyone is watching (either slot set), read by the message thread to draw a picture from
+   * the values the sound is made with. Relaxed atomics: a picture torn across two blocks is a picture.
+   * `liveBlock` is the block they came from, 0 until the module has run under a subscription.
+   */
+  std::array<std::atomic<float>, kMaxParamsPerModule> liveValues{};
+  std::atomic<uint64_t> liveBlock{0};
   uint64_t serial = 0;
   const RegisteredModule* type = nullptr;
   std::unique_ptr<Module> module;

@@ -36,8 +36,14 @@ public:
   void prune(const std::set<std::string>& liveNodeIds, const std::set<std::string>& liveEdgeIds);
   const ModuleInstance* find(const std::string& id) const;
   ModuleInstance* find(const std::string& id);
-  /// Stops every module publishing telemetry. Message thread; the audio thread reads these atomically.
+  /// Stops every module publishing telemetry, pictures included. Message thread; the audio thread reads
+  /// these atomically.
   void clearTelemetrySlots();
+  /// Every live instance, for the message thread's own passes over them (the preview publisher).
+  template <class F>
+  void forEach(F&& f) {
+    for (auto& [id, inst] : byId_) f(*inst);
+  }
   size_t size() const { return byId_.size(); }
 private:
   std::map<std::string, std::shared_ptr<ModuleInstance>> byId_;

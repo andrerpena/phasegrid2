@@ -160,6 +160,14 @@ void TelemetryWriter::writeParams(uint32_t slot, const float* values, uint32_t c
   });
 }
 
+void TelemetryWriter::writePreview(uint32_t slot, const float* samples, uint32_t count,
+                                   uint64_t index) noexcept {
+  const uint32_t n = std::min(count, kTelemetryScopeFrames);
+  publish(slot, TelemetryKind::Preview, 1, n, index, [&](float* out) noexcept {
+    for (uint32_t i = 0; i < n; ++i) out[i] = samples[i];
+  });
+}
+
 void TelemetryWriter::beat() noexcept PG_RT_NONBLOCKING {
   if (base_ == nullptr) return;
   header()->heartbeat.fetch_add(1, std::memory_order_relaxed);

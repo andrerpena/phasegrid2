@@ -65,7 +65,10 @@ void InstanceTable::prune(const std::set<std::string>& liveNodeIds, const std::s
 }
 
 void InstanceTable::clearTelemetrySlots() {
-  for (auto& [id, inst] : byId_) inst->telemetrySlot.store(kNoTelemetrySlot, std::memory_order_relaxed);
+  for (auto& [id, inst] : byId_) {
+    inst->telemetrySlot.store(kNoTelemetrySlot, std::memory_order_relaxed);
+    inst->previewSlot.store(kNoTelemetrySlot, std::memory_order_relaxed);
+  }
 }
 
 const ModuleInstance* InstanceTable::find(const std::string& id) const {
