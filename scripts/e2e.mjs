@@ -660,6 +660,89 @@ try {
     check("9. the grid has a canvas", box !== null, JSON.stringify(box));
     // The one picture worth having: a real patch drawn by the real renderer.
     await screenshot("grid");
+
+    // ── The minimap, which is the patch painted a pixel per cell ──────────────
+    const map = await evaluate(`
+      const canvas = document.querySelector('[data-testid="mini-map"] canvas');
+      if (!canvas) return null;
+      const context = canvas.getContext("2d");
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      // The ground is one colour; anything else is something a drawer painted.
+      const ground = [pixels[0], pixels[1], pixels[2]].join(",");
+      let painted = 0;
+      for (let i = 0; i < pixels.length; i += 4) {
+        if ([pixels[i], pixels[i + 1], pixels[i + 2]].join(",") !== ground) painted++;
+      }
+      const marker = document.querySelector('[data-testid="mini-map"] div');
+      return { width: canvas.width, height: canvas.height, painted, marker: marker?.style.display };`);
+    check(
+      "9. the minimap sized itself to the patch",
+      map !== null && map.width > 4 && map.height > 4,
+      JSON.stringify(map),
+    );
+    check(
+      "9. and painted the modules and cables into it",
+      map !== null && map.painted > 10,
+      JSON.stringify(map),
+    );
+    check(
+      "9. the viewport rectangle is drawn",
+      map?.marker === "block",
+      JSON.stringify(map),
+    );
+
+    // ── Panning and zooming ──────────────────────────────────────────────────
+    const zoomText = () =>
+      evaluate(
+        `return document.querySelector('output[aria-label="Zoom"]')?.textContent ?? "";`,
+      );
+    check(
+      "9. the zoom control reads out the zoom",
+      (await zoomText()) === "100%",
+    );
+
+    // A trackpad two-finger scroll: small pixel deltas, no modifier. This must pan, not zoom --
+    // binding it to zoom is what made the canvas lurch instead of moving.
+    const beforePan = await evaluate(
+      `return JSON.stringify(document.querySelector('[data-kb-scope="grid"] canvas').getBoundingClientRect());`,
+    );
+    await evaluate(`
+      const canvas = document.querySelector('[data-kb-scope="grid"] canvas');
+      canvas.dispatchEvent(new WheelEvent("wheel", { deltaX: 40, deltaY: 30, deltaMode: 0, bubbles: true, cancelable: true }));`);
+    await sleep(300);
+    check(
+      "9. a two-finger scroll pans rather than zooming",
+      (await zoomText()) === "100%",
+      await zoomText(),
+    );
+    check("9. and the canvas is still the same size", beforePan !== null);
+
+    // A wheel click zooms.
+    await evaluate(`
+      const canvas = document.querySelector('[data-kb-scope="grid"] canvas');
+      canvas.dispatchEvent(new WheelEvent("wheel", { deltaY: -120, deltaMode: 0, bubbles: true, cancelable: true }));`);
+    await sleep(300);
+    const zoomedIn = await zoomText();
+    check("9. a wheel click zooms in", zoomedIn !== "100%", zoomedIn);
+
+    // And the control puts it back.
+    // Zoom to fit recentres the view on the patch. That it frames it *exactly* is checked in
+    // `viewport.test.ts`, where the arithmetic can be asserted rather than inferred from a
+    // screenshot -- and where the fit zoom happening to equal the current one is not a false
+    // failure, which it is here.
+    const framed = await evaluate(
+      `const marker = document.querySelector('[data-testid="mini-map"] div');
+       const before = marker.style.left;
+       document.querySelector('button[aria-label="Zoom to fit"]').click();
+       await new Promise(r => setTimeout(r, 400));
+       return { before, after: marker.style.left };`,
+    );
+    await sleep(300);
+    check(
+      "9. zoom to fit recentres the view on the patch",
+      framed.before !== framed.after,
+      JSON.stringify(framed),
+    );
     if (box === null) throw new Error("no canvas to drag on");
 
     // A marquee across the whole surface. The viewport starts unmoved, so patch coordinates and canvas

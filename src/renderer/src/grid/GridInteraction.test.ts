@@ -114,6 +114,7 @@ function rig(nodes: Map<string, FakeNode>) {
     drawOverlay: vi.fn(),
     drawBackground: vi.fn(),
     refreshCables: vi.fn(),
+    drawSelection: vi.fn(),
   } as unknown as GridRenderer;
 
   const canvas = {

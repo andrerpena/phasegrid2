@@ -95,6 +95,35 @@ export class Viewport {
     this.zoomAt(centre, zoom / this.zoom);
   }
 
+  /** Centres a patch point in a view of the given size. What the minimap drives. */
+  panTo(point: Point, view: { width: number; height: number }): void {
+    this._x = view.width / 2 - point.x * this._zoom;
+    this._y = view.height / 2 - point.y * this._zoom;
+    this.commit();
+  }
+
+  /**
+   * The patch rectangle currently on screen.
+   *
+   * The minimap draws this as the box you can drag, so it is the answer to "where am I" that
+   * anything outside the canvas needs. Takes the view size rather than remembering one: the canvas
+   * is resized by dragging the dock, and a remembered size would be stale exactly when the box
+   * mattered.
+   */
+  visibleBounds(view: { width: number; height: number }): {
+    left: number;
+    top: number;
+    right: number;
+    bottom: number;
+  } {
+    return {
+      left: -this._x / this._zoom,
+      top: -this._y / this._zoom,
+      right: (view.width - this._x) / this._zoom,
+      bottom: (view.height - this._y) / this._zoom,
+    };
+  }
+
   /** Frames a rectangle, with room around it. Used by "zoom to fit". */
   fit(
     bounds: { x: number; y: number; width: number; height: number },

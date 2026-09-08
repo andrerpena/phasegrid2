@@ -1,6 +1,7 @@
 import { useCatalogStore } from "@renderer/catalog/catalog-store";
 import { registerShellCommands } from "@renderer/commands/definitions";
 import { CommandPalette } from "@renderer/components/command-palette/CommandPalette";
+import { registerBuiltInControlBars } from "@renderer/components/control-bars";
 import { Dock } from "@renderer/components/dock/Dock";
 import {
   ModalRenderer,
@@ -11,6 +12,7 @@ import {
   StatusBar,
 } from "@renderer/components/status-bars";
 import {
+  registerBuiltInMinimapDrawers,
   registerBuiltInWidgets,
   WidgetSlot,
   watchWidgetLayout,
@@ -59,6 +61,10 @@ export const App = () => {
     // would look like one this build does not have.
     registerBuiltInWidgets();
     registerBuiltInStatusBars();
+    registerBuiltInControlBars();
+    // What paints itself on the minimap. Separate from the widgets because a drawer is not a panel:
+    // adding something drawable to the canvas registers one here and the minimap learns nothing.
+    registerBuiltInMinimapDrawers();
     // The layout is the installation's, so it loads once and does not wait for a workspace. The
     // settings are the workspace's and are loaded by opening one.
     void loadLayout();

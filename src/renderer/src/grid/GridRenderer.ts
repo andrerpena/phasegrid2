@@ -37,12 +37,18 @@ const CATEGORY_ACCENT: Record<string, keyof PhasegridTheme["grid"]["signal"]> =
     sampler: "audio",
   };
 
+/** How far outside a node its selection ring sits, in patch units. */
+const SELECTION_GAP = 3;
+const SELECTION_RADIUS = 8;
+const SELECTION_WIDTH = 1.5;
+
 export class GridRenderer {
   readonly viewport: Viewport;
   private readonly world = new Container();
   private readonly background = new Graphics();
   private readonly cableLayer = new Container();
   private readonly nodeLayer = new Container();
+  private readonly selectionLayer = new Graphics();
   private readonly overlay = new Graphics();
 
   private readonly nodes = new Map<string, NodeView>();
@@ -57,8 +63,10 @@ export class GridRenderer {
     private theme: PhasegridTheme,
     private catalog: Map<string, ModuleDescriptor>,
   ) {
-    // Cables under nodes, so a cable passing behind a module looks like it goes behind it.
-    this.world.addChild(this.cableLayer, this.nodeLayer);
+    // Cables under nodes, so a cable passing behind a module looks like it goes behind it. The
+    // selection outlines go above both, and inside `world` rather than in the screen-space overlay,
+    // so panning and zooming carry them without a redraw.
+    this.world.addChild(this.cableLayer, this.nodeLayer, this.selectionLayer);
     app.stage.addChild(this.background, this.world, this.overlay);
     this.viewport = new Viewport(this.world);
     this.drawBackground();
@@ -146,6 +154,10 @@ export class GridRenderer {
       cable.destroy();
       this.cables.delete(id);
     }
+
+    // After the nodes, so a ring is drawn around a node that has just been created or moved by an
+    // undo rather than around where it used to be.
+    this.drawSelection();
   }
 
   /**
@@ -260,6 +272,40 @@ export class GridRenderer {
   setSelection(ids: Set<string>): void {
     this.selection = ids;
     for (const [id, node] of this.nodes) node.setSelected(ids.has(id));
+    this.drawSelection();
+  }
+
+  /**
+   * A ring around each selected node, drawn outside it with a gap.
+   *
+   * Recolouring a node's own border was the previous approach and it conflated two things: at a
+   * glance you could not tell a selected module from one whose border simply happened to be that
+   * colour, and with several selected the shape of the selection did not read at all. An outset ring
+   * is separate from the module, so the module still looks like itself and the selection is plainly
+   * an annotation on top.
+   *
+   * Redrawn on selection and on every move, because the rings are in world space and follow the
+   * nodes rather than the pointer.
+   */
+  drawSelection(): void {
+    this.selectionLayer.clear();
+    if (this.selection.size === 0) return;
+    const color = hexToNumber(this.theme.grid.nodeSelected);
+    for (const id of this.selection) {
+      const node = this.nodes.get(id);
+      if (node === undefined) continue;
+      const { x, y } = node.view.position;
+      const { width, height } = node.layout;
+      this.selectionLayer
+        .roundRect(
+          x - SELECTION_GAP,
+          y - SELECTION_GAP,
+          width + SELECTION_GAP * 2,
+          height + SELECTION_GAP * 2,
+          SELECTION_RADIUS,
+        )
+        .stroke({ width: SELECTION_WIDTH, color, alignment: 0.5 });
+    }
   }
 
   /** The marquee and the cable being dragged: transient things drawn over everything else. */
@@ -312,6 +358,7 @@ export class GridRenderer {
   setTheme(theme: PhasegridTheme): void {
     this.theme = theme;
     this.drawBackground();
+    this.drawSelection();
     for (const node of this.nodes.values()) {
       node.setStyle({
         colors: theme.grid,

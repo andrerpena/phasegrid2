@@ -90,6 +90,59 @@ describe("the viewport", () => {
     expect(bottomRight.x).toBeLessThan(800);
   });
 
+  it("frames a rectangle that is nowhere near the origin", () => {
+    // The case that matters for a patch: modules can sit anywhere, including at negative
+    // coordinates, and fitting has to centre on where they actually are rather than on the origin.
+    const { container } = fakeWorld();
+    const viewport = new Viewport(container);
+    const rect = { x: -900, y: -400, width: 600, height: 300 };
+    viewport.fit(rect, { width: 800, height: 600 });
+    const bounds = viewport.visibleBounds({ width: 800, height: 600 });
+    expect(bounds.left).toBeLessThanOrEqual(rect.x);
+    expect(bounds.top).toBeLessThanOrEqual(rect.y);
+    expect(bounds.right).toBeGreaterThanOrEqual(rect.x + rect.width);
+    expect(bounds.bottom).toBeGreaterThanOrEqual(rect.y + rect.height);
+  });
+
+  it("is settled: fitting the same rectangle twice changes nothing the second time", () => {
+    // What the zoom-to-fit button relies on. It also means the button is a way back to a known
+    // state rather than something that drifts each time it is pressed.
+    const { container } = fakeWorld();
+    const viewport = new Viewport(container);
+    const rect = { x: 100, y: 50, width: 900, height: 400 };
+    const view = { width: 1000, height: 700 };
+    viewport.fit(rect, view);
+    const first = { x: viewport.x, y: viewport.y, zoom: viewport.zoom };
+    viewport.zoomAt({ x: 10, y: 10 }, 1.4);
+    viewport.panBy(120, -60);
+    viewport.fit(rect, view);
+    expect(viewport.zoom).toBeCloseTo(first.zoom, 10);
+    expect(viewport.x).toBeCloseTo(first.x, 10);
+    expect(viewport.y).toBeCloseTo(first.y, 10);
+  });
+
+  it("centres a patch point in the view", () => {
+    const { container } = fakeWorld();
+    const viewport = new Viewport(container);
+    viewport.zoom = 2;
+    viewport.panTo({ x: 300, y: 150 }, { width: 800, height: 600 });
+    const centre = viewport.toScreen({ x: 300, y: 150 });
+    expect(centre.x).toBeCloseTo(400, 6);
+    expect(centre.y).toBeCloseTo(300, 6);
+  });
+
+  it("reports the patch rectangle currently on screen", () => {
+    const { container } = fakeWorld();
+    const viewport = new Viewport(container);
+    viewport.zoom = 2;
+    viewport.panBy(-100, -50);
+    const bounds = viewport.visibleBounds({ width: 800, height: 600 });
+    expect(bounds.left).toBeCloseTo(50, 6);
+    expect(bounds.top).toBeCloseTo(25, 6);
+    expect(bounds.right).toBeCloseTo(450, 6);
+    expect(bounds.bottom).toBeCloseTo(325, 6);
+  });
+
   it("ignores a request to frame nothing", () => {
     const { container } = fakeWorld();
     const viewport = new Viewport(container);

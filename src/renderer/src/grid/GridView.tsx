@@ -16,6 +16,7 @@ import { GridInteraction } from "./GridInteraction";
 import { GridRenderer } from "./GridRenderer";
 import { startPreviewSync } from "./preview-sync";
 import { startTelemetrySync } from "./telemetry-sync";
+import { viewportStore } from "./viewport-store";
 
 /**
  * React's entire involvement with the canvas: create it, hand it to the renderer, destroy it.
@@ -102,7 +103,23 @@ export const GridView = () => {
         }),
       );
 
-      const observer = new ResizeObserver(() => view.drawBackground());
+      // The view, reachable from outside the canvas: the minimap draws the visible rectangle and
+      // drags it, and the zoom control reads and sets the zoom. Neither can be handed a Pixi object
+      // through React, because all of this lives outside the tree.
+      const reportView = () => {
+        const box = element.getBoundingClientRect();
+        viewportStore.setView({ width: box.width, height: box.height });
+      };
+      viewportStore.set(view.viewport, {
+        width: element.clientWidth,
+        height: element.clientHeight,
+      });
+      stop.push(() => viewportStore.set(null));
+
+      const observer = new ResizeObserver(() => {
+        reportView();
+        view.drawBackground();
+      });
       observer.observe(element);
       stop.push(() => observer.disconnect());
 

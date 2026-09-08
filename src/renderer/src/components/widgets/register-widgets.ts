@@ -4,6 +4,7 @@ import {
   historyWidget,
   inspectorWidget,
   logWidget,
+  miniMapWidget,
   performanceWidget,
   projectsWidget,
   scopeWidget,
@@ -27,6 +28,7 @@ export function registerBuiltInWidgets(): void {
   widgetRegistry.register(historyWidget);
   widgetRegistry.register(inspectorWidget);
   widgetRegistry.register(logWidget);
+  widgetRegistry.register(miniMapWidget);
   widgetRegistry.register(scopeWidget);
   widgetRegistry.register(performanceWidget);
   refreshWidgetLayout();

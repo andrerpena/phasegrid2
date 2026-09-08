@@ -68,11 +68,21 @@ export const CONFIG_SCHEMA: Record<string, ConfigPropertySchema> = {
       "left-bottom": ["projects", "history"],
       center: ["grid", "settings"],
       "center-bottom": ["log"],
-      "right-top": ["inspector"],
+      "right-top": ["mini-map", "inspector"],
       "right-bottom": ["scope", "performance"],
     },
     description:
       "Which panel is in which dock slot. Column widths are not here -- those are about your display and live outside the workspace.",
+  },
+  "layout.controlBars": {
+    type: "object",
+    default: {
+      "left-top": [],
+      "left-bottom": [],
+      "right-top": ["zoom-control"],
+      "right-bottom": [],
+    },
+    description: "Which controls float over the canvas, and in which corner.",
   },
   "layout.statusBars": {
     type: "object",

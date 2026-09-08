@@ -23,6 +23,26 @@ import {
   paramFraction,
   snap,
 } from "./layout";
+import { classifyWheel } from "./wheel";
+
+/** How far apart two fingers are. */
+function touchSpread(touches: TouchList): number {
+  const a = touches[0];
+  const b = touches[1];
+  if (a === undefined || b === undefined) return 0;
+  return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+}
+
+/** The point a pinch is anchored on. */
+function touchCentre(touches: TouchList): { x: number; y: number } {
+  const a = touches[0];
+  const b = touches[1];
+  if (a === undefined || b === undefined) return { x: 0, y: 0 };
+  return {
+    x: (a.clientX + b.clientX) / 2,
+    y: (a.clientY + b.clientY) / 2,
+  };
+}
 
 /**
  * Everything a pointer can do on the grid, in one place.
@@ -105,6 +125,10 @@ export class GridInteraction {
   private dragOrigins = new Map<string, { x: number; y: number }>();
   private selection = new Set<string>();
   private detach: (() => void)[] = [];
+  /** Space is the pan modifier; see `attach`. */
+  private spaceHeld = false;
+  /** Distance between two fingers on the last touch frame, while a pinch is under way. */
+  private pinchDistance: number | null = null;
 
   constructor(
     private readonly renderer: GridRenderer,
@@ -125,6 +149,23 @@ export class GridInteraction {
     const up = (event: PointerEvent) => this.onUp(event);
     const wheel = (event: WheelEvent) => this.onWheel(event);
     const doubleClick = (event: MouseEvent) => this.onDoubleClick(event);
+    const touchStart = (event: TouchEvent) => this.onTouchStart(event);
+    const touchMove = (event: TouchEvent) => this.onTouchMove(event);
+    const touchEnd = (event: TouchEvent) => this.onTouchEnd(event);
+
+    // Space held is the pan modifier. Tracked on the window rather than read off each event, because
+    // the space bar is pressed *before* the drag begins and a pointer event carries no record of it.
+    const keyDown = (event: KeyboardEvent) => {
+      if (event.code === "Space") this.spaceHeld = true;
+    };
+    const keyUp = (event: KeyboardEvent) => {
+      if (event.code === "Space") this.spaceHeld = false;
+    };
+    // Losing the window loses the key: otherwise tabbing away mid-hold leaves the canvas convinced
+    // space is still down and every click pans.
+    const blur = () => {
+      this.spaceHeld = false;
+    };
 
     this.canvas.addEventListener("pointerdown", down);
     this.canvas.addEventListener("dblclick", doubleClick);
@@ -132,14 +173,28 @@ export class GridInteraction {
     // working, and a release outside it must still end the gesture rather than leaving it stuck down.
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
+    window.addEventListener("keydown", keyDown);
+    window.addEventListener("keyup", keyUp);
+    window.addEventListener("blur", blur);
     this.canvas.addEventListener("wheel", wheel, { passive: false });
+    this.canvas.addEventListener("touchstart", touchStart, { passive: false });
+    this.canvas.addEventListener("touchmove", touchMove, { passive: false });
+    this.canvas.addEventListener("touchend", touchEnd);
+    this.canvas.addEventListener("touchcancel", touchEnd);
 
     this.detach = [
       () => this.canvas.removeEventListener("pointerdown", down),
       () => this.canvas.removeEventListener("dblclick", doubleClick),
       () => window.removeEventListener("pointermove", move),
       () => window.removeEventListener("pointerup", up),
+      () => window.removeEventListener("keydown", keyDown),
+      () => window.removeEventListener("keyup", keyUp),
+      () => window.removeEventListener("blur", blur),
       () => this.canvas.removeEventListener("wheel", wheel),
+      () => this.canvas.removeEventListener("touchstart", touchStart),
+      () => this.canvas.removeEventListener("touchmove", touchMove),
+      () => this.canvas.removeEventListener("touchend", touchEnd),
+      () => this.canvas.removeEventListener("touchcancel", touchEnd),
     ];
     return () => {
       for (const off of this.detach) off();
@@ -187,8 +242,9 @@ export class GridInteraction {
     const point = this.renderer.viewport.toWorld(screen);
 
     // Middle button pans. Every canvas application does this and muscle memory outweighs any argument
-    // for something else.
-    if (event.button === 1) {
+    // for something else. Space and the left button do too, for the laptops that have no middle one --
+    // which is most of them, and was the reason panning was effectively unreachable.
+    if (event.button === 1 || (event.button === 0 && this.spaceHeld)) {
       this.state = beginPan(screen);
       return;
     }
@@ -394,6 +450,8 @@ export class GridInteraction {
         node?.setPosition(snap(from.x + dx, CELL), snap(from.y + dy, CELL));
       }
       this.renderer.refreshCables();
+      // The rings are drawn around where the nodes are, so a drag has to move them too.
+      this.renderer.drawSelection();
       return;
     }
 
@@ -470,13 +528,48 @@ export class GridInteraction {
     }
   }
 
+  /**
+   * The wheel: pan, or zoom, depending on what the gesture turns out to have been.
+   *
+   * Which it is comes from `classifyWheel`, which is where that judgement lives and where it is
+   * tested. This is only the part that needs a viewport.
+   */
   private onWheel(event: WheelEvent): void {
     event.preventDefault();
-    this.renderer.viewport.zoomAt(
-      this.screen(event),
-      event.deltaY < 0 ? 1.1 : 1 / 1.1,
-    );
+    const gesture = classifyWheel(event);
+    if (gesture.kind === "none") return;
+    if (gesture.kind === "pan")
+      this.renderer.viewport.panBy(gesture.dx, gesture.dy);
+    else this.renderer.viewport.zoomAt(this.screen(event), gesture.factor);
     this.renderer.drawBackground();
+  }
+
+  private onTouchStart(event: TouchEvent): void {
+    if (event.touches.length !== 2) return;
+    event.preventDefault();
+    // A pinch is not a drag: whatever gesture was in progress is abandoned rather than continuing
+    // with one of the two fingers, which is how a two-finger zoom ends up dragging a module.
+    this.state = IDLE;
+    this.pinchDistance = touchSpread(event.touches);
+  }
+
+  private onTouchMove(event: TouchEvent): void {
+    if (event.touches.length !== 2 || this.pinchDistance === null) return;
+    event.preventDefault();
+    const spread = touchSpread(event.touches);
+    if (spread <= 0) return;
+    const rect = this.canvas.getBoundingClientRect();
+    const centre = touchCentre(event.touches);
+    this.renderer.viewport.zoomAt(
+      { x: centre.x - rect.left, y: centre.y - rect.top },
+      spread / this.pinchDistance,
+    );
+    this.pinchDistance = spread;
+    this.renderer.drawBackground();
+  }
+
+  private onTouchEnd(event: TouchEvent): void {
+    if (event.touches.length < 2) this.pinchDistance = null;
   }
 
   private select(ids: string[]): void {

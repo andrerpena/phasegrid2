@@ -3,6 +3,7 @@ export { gridWidget } from "./GridWidget";
 export { historyWidget } from "./HistoryWidget";
 export { inspectorWidget } from "./InspectorWidget";
 export { logWidget } from "./LogWidget";
+export { miniMapWidget } from "./MiniMapWidget";
 export { performanceWidget } from "./PerformanceWidget";
 export { projectsWidget } from "./ProjectsWidget";
 export { scopeWidget } from "./ScopeWidget";

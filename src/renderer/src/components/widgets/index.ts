@@ -1,4 +1,5 @@
 export * from "./definitions";
+export { registerBuiltInMinimapDrawers } from "./definitions/minimap";
 export { registerBuiltInWidgets } from "./register-widgets";
 export { SLOT_LABELS } from "./slot-labels";
 export type {
