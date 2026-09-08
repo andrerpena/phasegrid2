@@ -543,6 +543,15 @@ try {
         `document.querySelector("dialog").dispatchEvent(new Event("cancel", { cancelable: true }));`,
       );
       await sleep(250);
+
+      // One picture in a theme that is not the default, as a check that nothing is styled by
+      // accident rather than by token: an unstyled component looks fine in dark and wrong here.
+      await evaluate(`document.documentElement.dataset.theme = "terminal";`);
+      await sleep(300);
+      await screenshot("terminal");
+      await evaluate(`document.documentElement.dataset.theme = "dark";`);
+      await sleep(200);
+
       check(
         "6. and escaping puts the old one back",
         (await evaluate(`return ${activeTheme};`)) === themeBefore,
@@ -661,6 +670,103 @@ try {
     // The one picture worth having: a real patch drawn by the real renderer.
     await screenshot("grid");
 
+    // ── The inspector: a form built from the engine's own descriptors ────────
+    // Before anything moves the view, so a patch coordinate is a canvas coordinate: the oscillator
+    // is written at (48, 48) below, and this clicks its title bar -- body rather than knob or
+    // socket. Its slot shows one panel at a time, so the tab has to be at the front to be asked.
+    await evaluate(`click('[role="tab"]', "Inspector");`);
+    await sleep(300);
+    await mouse("mousePressed", box.x + 118, box.y + 58);
+    await mouse("mouseReleased", box.x + 118, box.y + 58);
+    await sleep(500);
+    const inspector = await evaluate(`
+      const panel = document.querySelector('[data-widget="inspector"]');
+      if (!panel) return null;
+      return {
+        labels: [...panel.querySelectorAll("label")].map((l) => l.textContent.trim()),
+        inputs: panel.querySelectorAll("input").length,
+        text: panel.innerText.slice(0, 80),
+      };`);
+    check(
+      "9. selecting a module fills the inspector from its descriptor",
+      inspector !== null && inspector.inputs > 2,
+      JSON.stringify(inspector),
+    );
+    check(
+      "9. and its fields are the engine's own parameter names",
+      inspector !== null && inspector.labels.includes("Level"),
+      JSON.stringify(inspector?.labels?.slice(0, 12)),
+    );
+    await screenshot("inspector");
+
+    if (box === null) throw new Error("no canvas to drag on");
+
+    // A marquee across the whole surface. The viewport starts unmoved, so patch coordinates and canvas
+    // coordinates agree and both modules are inside it.
+    await mouse("mousePressed", box.x + 20, box.y + 20);
+    await sleep(80);
+    for (let i = 1; i <= 6; i++) {
+      await mouse(
+        "mouseMoved",
+        box.x + 20 + ((box.w - 40) * i) / 6,
+        box.y + 20 + ((box.h - 40) * i) / 6,
+      );
+      await sleep(40);
+    }
+    await mouse("mouseReleased", box.x + box.w - 20, box.y + box.h - 20);
+    await sleep(300);
+    // The grid must actually hold focus, or a binding scoped to it can never match.
+    check(
+      "9. clicking the grid gives it focus",
+      (await evaluate(
+        `return document.activeElement?.closest("[data-kb-scope]")?.dataset.kbScope ?? "(none)";`,
+      )) === "grid",
+    );
+
+    await evaluate(`press("Delete");`);
+    await sleep(300);
+    check(
+      "9. deleting marks the project unsaved",
+      (await text()).includes("•"),
+    );
+
+    await evaluate(`press("s", { metaKey: true });`);
+    await sleep(700);
+    const afterDelete = JSON.parse(
+      readFileSync(join(ws, "projects", "wiring", "project.json"), "utf8"),
+    );
+    check(
+      "9. the modules are gone",
+      afterDelete.patch.modules.length === 0,
+      JSON.stringify(afterDelete.patch.modules),
+    );
+    check(
+      "9. and so is the cable between them",
+      afterDelete.patch.edges.length === 0,
+      JSON.stringify(afterDelete.patch.edges),
+    );
+
+    await evaluate(`press("z", { metaKey: true });`);
+    await sleep(400);
+    await evaluate(`press("s", { metaKey: true });`);
+    await sleep(700);
+    const afterUndo = JSON.parse(
+      readFileSync(join(ws, "projects", "wiring", "project.json"), "utf8"),
+    );
+    check(
+      "9. undo brings the modules back",
+      afterUndo.patch.modules
+        .map((m) => m.id)
+        .sort()
+        .join(",") === "osc,out",
+      JSON.stringify(afterUndo.patch.modules.map((m) => m.id)),
+    );
+    check(
+      "9. undo brings the cable back too",
+      afterUndo.patch.edges.length === 1,
+      JSON.stringify(afterUndo.patch.edges),
+    );
+
     // ── The minimap, which is the patch painted a pixel per cell ──────────────
     const map = await evaluate(`
       const canvas = document.querySelector('[data-testid="mini-map"] canvas');
@@ -742,73 +848,6 @@ try {
       "9. zoom to fit recentres the view on the patch",
       framed.before !== framed.after,
       JSON.stringify(framed),
-    );
-    if (box === null) throw new Error("no canvas to drag on");
-
-    // A marquee across the whole surface. The viewport starts unmoved, so patch coordinates and canvas
-    // coordinates agree and both modules are inside it.
-    await mouse("mousePressed", box.x + 20, box.y + 20);
-    await sleep(80);
-    for (let i = 1; i <= 6; i++) {
-      await mouse(
-        "mouseMoved",
-        box.x + 20 + ((box.w - 40) * i) / 6,
-        box.y + 20 + ((box.h - 40) * i) / 6,
-      );
-      await sleep(40);
-    }
-    await mouse("mouseReleased", box.x + box.w - 20, box.y + box.h - 20);
-    await sleep(300);
-    // The grid must actually hold focus, or a binding scoped to it can never match.
-    check(
-      "9. clicking the grid gives it focus",
-      (await evaluate(
-        `return document.activeElement?.closest("[data-kb-scope]")?.dataset.kbScope ?? "(none)";`,
-      )) === "grid",
-    );
-
-    await evaluate(`press("Delete");`);
-    await sleep(300);
-    check(
-      "9. deleting marks the project unsaved",
-      (await text()).includes("•"),
-    );
-
-    await evaluate(`press("s", { metaKey: true });`);
-    await sleep(700);
-    const afterDelete = JSON.parse(
-      readFileSync(join(ws, "projects", "wiring", "project.json"), "utf8"),
-    );
-    check(
-      "9. the modules are gone",
-      afterDelete.patch.modules.length === 0,
-      JSON.stringify(afterDelete.patch.modules),
-    );
-    check(
-      "9. and so is the cable between them",
-      afterDelete.patch.edges.length === 0,
-      JSON.stringify(afterDelete.patch.edges),
-    );
-
-    await evaluate(`press("z", { metaKey: true });`);
-    await sleep(400);
-    await evaluate(`press("s", { metaKey: true });`);
-    await sleep(700);
-    const afterUndo = JSON.parse(
-      readFileSync(join(ws, "projects", "wiring", "project.json"), "utf8"),
-    );
-    check(
-      "9. undo brings the modules back",
-      afterUndo.patch.modules
-        .map((m) => m.id)
-        .sort()
-        .join(",") === "osc,out",
-      JSON.stringify(afterUndo.patch.modules.map((m) => m.id)),
-    );
-    check(
-      "9. undo brings the cable back too",
-      afterUndo.patch.edges.length === 1,
-      JSON.stringify(afterUndo.patch.edges),
     );
   });
 } catch (error) {

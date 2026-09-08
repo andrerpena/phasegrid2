@@ -67,8 +67,8 @@ export const CONFIG_SCHEMA: Record<string, ConfigPropertySchema> = {
       "left-top": ["catalog"],
       "left-bottom": ["projects", "history"],
       center: ["grid", "settings"],
-      "center-bottom": ["log"],
-      "right-top": ["mini-map", "inspector"],
+      "center-bottom": ["inspector", "log"],
+      "right-top": ["mini-map"],
       "right-bottom": ["scope", "performance"],
     },
     description:
