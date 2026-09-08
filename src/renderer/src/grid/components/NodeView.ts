@@ -191,15 +191,11 @@ export class NodeView {
         );
       }
     }
-    for (const [id, socket] of this.ports) {
-      const connected = connectedPorts.has(id);
-      socket.update({ connected, hovered: hoveredPort === id });
-      // An implicit port shows once something is plugged into it, or while the node is hovered.
-      const implicit =
-        this.layout.inputs.find((p) => p.port.id === id)?.port.implicit ??
-        false;
-      socket.view.visible = !implicit || connected || hoveredPort !== null;
-    }
+    for (const [id, socket] of this.ports)
+      socket.update({
+        connected: connectedPorts.has(id),
+        hovered: hoveredPort === id,
+      });
   }
 
   setStyle(style: NodeStyle): void {

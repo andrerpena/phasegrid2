@@ -3,8 +3,9 @@ import type { PhasegridTheme } from "@renderer/theming/theme";
 import type { ModuleDescriptor } from "@shared/protocol/catalog";
 import type { PatchDoc } from "@shared/protocol/patch";
 import { type Application, Container, Graphics } from "pixi.js";
-import { Cable } from "./components/Cable";
+import { Cable, cableControlPoints } from "./components/Cable";
 import { NodeView } from "./components/NodeView";
+import type { PortEdge } from "./layout";
 import { Viewport } from "./viewport";
 
 /**
@@ -138,7 +139,7 @@ export class GridRenderer {
         this.cableLayer.addChild(cable.view);
       }
       cable.setColor(this.cableColor(edge.from.module, edge.from.port));
-      cable.update(from, to);
+      cable.update(from, to, { toEdge: to.edge });
     }
     for (const [id, cable] of this.cables) {
       if (seenEdges.has(id)) continue;
@@ -165,7 +166,7 @@ export class GridRenderer {
       );
       const to = this.portPosition(edge.to.module, edge.to.port, "input");
       if (cable === undefined || from === null || to === null) continue;
-      cable.update(from, to);
+      cable.update(from, to, { toEdge: to.edge });
     }
   }
 
@@ -188,8 +189,15 @@ export class GridRenderer {
     );
   }
 
-  /** Where a port sits in patch coordinates, or null when the module is not drawn. */
-  portPosition(moduleId: string, portId: string, side: "input" | "output") {
+  /**
+   * Where a port sits in patch coordinates, and which border it is on, or null when the module is not
+   * drawn.
+   */
+  portPosition(
+    moduleId: string,
+    portId: string,
+    side: "input" | "output",
+  ): { x: number; y: number; edge: PortEdge } | null {
     const node = this.nodes.get(moduleId);
     if (node === undefined) return null;
     const list = side === "output" ? node.layout.outputs : node.layout.inputs;
@@ -198,6 +206,7 @@ export class GridRenderer {
     return {
       x: node.view.position.x + port.x,
       y: node.view.position.y + port.y,
+      edge: port.edge,
     };
   }
 
@@ -213,6 +222,8 @@ export class GridRenderer {
       from: { x: number; y: number };
       to: { x: number; y: number };
       color: number;
+      /** The border the cable is heading for, once it is over a socket. */
+      toEdge?: PortEdge;
     } | null,
   ): void {
     this.overlay.clear();
@@ -229,12 +240,19 @@ export class GridRenderer {
         .stroke({ width: 1, color: hexToNumber(this.theme.grid.marquee) });
     }
     if (pendingCable !== null) {
+      // The same curve a finished cable takes, so the drag shows where the cable will actually lie.
+      const [c1, c2] = cableControlPoints(
+        pendingCable.from,
+        pendingCable.to,
+        pendingCable.toEdge,
+      );
       const from = this.viewport.toScreen(pendingCable.from);
       const to = this.viewport.toScreen(pendingCable.to);
-      const reach = Math.min(160, Math.max(40, Math.abs(to.x - from.x) * 0.6));
+      const p1 = this.viewport.toScreen(c1);
+      const p2 = this.viewport.toScreen(c2);
       this.overlay
         .moveTo(from.x, from.y)
-        .bezierCurveTo(from.x + reach, from.y, to.x - reach, to.y, to.x, to.y)
+        .bezierCurveTo(p1.x, p1.y, p2.x, p2.y, to.x, to.y)
         .stroke({
           width: 2,
           color: pendingCable.color,

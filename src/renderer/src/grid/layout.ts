@@ -56,11 +56,15 @@ export const MIN_COLS = 3;
  */
 export const MAX_FACE_CONTROLS = 4;
 
+/** Which border of the module a socket sits on, and so which way a cable meets it. */
+export type PortEdge = "left" | "right" | "bottom";
+
 export interface PortLayout {
   port: PortDesc;
   x: number;
   y: number;
   side: "input" | "output";
+  edge: PortEdge;
 }
 
 export interface ControlLayout {
@@ -136,9 +140,10 @@ export const DISPLAY_HEIGHT = 32;
  * Lays out one node.
  *
  * Implicit modulation ports never appear in the port columns. There is one per modulatable parameter,
- * and a wavetable oscillator has twenty-odd, so giving each a socket makes the node taller than the
- * patch it belongs to and unreadable at any zoom. A cable is dropped on the knob instead, which is both
- * more compact and closer to what the gesture means: you are modulating that control.
+ * and a wavetable oscillator has twenty-odd, so giving each a socket down the side makes the node
+ * taller than the patch it belongs to and unreadable at any zoom. The ones whose knob is on the face
+ * get a socket on the bottom border directly under that knob, which says what it is for without a
+ * label and adds no height; the rest are reached by dropping a cable on the knob.
  */
 export function measureNode(
   descriptor: ModuleDescriptor,
@@ -173,18 +178,38 @@ export function measureNode(
       // modules an integer number of cells apart runs exactly horizontally.
       y: HEADER_HEIGHT + (i + 0.5) * CELL,
       side,
+      edge: side === "input" ? "left" : "right",
     }));
 
   // Centred as a group so a node with one knob has it in the middle rather than pinned left.
   const controlsLeft = ((cols - controlCols) / 2) * CELL;
   const controlsTop = HEADER_HEIGHT + ((bodyRows - controlRows) / 2) * CELL;
+  const controlX = (i: number): number =>
+    // Shifted one slot right when a display holds the first one.
+    controlsLeft + (i + (wave ? 1 : 0) + 0.5) * KNOB_CELL_WIDTH;
+
+  // The socket under each knob: the descriptor's own implicit port for that param, on the border.
+  const underKnobs: PortLayout[] = [];
+  controls.forEach((param, i) => {
+    const port = descriptor.inputs.find(
+      (p) => p.implicit && p.param === param.id,
+    );
+    if (port === undefined) return;
+    underKnobs.push({
+      port,
+      x: controlX(i),
+      y: height,
+      side: "input",
+      edge: "bottom",
+    });
+  });
 
   return {
     cols,
     rows,
     width,
     height,
-    inputs: place(inputs, "input"),
+    inputs: [...place(inputs, "input"), ...underKnobs],
     outputs: place(outputs, "output"),
     display: !wave
       ? null
@@ -198,8 +223,7 @@ export function measureNode(
     controls: controls.map((param, i) => ({
       param,
       modulationPort: param.flags.modulatable ? `param:${param.id}` : null,
-      // Shifted one slot right when a display holds the first one.
-      x: controlsLeft + (i + (wave ? 1 : 0) + 0.5) * KNOB_CELL_WIDTH,
+      x: controlX(i),
       // In the upper of its two cells, leaving the lower one for the label.
       y: controlsTop + CELL * 0.5 + 2,
       radius: KNOB_RADIUS,

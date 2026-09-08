@@ -1,5 +1,5 @@
 import { Graphics } from "pixi.js";
-import type { Point } from "../layout";
+import type { Point, PortEdge } from "../layout";
 
 /**
  * A cable between two ports.
@@ -13,12 +13,22 @@ import type { Point } from "../layout";
  * and you can follow a signal across a patch by colour alone.
  */
 
-export function cableControlPoints(from: Point, to: Point): [Point, Point] {
+/**
+ * `toEdge` is the border the destination socket sits on. A knob's modulation socket is on the bottom
+ * border, so a cable into it drops in from below rather than crossing the module it is plugging into.
+ */
+export function cableControlPoints(
+  from: Point,
+  to: Point,
+  toEdge: PortEdge = "left",
+): [Point, Point] {
   // Enough curve to be readable, capped so a cable across the window does not loop back on itself.
   const reach = Math.min(160, Math.max(40, Math.abs(to.x - from.x) * 0.6));
   return [
     { x: from.x + reach, y: from.y },
-    { x: to.x - reach, y: to.y },
+    toEdge === "bottom"
+      ? { x: to.x, y: to.y + reach }
+      : { x: to.x - reach, y: to.y },
   ];
 }
 
@@ -30,9 +40,9 @@ export class Cable {
   update(
     from: Point,
     to: Point,
-    options: { selected?: boolean; dimmed?: boolean } = {},
+    options: { selected?: boolean; dimmed?: boolean; toEdge?: PortEdge } = {},
   ): void {
-    const [c1, c2] = cableControlPoints(from, to);
+    const [c1, c2] = cableControlPoints(from, to, options.toEdge);
     this.view
       .clear()
       .moveTo(from.x, from.y)

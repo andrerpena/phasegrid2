@@ -23,6 +23,8 @@ function port(id: string, implicit = false) {
     role: "any" as const,
     doc: "",
     implicit,
+    // As the catalogue has it: an implicit `param:<id>` port names the param it feeds.
+    ...(implicit ? { param: id.slice("param:".length) } : {}),
   };
 }
 
@@ -94,18 +96,22 @@ describe("measuring a node", () => {
     }
   });
 
-  it("puts every socket on a half-cell line", () => {
+  it("puts every side socket on a half-cell line", () => {
     // So a cable between two modules an integer number of cells apart runs exactly horizontally
     // instead of a hair off.
     const layout = measureNode(vca);
-    for (const p of [...layout.inputs, ...layout.outputs]) {
+    const side = [...layout.inputs, ...layout.outputs].filter(
+      (p) => p.edge !== "bottom",
+    );
+    for (const p of side) {
       expect((p.y - CELL / 2) % CELL).toBeCloseTo(0, 6);
     }
   });
 
   it("puts inputs on the left and outputs on the right", () => {
     const layout = measureNode(vca);
-    expect(layout.inputs.every((p) => p.x === 0)).toBe(true);
+    const side = layout.inputs.filter((p) => p.edge === "left");
+    expect(side.every((p) => p.x === 0)).toBe(true);
     expect(layout.outputs.every((p) => p.x === layout.width)).toBe(true);
   });
 
@@ -115,13 +121,38 @@ describe("measuring a node", () => {
     expect(layout.inputs[1].y - layout.inputs[0].y).toBe(CELL);
   });
 
-  it("never gives an implicit modulation port a socket of its own", () => {
+  it("keeps implicit modulation ports out of the side column", () => {
     // There is one per modulatable parameter. A wavetable oscillator has twenty-odd, so a socket each
-    // makes the node taller than the patch it sits in. A cable is dropped on the knob instead.
-    expect(measureNode(vca).inputs.map((p) => p.port.id)).toEqual([
-      "in",
-      "gain",
-    ]);
+    // down the side makes the node taller than the patch it sits in. The ones on the face get a
+    // socket under their knob instead; the rest are reached by dropping a cable on the knob.
+    const side = measureNode(vca).inputs.filter((p) => p.edge === "left");
+    expect(side.map((p) => p.port.id)).toEqual(["in", "gain"]);
+  });
+
+  it("gives every knob on the face a socket on the bottom border, right under it", () => {
+    // Where a modulation cable plugs in, visibly and without hunting: below the control it moves.
+    const layout = measureNode(vca);
+    const socket = layout.inputs.find((p) => p.port.id === "param:gain");
+    expect(socket).toBeDefined();
+    if (socket === undefined) return;
+    expect(socket.edge).toBe("bottom");
+    expect(socket.side).toBe("input");
+    expect(socket.x).toBe(layout.controls[0].x);
+    expect(socket.y).toBe(layout.height);
+    // Still a whole number of cells tall: the socket sits on the border, it does not add a row.
+    expect(layout.height % CELL).toBe(0);
+  });
+
+  it("gives no bottom socket to a knob that cannot be modulated", () => {
+    const plain = param("x").flags;
+    const fixed: ModuleDescriptor = {
+      ...vca,
+      inputs: [port("in")],
+      params: [param("trim", { flags: { ...plain, modulatable: false } })],
+    };
+    expect(
+      measureNode(fixed).inputs.filter((p) => p.edge === "bottom"),
+    ).toEqual([]);
   });
 
   it("tells each knob which port a cable dropped on it would connect to", () => {
@@ -152,6 +183,18 @@ describe("hit testing", () => {
     expect(
       hitPort({ x: origin.x + 80, y: origin.y + 80 }, origin, layout),
     ).toBeNull();
+  });
+
+  it("finds the socket under a knob", () => {
+    const socket = layout.inputs.find((p) => p.edge === "bottom");
+    expect(socket).toBeDefined();
+    if (socket === undefined) return;
+    const hit = hitPort(
+      { x: origin.x + socket.x + 3, y: origin.y + socket.y - 2 },
+      origin,
+      layout,
+    );
+    expect(hit?.port.id).toBe("param:gain");
   });
 
   it("picks the nearest socket rather than the first one in range", () => {
