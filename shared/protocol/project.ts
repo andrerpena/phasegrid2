@@ -85,8 +85,15 @@ export const ProjectDocSchema = z.object({
    * afterwards that the work cannot be kept. Making it plainly a demonstration means nobody starts.
    */
   kind: z.enum(["example", "user"]).default("user"),
-  /** Where it saves. Absent for an example, and for a user project that has never been saved. */
-  path: z.string().optional(),
+  /**
+   * Where it lives inside the workspace: the name of its folder under `projects/`.
+   *
+   * Absent for an example, and for a user project that has never been saved. Assigned when a project is
+   * loaded or first written, and stripped again before it is serialised, so the folder name is the only
+   * record of where a project is. That is what lets someone rename or move the folder and have the
+   * project follow, rather than leaving a document that confidently points at nothing.
+   */
+  slug: z.string().optional(),
   /** Shown above the grid. An example says what it is demonstrating. */
   description: z.string().optional(),
 });

@@ -7,6 +7,11 @@ import { create } from "zustand";
  * Overrides are edited as text, because the settings widget is a JSON editor and a person mid-edit has
  * text that does not parse yet. Keeping the raw text beside the last valid object is what lets the
  * editor show what was typed while the application keeps running on the last thing that made sense.
+ * Text that does not parse is never written, so what is on disk is always something that loads.
+ *
+ * The overrides are the `settings` object in the workspace's `workspace.json`. They belong to the
+ * workspace rather than to the installation because a workspace is a thing you copy to another machine,
+ * and settings you tuned for the music you are making should arrive with it.
  */
 
 export interface ConfigState {
@@ -41,6 +46,14 @@ export const DEFAULT_CONFIG: ConfigRecord = {
   "engine.blockSize": 64,
   "engine.voiceCount": 4,
   "telemetry.fps": 30,
+  /**
+   * Keybindings are a setting like any other, so they are one key here rather than a file of their own.
+   *
+   * Empty by default: what ships is `DEFAULT_KEYBINDINGS`, and what is written here is added after it,
+   * so a user's file says what they changed rather than restating everything they did not. The key is
+   * listed all the same, so the settings editor shows it exists.
+   */
+  keybindings: [],
 };
 
 function merge(defaults: ConfigRecord, overrides: ConfigRecord): ConfigRecord {
@@ -131,10 +144,23 @@ export const useConfigStore = create<ConfigState & ConfigActions>(
       void get().save();
     },
 
+    /**
+     * Reads the workspace's settings.
+     *
+     * Called again every time a workspace opens, not once at startup: settings belong to the folder, so
+     * switching folders has to switch them. A failure — most often "no workspace is open", before one
+     * has been picked — leaves the defaults in place, which is what the gate is showing anyway.
+     */
     load: async () => {
-      const result = await window.appStorage.read("config");
+      const result = await window.workspace.readSettings();
       if (!result.ok || result.value === null) {
-        set({ loaded: true });
+        set({
+          overrides: {},
+          computed: get().defaults,
+          overridesText: "{}",
+          parseError: null,
+          loaded: true,
+        });
         return;
       }
       get().setOverridesText(result.value);
@@ -142,9 +168,9 @@ export const useConfigStore = create<ConfigState & ConfigActions>(
     },
 
     save: async () => {
-      // The text, not the parsed object, so reopening shows what was typed, comments of the "unused key
-      // I might want back" kind included.
-      await window.appStorage.write("config", get().overridesText);
+      // The text, not the parsed object, so reopening shows what was typed — the spacing someone chose,
+      // and the "unused key I might want back" they left at the bottom.
+      await window.workspace.writeSettings(get().overridesText);
     },
   }),
 );

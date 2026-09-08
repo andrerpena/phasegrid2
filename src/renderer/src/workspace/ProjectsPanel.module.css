@@ -1,0 +1,77 @@
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  padding: var(--space-1);
+  list-style: none;
+  overflow-y: auto;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+}
+
+.name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-1) var(--space-2);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-muted-foreground);
+  font: inherit;
+  font-size: var(--font-size-caption);
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.name:hover {
+  background: var(--color-card);
+}
+
+.name[data-open="true"] {
+  color: var(--color-foreground);
+}
+
+.name[data-active="true"] {
+  background: var(--color-card);
+}
+
+.dirty {
+  color: var(--color-signal-note);
+}
+
+.delete {
+  padding: 0 var(--space-1);
+  border: none;
+  background: transparent;
+  color: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* Hidden until the row is under the pointer: a delete button beside every name is a delete button that
+   eventually gets pressed by accident. */
+.row:hover .delete,
+.delete:focus-visible {
+  color: var(--color-muted-foreground);
+}
+
+.delete:hover {
+  color: var(--color-destructive);
+}
+
+.empty {
+  margin: 0;
+  padding: var(--space-3);
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-caption);
+}

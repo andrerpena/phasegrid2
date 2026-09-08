@@ -1,3 +1,4 @@
+import { commandRegistry } from "@renderer/commands/registry";
 import { useEngineStore } from "@renderer/engine/engine-store";
 import { useProjectStore } from "@renderer/project/project-store";
 import { NOTE_NAMES, SCALE_NAMES, scaleLabel } from "@shared/protocol/project";
@@ -12,6 +13,7 @@ import styles from "./ProjectHeader.module.css";
  */
 export const ProjectHeader = () => {
   const project = useProjectStore((s) => s.active());
+  const dirtyIds = useProjectStore((s) => s.dirtyIds);
   const setTempo = useProjectStore((s) => s.setTempo);
   const setTimeSignature = useProjectStore((s) => s.setTimeSignature);
   const setScale = useProjectStore((s) => s.setScale);
@@ -211,7 +213,7 @@ export const ProjectHeader = () => {
         className={styles.name}
         title={
           project.kind === "example"
-            ? "An example: it has nowhere to save to"
+            ? "An example. Saving it makes it a project of your own."
             : undefined
         }
       >
@@ -220,6 +222,30 @@ export const ProjectHeader = () => {
           <span className={styles.badge}>example</span>
         )}
       </span>
+
+      {/*
+        One button, whose label says which of the two things it will do.
+
+        A project that has been saved before is saved again where it already lives; anything else asks
+        for a name first. Disabled once there is nothing to save, because a Save button that is always
+        live tells you nothing about whether your work is safe — which is the only question it exists
+        to answer.
+      */}
+      <button
+        type="button"
+        className={styles.save}
+        disabled={!dirtyIds.includes(project.id)}
+        title={
+          dirtyIds.includes(project.id)
+            ? "Save this project into the workspace"
+            : "Saved"
+        }
+        onClick={() => void commandRegistry.dispatch("project.save")}
+      >
+        {project.kind === "example" || project.slug === undefined
+          ? "Save As…"
+          : "Save"}
+      </button>
     </div>
   );
 };

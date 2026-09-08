@@ -1,19 +1,22 @@
-import type { StorageKey } from "@shared/protocol/storage";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_CONFIG, useConfigStore } from "./config-store";
 
-const written = new Map<string, string>();
+/** Stands in for the workspace's `workspace.json`. */
+let stored: string | null = null;
+let openWorkspace = true;
 
 beforeEach(() => {
-  written.clear();
+  stored = null;
+  openWorkspace = true;
   vi.stubGlobal("window", {
-    appStorage: {
-      read: async (key: StorageKey) => ({
-        ok: true,
-        value: written.get(key) ?? null,
-      }),
-      write: async (key: StorageKey, text: string) => {
-        written.set(key, text);
+    workspace: {
+      readSettings: async () =>
+        openWorkspace
+          ? { ok: true, value: stored }
+          : { ok: false, error: "no workspace is open" },
+      writeSettings: async (text: string) => {
+        if (!openWorkspace) return { ok: false, error: "no workspace is open" };
+        stored = text;
         return { ok: true, value: undefined };
       },
     },
@@ -81,19 +84,45 @@ describe("configuration", () => {
     // parsed object instead would quietly delete their scratch work every time.
     useConfigStore.getState().setOverridesText('{\n  "grid.snap": 12\n}');
     await useConfigStore.getState().save();
-    expect(written.get("config")).toBe('{\n  "grid.snap": 12\n}');
+    expect(stored).toBe('{\n  "grid.snap": 12\n}');
   });
 
-  it("loads what was stored", async () => {
-    written.set("config", '{"grid.snap": 24}');
+  it("never writes text that does not parse", async () => {
+    // What reaches the workspace file always loads again. Someone mid-keystroke has text that does
+    // not, and the store keeps it on screen without ever putting it on disk.
+    useConfigStore.getState().setOverridesText('{"grid.snap": 12}');
+    useConfigStore.getState().setOverridesText('{"grid.snap": ');
+    await Promise.resolve();
+    expect(stored).toBe('{"grid.snap": 12}');
+  });
+
+  it("loads what the workspace had", async () => {
+    stored = '{"grid.snap": 24}';
     await useConfigStore.getState().load();
     expect(useConfigStore.getState().getNumber("grid.snap", 0)).toBe(24);
     expect(useConfigStore.getState().loaded).toBe(true);
   });
 
-  it("starts on defaults when nothing has been stored", async () => {
+  it("starts on defaults when the workspace has no settings", async () => {
     await useConfigStore.getState().load();
     expect(useConfigStore.getState().loaded).toBe(true);
+    expect(useConfigStore.getState().getNumber("grid.snap", 0)).toBe(8);
+  });
+
+  it("forgets the previous workspace's settings when a load finds none", async () => {
+    // Settings belong to the folder, so opening a folder that has none must show the defaults rather
+    // than the last folder's answers.
+    stored = '{"grid.snap": 24}';
+    await useConfigStore.getState().load();
+    stored = null;
+    await useConfigStore.getState().load();
+    expect(useConfigStore.getState().getNumber("grid.snap", 0)).toBe(8);
+    expect(useConfigStore.getState().overridesText).toBe("{}");
+  });
+
+  it("keeps the defaults when there is no workspace yet", async () => {
+    openWorkspace = false;
+    await useConfigStore.getState().load();
     expect(useConfigStore.getState().getNumber("grid.snap", 0)).toBe(8);
   });
 });

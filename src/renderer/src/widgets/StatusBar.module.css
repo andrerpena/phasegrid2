@@ -28,6 +28,26 @@
   background: var(--color-destructive);
 }
 
+.workspace {
+  flex: none;
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 var(--space-1);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-foreground);
+  font: inherit;
+  font-size: var(--font-size-caption);
+  cursor: pointer;
+}
+
+.workspace:hover {
+  background: var(--color-card);
+}
+
 .status {
   overflow: hidden;
   text-overflow: ellipsis;

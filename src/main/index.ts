@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { electronApp, is, optimizer } from "@electron-toolkit/utils";
 import { app, BrowserWindow, ipcMain, shell } from "electron";
+import { CONFIRM_CLOSE_CHANNEL } from "../../shared/protocol/workspace";
 import { forwardEngineEvents, registerEngineIpc } from "./engine/ipc";
 import {
   chooseSocketPath,
@@ -9,6 +10,7 @@ import {
   resolveEnginePath,
 } from "./engine/supervisor";
 import { registerAppStorageIpc } from "./storage/app-storage";
+import { guardClose, registerWorkspaceIpc } from "./workspace/workspace-ipc";
 
 let supervisor: EngineSupervisor | null = null;
 
@@ -79,6 +81,15 @@ app.whenReady().then(() => {
   );
   registerAppStorageIpc(ipcMain, app.getPath("userData"));
   const window = createWindow();
+  registerWorkspaceIpc(ipcMain, {
+    window,
+    userData: app.getPath("userData"),
+  });
+  // The window asks before it goes. The renderer owns the answer, because it is the only side that
+  // knows which projects have unsaved work in them.
+  guardClose(window, (target) =>
+    target.webContents.send(CONFIRM_CLOSE_CHANNEL),
+  );
   void startEngine(window);
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

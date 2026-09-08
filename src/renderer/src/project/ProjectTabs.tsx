@@ -1,4 +1,5 @@
 import { emptyProject, useProjectStore } from "@renderer/project/project-store";
+import { closeProject } from "@renderer/workspace/unsaved";
 import styles from "./ProjectTabs.module.css";
 import { ProjectView } from "./ProjectView";
 
@@ -12,8 +13,8 @@ export const ProjectTabs = () => {
   const projects = useProjectStore((s) => s.projects);
   const activeId = useProjectStore((s) => s.activeId);
   const activate = useProjectStore((s) => s.activate);
-  const close = useProjectStore((s) => s.close);
   const open = useProjectStore((s) => s.open);
+  const dirtyIds = useProjectStore((s) => s.dirtyIds);
 
   return (
     <div className={styles.root}>
@@ -33,6 +34,13 @@ export const ProjectTabs = () => {
               title={project.description ?? project.name}
             >
               {project.name}
+              {/* A dot rather than an asterisk in the name: it does not shift the label as you type,
+                  and it is the mark every other document application uses for the same thing. */}
+              {dirtyIds.includes(project.id) && (
+                <span className={styles.dirty} title="Unsaved changes">
+                  •
+                </span>
+              )}
               {project.kind === "example" && (
                 <span className={styles.badge}>example</span>
               )}
@@ -41,7 +49,7 @@ export const ProjectTabs = () => {
               type="button"
               className={styles.close}
               aria-label={`Close ${project.name}`}
-              onClick={() => close(project.id)}
+              onClick={() => void closeProject(project.id)}
             >
               ×
             </button>
@@ -60,7 +68,7 @@ export const ProjectTabs = () => {
         {activeId === null ? (
           <p className={styles.empty}>
             No project open. Press <kbd>⌘K</kbd> and search for a module to open
-            its example.
+            its example, or pick one from Projects on the left.
           </p>
         ) : (
           // Keyed by project, so switching tabs rebuilds the canvas rather than reusing one built for

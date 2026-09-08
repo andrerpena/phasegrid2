@@ -18,6 +18,7 @@ import {
   STORAGE_READ_CHANNEL,
   STORAGE_WRITE_CHANNEL,
   type StorageKey,
+  type StorageResult,
 } from "../../shared/protocol/storage";
 import {
   decodeSlot,
@@ -28,6 +29,14 @@ import {
   TELEMETRY_SLOT_BYTES,
   type TelemetryHeader,
 } from "../../shared/protocol/telemetry";
+import {
+  CONFIRM_CLOSE_CHANNEL,
+  type ProjectSummary,
+  type UnsavedChoice,
+  WORKSPACE_CALL_CHANNEL,
+  type WorkspaceBridge,
+  type WorkspaceInfo,
+} from "../../shared/protocol/workspace";
 
 /**
  * An engine error, rebuilt on this side of IPC.
@@ -153,15 +162,64 @@ const appStorage: AppStorageBridge = {
     ipcRenderer.invoke(STORAGE_WRITE_CHANNEL, key, text),
 };
 
+/**
+ * The workspace. A pass-through: the main process owns every path and validates the operation.
+ *
+ * The renderer names a project by its slug and a workspace only by picking one, so nothing here can be
+ * handed a path to write to. That is the whole point of the shape.
+ */
+function workspaceCall<T>(
+  op: string,
+  ...args: unknown[]
+): Promise<StorageResult<T>> {
+  return ipcRenderer.invoke(WORKSPACE_CALL_CHANNEL, op, ...args);
+}
+
+const workspace: WorkspaceBridge = {
+  current: () => workspaceCall<WorkspaceInfo | null>("current"),
+  recent: () => workspaceCall<string[]>("recent"),
+  choose: () => workspaceCall<WorkspaceInfo | null>("choose"),
+  openAt: (root) => workspaceCall<WorkspaceInfo>("openAt", root),
+
+  readSettings: () => workspaceCall<string | null>("readSettings"),
+  writeSettings: (text) => workspaceCall<void>("writeSettings", text),
+
+  listProjects: () => workspaceCall<ProjectSummary[]>("listProjects"),
+  readProject: (slug) => workspaceCall<string>("readProject", slug),
+  writeProject: (slug, text) => workspaceCall<void>("writeProject", slug, text),
+  deleteProject: (slug) => workspaceCall<void>("deleteProject", slug),
+
+  readSession: () => workspaceCall<string | null>("readSession"),
+  writeSession: (text) => workspaceCall<void>("writeSession", text),
+
+  confirmUnsaved: (names) =>
+    workspaceCall<UnsavedChoice>("confirmUnsaved", names),
+  confirmDelete: (name) => workspaceCall<boolean>("confirmDelete", name),
+
+  allowClose: () => workspaceCall<void>("allowClose"),
+
+  // Wrapped rather than passed through, for the same reason engine events are: handing the renderer an
+  // `IpcRendererEvent` would leak `sender`, and with it a path back into the main process.
+  onConfirmClose: (listener) => {
+    const wrapped = (): void => listener();
+    ipcRenderer.on(CONFIRM_CLOSE_CHANNEL, wrapped);
+    return () => {
+      ipcRenderer.off(CONFIRM_CLOSE_CHANNEL, wrapped);
+    };
+  },
+};
+
 if (process.contextIsolated) {
   contextBridge.exposeInMainWorld("electron", electronAPI);
   contextBridge.exposeInMainWorld("engine", engine);
   contextBridge.exposeInMainWorld("telemetry", telemetry);
   contextBridge.exposeInMainWorld("appStorage", appStorage);
+  contextBridge.exposeInMainWorld("workspace", workspace);
 } else {
   const win = window as unknown as Record<string, unknown>;
   win.electron = electronAPI;
   win.engine = engine;
   win.telemetry = telemetry;
   win.appStorage = appStorage;
+  win.workspace = workspace;
 }

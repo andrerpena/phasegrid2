@@ -25,6 +25,13 @@ import { create } from "zustand";
 interface ProjectState {
   projects: ProjectDoc[];
   activeId: string | null;
+  /**
+   * Which projects have work in them that is not on disk.
+   *
+   * Runtime state, so it lives beside the documents rather than in them: `ProjectDoc` is the thing that
+   * gets serialised, and a saved file that remembers it was once unsaved would be nonsense.
+   */
+  dirtyIds: string[];
 }
 
 interface ProjectActions {
@@ -36,8 +43,21 @@ interface ProjectActions {
   setTimeSignature: (signature: TimeSignature) => void;
   setScale: (scale: Scale) => void;
   rename: (id: string, name: string) => void;
-  /** Whether this project has somewhere to save to. An example never does. */
+  /** Whether this project has somewhere to save to. An example never does, until it is saved. */
   canSave: (id: string) => boolean;
+  markDirty: (id: string) => void;
+  markClean: (id: string) => void;
+  isDirty: (id: string) => boolean;
+  /**
+   * The document as it stands, patch included.
+   *
+   * The active project's patch lives in the patch store rather than in its record, so reading the
+   * record alone would save the patch as it was when the tab was last switched away from. Everything
+   * that writes a project to disk goes through here.
+   */
+  snapshot: (id: string) => ProjectDoc | null;
+  /** Records where a project now lives, and that it is a project rather than a demonstration. */
+  located: (id: string, slug: string, name?: string) => void;
 }
 
 let nextUntitled = 1;
@@ -69,6 +89,7 @@ export const useProjectStore = create<ProjectState & ProjectActions>(
   (set, get) => ({
     projects: [],
     activeId: null,
+    dirtyIds: [],
 
     open: (project) => {
       const projects = captureActive(get());
@@ -83,7 +104,7 @@ export const useProjectStore = create<ProjectState & ProjectActions>(
 
     close: (id) => {
       const projects = captureActive(get()).filter((p) => p.id !== id);
-      set({ projects });
+      set({ projects, dirtyIds: get().dirtyIds.filter((d) => d !== id) });
       if (get().activeId !== id) return;
       const next = projects.at(-1);
       if (next === undefined) {
@@ -110,34 +131,69 @@ export const useProjectStore = create<ProjectState & ProjectActions>(
 
     active: () => get().projects.find((p) => p.id === get().activeId) ?? null,
 
-    setTempo: (tempo) =>
+    // Tempo, meter, scale and the name are as much a part of the piece as the wiring is, so changing
+    // one is an unsaved change like any other.
+    setTempo: (tempo) => {
+      const id = get().activeId;
       set({
         projects: get().projects.map((p) =>
-          p.id === get().activeId
-            ? { ...p, tempo: Math.min(400, Math.max(20, tempo)) }
-            : p,
+          p.id === id ? { ...p, tempo: Math.min(400, Math.max(20, tempo)) } : p,
         ),
-      }),
+      });
+      if (id !== null) get().markDirty(id);
+    },
 
-    setTimeSignature: (signature) =>
+    setTimeSignature: (signature) => {
+      const id = get().activeId;
       set({
         projects: get().projects.map((p) =>
-          p.id === get().activeId ? { ...p, timeSignature: signature } : p,
+          p.id === id ? { ...p, timeSignature: signature } : p,
         ),
-      }),
+      });
+      if (id !== null) get().markDirty(id);
+    },
 
-    setScale: (scale) =>
+    setScale: (scale) => {
+      const id = get().activeId;
       set({
         projects: get().projects.map((p) =>
-          p.id === get().activeId ? { ...p, scale } : p,
+          p.id === id ? { ...p, scale } : p,
         ),
-      }),
+      });
+      if (id !== null) get().markDirty(id);
+    },
 
-    rename: (id, name) =>
+    rename: (id, name) => {
       set({
         projects: get().projects.map((p) => (p.id === id ? { ...p, name } : p)),
-      }),
+      });
+      get().markDirty(id);
+    },
 
     canSave: (id) => get().projects.find((p) => p.id === id)?.kind === "user",
+
+    markDirty: (id) => {
+      if (get().dirtyIds.includes(id)) return;
+      set({ dirtyIds: [...get().dirtyIds, id] });
+    },
+
+    markClean: (id) =>
+      set({ dirtyIds: get().dirtyIds.filter((d) => d !== id) }),
+
+    isDirty: (id) => get().dirtyIds.includes(id),
+
+    snapshot: (id) => {
+      const record = get().projects.find((p) => p.id === id);
+      if (record === undefined) return null;
+      if (id !== get().activeId) return record;
+      return { ...record, patch: usePatchStore.getState().doc };
+    },
+
+    located: (id, slug, name) =>
+      set({
+        projects: get().projects.map((p) =>
+          p.id === id ? { ...p, slug, kind: "user", name: name ?? p.name } : p,
+        ),
+      }),
   }),
 );

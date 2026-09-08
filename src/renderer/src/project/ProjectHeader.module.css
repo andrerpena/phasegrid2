@@ -97,3 +97,26 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+
+.save {
+  flex: none;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-card);
+  color: var(--color-foreground);
+  font: inherit;
+  font-size: var(--font-size-caption);
+  cursor: pointer;
+}
+
+.save:hover:not(:disabled) {
+  border-color: var(--color-ring);
+}
+
+/* Dimmed rather than hidden: the button staying in place is what makes "Saved" a state you can see
+   rather than a thing you have to remember. */
+.save:disabled {
+  color: var(--color-muted-foreground);
+  cursor: default;
+}

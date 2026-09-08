@@ -17,4 +17,6 @@ export const DEFAULT_KEYBINDINGS: Keybinding[] = [
   { key: "mod+alt+b", command: "view.toggleRight" },
   { key: "mod+j", command: "view.toggleBottom" },
   { key: "mod+alt+t", command: "workbench.cycleTheme" },
+  { key: "mod+s", command: "project.save" },
+  { key: "mod+shift+s", command: "project.saveAs" },
 ];

@@ -5,6 +5,9 @@ import { useLayoutStore } from "@renderer/layout/layout-store";
 import { emptyProject, useProjectStore } from "@renderer/project/project-store";
 import { useThemeStore } from "@renderer/theming/theme-store";
 import { THEMES } from "@renderer/theming/themes";
+import { SAVE_AS_MODAL } from "@renderer/workspace/SaveAsDialog";
+import { closeProject, resolveUnsaved } from "@renderer/workspace/unsaved";
+import { useWorkspaceStore } from "@renderer/workspace/workspace-store";
 import { commandRegistry } from "../registry";
 import type { CommandDefinition } from "../types";
 
@@ -97,9 +100,54 @@ const PROJECT_COMMANDS: CommandDefinition<never>[] = [
     id: "project.close",
     name: "Close Project",
     category: "Project",
-    execute: () => {
+    execute: async () => {
       const id = useProjectStore.getState().activeId;
-      if (id !== null) useProjectStore.getState().close(id);
+      if (id !== null) await closeProject(id);
+    },
+  },
+  {
+    /**
+     * Saves where it already lives, or asks where to put it.
+     *
+     * A project that has been saved before, and is not a demonstration, has one right answer and is
+     * given it. Anything else gets the name dialog, because filing an example under the example's own
+     * name would be filing your work under somebody else's title.
+     */
+    id: "project.save",
+    name: "Save Project",
+    category: "Project",
+    execute: async () => {
+      const project = useProjectStore.getState().active();
+      if (project === null) return;
+      if (project.kind === "example" || project.slug === undefined) {
+        useModalStore.getState().show(SAVE_AS_MODAL);
+        return;
+      }
+      await useWorkspaceStore.getState().saveProject(project.id);
+    },
+  },
+  {
+    id: "project.saveAs",
+    name: "Save Project As…",
+    category: "Project",
+    execute: () => {
+      if (useProjectStore.getState().activeId === null) return;
+      useModalStore.getState().show(SAVE_AS_MODAL);
+    },
+  },
+];
+
+const WORKSPACE_COMMANDS: CommandDefinition<never>[] = [
+  {
+    id: "workspace.open",
+    name: "Open Workspace…",
+    category: "Workspace",
+    description: "Switch to another folder of projects",
+    execute: async () => {
+      // Asked before the dialog rather than after: a person who is told they have unsaved work while a
+      // folder chooser is up has already made a decision they did not know they were making.
+      if (!(await resolveUnsaved())) return;
+      await useWorkspaceStore.getState().choose();
     },
   },
 ];
@@ -107,5 +155,6 @@ const PROJECT_COMMANDS: CommandDefinition<never>[] = [
 export function registerShellCommands(): void {
   commandRegistry.registerAll(SHELL_COMMANDS);
   commandRegistry.registerAll(PROJECT_COMMANDS);
+  commandRegistry.registerAll(WORKSPACE_COMMANDS);
   commandRegistry.registerAll(exampleCommands());
 }

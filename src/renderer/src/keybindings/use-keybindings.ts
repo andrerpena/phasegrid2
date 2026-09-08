@@ -1,8 +1,9 @@
 import { useModalStore } from "@renderer/components/floating/modal/modal-store";
+import { useConfigStore } from "@renderer/config/config-store";
 import { useEngineStore } from "@renderer/engine/engine-store";
 import { useEffect } from "react";
 import { commandRegistry } from "../commands/registry";
-import { DEFAULT_KEYBINDINGS } from "./defaults";
+import { bindingsFromConfig } from "./from-config";
 import {
   eventToKey,
   focusScope,
@@ -16,10 +17,24 @@ import {
  * On capture, so a binding can take precedence over a component's own handler, and skipped entirely
  * while a text field has focus unless the binding carries a modifier: someone typing a module name
  * should not trigger commands, and that rule is easier to get right here than in every field.
+ *
+ * The bindings follow the settings rather than being registered once, so editing them in the settings
+ * editor changes the keyboard as you type rather than at the next launch — which is also how you find
+ * out you have bound something to a key you use for something else.
  */
 export function useKeybindings(): void {
   useEffect(() => {
-    keybindingRegistry.setBindings(DEFAULT_KEYBINDINGS);
+    const applyBindings = (): void => {
+      keybindingRegistry.setBindings(
+        bindingsFromConfig(useConfigStore.getState().get("keybindings"))
+          .bindings,
+      );
+    };
+    applyBindings();
+    const stopFollowingConfig = useConfigStore.subscribe((state, previous) => {
+      if (state.computed.keybindings !== previous.computed.keybindings)
+        applyBindings();
+    });
 
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
@@ -46,7 +61,9 @@ export function useKeybindings(): void {
     };
 
     window.addEventListener("keydown", onKeyDown, { capture: true });
-    return () =>
+    return () => {
+      stopFollowingConfig();
       window.removeEventListener("keydown", onKeyDown, { capture: true });
+    };
   }, []);
 }

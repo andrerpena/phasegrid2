@@ -1,5 +1,5 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import type { IpcMain } from "electron";
 import {
   isStorageKey,
@@ -8,14 +8,15 @@ import {
   type StorageKey,
   type StorageResult,
 } from "../../../shared/protocol/storage";
+import { writeFileAtomic } from "./atomic-write";
 
 /**
- * Application settings on disk: one JSON file per key under the user data directory.
+ * Installation-level state on disk: one JSON file per key under the user data directory.
  *
- * Separate files rather than one, so a corrupt layout cannot cost the user their keybindings. Each is
- * written by rename, which is the only way to be sure a reader never sees a half-written file: writing
- * in place leaves a window where the file exists but is truncated, and that window is exactly when a
- * crash or a power cut will find it.
+ * Two keys live here and nothing else does. `layout` is the dock, which is shaped by the screen in front
+ * of you rather than by any folder; `workspace` is the pointer to the workspace you were last in,
+ * because something has to survive outside a workspace in order to find it. Separate files rather than
+ * one, so a corrupt layout cannot cost you the way back to your work.
  */
 
 function pathFor(userData: string, key: StorageKey): string {
@@ -42,14 +43,8 @@ export async function writeSetting(
   key: StorageKey,
   text: string,
 ): Promise<StorageResult<void>> {
-  const target = pathFor(userData, key);
-  const temporary = `${target}.tmp`;
   try {
-    await mkdir(dirname(target), { recursive: true });
-    await writeFile(temporary, text, "utf8");
-    // Rename is atomic within a filesystem: the file is either the old contents or the new one, never
-    // half of each.
-    await rename(temporary, target);
+    await writeFileAtomic(pathFor(userData, key), text);
     return { ok: true, value: undefined };
   } catch (error) {
     return { ok: false, error: (error as Error).message };

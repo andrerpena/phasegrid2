@@ -29,6 +29,17 @@ export class CommandRegistry {
     for (const command of commands) this.register(command);
   }
 
+  /**
+   * Takes a command away.
+   *
+   * For commands that exist because something else does — one per project in the workspace, say. Those
+   * have to be able to stop existing when a project is deleted, or the palette becomes a list of things
+   * that used to be there.
+   */
+  unregister(id: CommandId): void {
+    this.commands.delete(id);
+  }
+
   get(id: CommandId): CommandDefinition<never> | undefined {
     return this.commands.get(id);
   }
