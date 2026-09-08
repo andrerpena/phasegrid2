@@ -39,10 +39,17 @@ export class Knob {
   readonly view = new Container();
   private readonly track = new Graphics();
   private readonly arc = new Graphics();
+  private readonly notch = new Graphics();
   private readonly body = new Graphics();
   private readonly pointer = new Graphics();
   private readonly label: Text;
+  /** The value the document holds: what a drag edits and, with nothing modulating, what is drawn. */
   private fraction = -1;
+  /**
+   * Where modulation has put the value right now, or null when nothing is plugged in. Drawn as the
+   * pointer and the arc, so the knob visibly turns; `fraction` then shows as a notch on the track.
+   */
+  private live: number | null = null;
 
   constructor(
     private readonly radius: number,
@@ -68,6 +75,7 @@ export class Knob {
     this.view.addChild(
       this.track,
       this.arc,
+      this.notch,
       this.body,
       this.pointer,
       this.label,
@@ -96,19 +104,54 @@ export class Knob {
       .stroke({ width: 1, color: 0x000000, alpha: 0.45 });
   }
 
-  /** `fraction` is 0 to 1 across the parameter's range. */
+  /** `fraction` is 0 to 1 across the parameter's range: the document's value. */
   update(fraction: number): void {
     if (Math.abs(fraction - this.fraction) < 0.001) return;
     this.fraction = fraction;
+    this.draw();
+  }
+
+  /**
+   * The value modulation has produced this frame, 0 to 1, or null once nothing is plugged in.
+   *
+   * Called at frame rate while a cable feeds the knob, so it does the same "only redraw on a change"
+   * as `update`: a slow LFO holds still for many frames, and redrawing geometry for them costs the
+   * canvas frames for nothing.
+   */
+  setLive(fraction: number | null): void {
+    if (
+      fraction === null
+        ? this.live === null
+        : this.live !== null && Math.abs(fraction - this.live) < 0.001
+    )
+      return;
+    this.live = fraction;
+    this.draw();
+  }
+
+  private draw(): void {
     const r = this.radius;
-    const angle = START_ANGLE + SWEEP * fraction;
+    const base = Math.max(0, this.fraction);
+    const shown = this.live ?? base;
+    const angle = START_ANGLE + SWEEP * shown;
 
     this.arc.clear();
     // A zero-length arc still draws a round cap, which reads as a value that is not zero. Skip it.
-    if (fraction > 0.001) {
+    if (shown > 0.001) {
       this.arc
         .arc(0, 0, r + 3, START_ANGLE, angle)
         .stroke({ width: 2.5, color: this.style.arc, cap: "round" });
+    }
+
+    // With modulation moving the pointer, the value the knob is set to still has to be readable: it
+    // is what a drag changes and what undo returns to. A short tick across the track marks it.
+    this.notch.clear();
+    if (this.live !== null) {
+      const at = START_ANGLE + SWEEP * base;
+      this.notch
+        .moveTo(Math.cos(at) * (r + 0.5), Math.sin(at) * (r + 0.5))
+        .lineTo(Math.cos(at) * (r + 5.5), Math.sin(at) * (r + 5.5))
+        .stroke({ width: 2, color: this.style.label, cap: "butt" });
     }
 
     this.pointer
@@ -122,9 +165,7 @@ export class Knob {
     this.style = style;
     this.label.style.fill = style.label;
     this.drawStatic();
-    const previous = this.fraction;
-    this.fraction = -1;
-    this.update(previous < 0 ? 0 : previous);
+    this.draw();
   }
 
   destroy(): void {

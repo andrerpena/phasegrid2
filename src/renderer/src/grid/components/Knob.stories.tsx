@@ -20,24 +20,27 @@ interface Args {
   value: number;
   radius: number;
   label: string;
+  /** Where modulation has put the value, or nothing plugged in. */
+  live?: number | null;
 }
 
-const KnobStage = ({ value, radius, label }: Args) => {
+const KnobStage = ({ value, radius, label, live = null }: Args) => {
   const theme = useThemeStore((s) => s.theme);
   const build = useCallback(() => {
     const view = new Container();
     const knob = new Knob(radius, label, {
       arc: hexToNumber(theme.grid.signal.audio),
       track: hexToNumber(theme.grid.gridLine),
-      body: hexToNumber(theme.grid.nodeFill),
-      pointer: 0xd8dae0,
-      label: 0x8a8f98,
+      body: hexToNumber(theme.grid.knobBody),
+      pointer: hexToNumber(theme.grid.knobPointer),
+      label: hexToNumber(theme.grid.knobLabel),
     });
     knob.update(value);
+    knob.setLive(live);
     knob.view.position.set(90, 60);
     view.addChild(knob.view);
     return { view, destroy: () => knob.destroy() };
-  }, [value, radius, label, theme]);
+  }, [value, radius, label, live, theme]);
   return <PixiStage build={build} width={180} height={130} />;
 };
 
@@ -63,5 +66,18 @@ export const Maximum: StoryObj<Args> = {
 /** Larger, for a module with room for one important control rather than four small ones. */
 export const Large: StoryObj<Args> = {
   args: { value: 0.4, radius: 26, label: "Fold" },
+  render: (args) => <KnobStage {...args} />,
+};
+
+/**
+ * Something is plugged into the knob. The pointer and arc are where modulation has put the value;
+ * the notch on the track is where the knob itself is set, which is what a drag changes.
+ */
+export const Modulated: StoryObj<Args> = {
+  args: { value: 0.5, radius: 17, label: "Fold", live: 0.8 },
+  argTypes: {
+    value: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+    live: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+  },
   render: (args) => <KnobStage {...args} />,
 };

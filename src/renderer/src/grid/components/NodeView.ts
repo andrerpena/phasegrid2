@@ -4,15 +4,10 @@ import type { GridColors } from "@renderer/theming/theme";
 import type { ModuleDescriptor } from "@shared/protocol/catalog";
 import type { PatchModule } from "@shared/protocol/patch";
 import { Container, Graphics, Text } from "pixi.js";
-import {
-  KNOB_CELL_WIDTH,
-  measureNode,
-  type NodeLayout,
-  paramFraction,
-} from "../layout";
-import { Knob } from "./Knob";
+import { measureNode, type NodeLayout, paramFraction } from "../layout";
+import { KnobRow } from "./KnobRow";
+import { faceStyle, OscillatorFace } from "./OscillatorFace";
 import { Port } from "./Port";
-import { SimpleWave } from "./SimpleWave";
 
 /**
  * One module on the grid: a framed panel with a title, ports down its sides and its performance
@@ -39,8 +34,12 @@ export class NodeView {
   private readonly frame = new Graphics();
   private readonly title: Text;
   private readonly ports = new Map<string, Port>();
-  private readonly knobs = new Map<string, Knob>();
-  private readonly wave: SimpleWave | null = null;
+  /**
+   * The controls between the port columns. A module that draws its wave wears an `OscillatorFace`,
+   * wave on the left and knobs on the right; every other module wears the knobs alone. Both take the
+   * layout's geometry and the theme and nothing else, so what a node is made of is decided here once.
+   */
+  private readonly face: OscillatorFace | KnobRow;
   private selected = false;
 
   constructor(
@@ -72,41 +71,13 @@ export class NodeView {
     this.view.addChild(this.frame, this.title);
     this.drawFrame();
 
-    for (const control of this.layout.controls) {
-      const knob = new Knob(
-        control.radius,
-        control.param.name,
-        {
-          arc: style.accent,
-          track: hexToNumber(style.colors.gridLine),
-          body: hexToNumber(style.colors.knobBody),
-          pointer: hexToNumber(style.colors.knobPointer),
-          label: hexToNumber(style.colors.knobLabel),
-        },
-        KNOB_CELL_WIDTH - 4,
-      );
-      knob.view.position.set(control.x, control.y);
-      knob.update(
-        paramFraction(
-          control.param,
-          paramValue(module, descriptor, control.param.id),
-        ),
-      );
-      this.knobs.set(control.param.id, knob);
-      this.view.addChild(knob.view);
-    }
-
-    if (this.layout.display !== null) {
-      const { x, y, width, height } = this.layout.display;
-      this.wave = new SimpleWave(width, height, {
-        curve: style.accent,
-        grid: hexToNumber(style.colors.gridLine),
-        background: hexToNumber(style.colors.background),
-        border: hexToNumber(style.colors.nodeStroke),
-      });
-      this.wave.view.position.set(x, y);
-      this.view.addChild(this.wave.view);
-    }
+    const colors = faceStyle(style.colors, style.accent);
+    this.face =
+      this.layout.display !== null
+        ? new OscillatorFace(this.layout.display, this.layout.controls, colors)
+        : new KnobRow(this.layout.controls, colors.knob);
+    this.view.addChild(this.face.view);
+    this.applyValues(module);
 
     for (const port of [...this.layout.inputs, ...this.layout.outputs]) {
       const socket = new Port(
@@ -131,7 +102,29 @@ export class NodeView {
    * ignores it.
    */
   setWave(samples: ArrayLike<number>): void {
-    this.wave?.setSamples(samples);
+    if (this.face instanceof OscillatorFace) this.face.setWave(samples);
+  }
+
+  /**
+   * Where modulation has put a parameter this frame, 0..1 of its range, or null once nothing feeds
+   * it. Telemetry's channel into the node, kept apart from the document's: it moves the pointer and
+   * never the value.
+   */
+  setLive(paramId: string, fraction: number | null): void {
+    this.face.setLive(paramId, fraction);
+  }
+
+  /** Every knob to the document's value for it. */
+  private applyValues(module: PatchModule): void {
+    for (const control of this.layout.controls) {
+      this.face.setValue(
+        control.param.id,
+        paramFraction(
+          control.param,
+          paramValue(module, this.descriptor, control.param.id),
+        ),
+      );
+    }
   }
 
   private drawFrame(): void {
@@ -183,30 +176,34 @@ export class NodeView {
   ): void {
     if (module !== this.module) {
       this.module = module;
-      for (const [id, knob] of this.knobs) {
-        const param = this.descriptor.params.find((p) => p.id === id);
-        if (param === undefined) continue;
-        knob.update(
-          paramFraction(param, paramValue(module, this.descriptor, id)),
-        );
-      }
+      this.applyValues(module);
     }
     for (const [id, socket] of this.ports)
       socket.update({
         connected: connectedPorts.has(id),
         hovered: hoveredPort === id,
       });
+    // A knob nothing feeds any more goes back to drawing its own value at once, rather than staying
+    // wherever the last telemetry frame left it until the next one, which never comes.
+    for (const control of this.layout.controls)
+      if (
+        control.modulationPort !== null &&
+        !connectedPorts.has(control.modulationPort)
+      )
+        this.face.setLive(control.param.id, null);
   }
 
   setStyle(style: NodeStyle): void {
     this.style = style;
     this.title.style.fill = style.accent;
     this.drawFrame();
+    const colors = faceStyle(style.colors, style.accent);
+    if (this.face instanceof OscillatorFace) this.face.setStyle(colors);
+    else this.face.setStyle(colors.knob);
   }
 
   destroy(): void {
-    this.wave?.destroy();
-    for (const knob of this.knobs.values()) knob.destroy();
+    this.face.destroy();
     for (const port of this.ports.values()) port.destroy();
     this.view.destroy({ children: true });
   }
