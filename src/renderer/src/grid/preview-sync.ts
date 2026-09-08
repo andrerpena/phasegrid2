@@ -3,7 +3,9 @@ import { afterSync } from "@renderer/patch/engine-sync";
 import { usePatchStore } from "@renderer/patch/patch-store";
 
 /**
- * Keeps the wave panels on the canvas showing what the engine would play.
+ * Keeps the wave panels on the canvas showing what the engine would play, for an engine with no
+ * telemetry segment. With one, `telemetry-sync.ts` reads the pictures the engine publishes live and
+ * this asks for nothing.
  *
  * A module that can draw itself says so in the catalogue, and the picture is computed by the module
  * from the same parameters the sound is. Nothing here knows what any waveform looks like; it only knows
@@ -63,6 +65,9 @@ export function startPreviewSync(target: PreviewTarget): PreviewSync {
 
   const refresh = (moduleId: string): void => {
     if (stopped) return;
+    // With a telemetry segment the engine publishes every picture itself, live, and asking as well
+    // would paint the document's shape over the running one for a frame. This path is the fallback.
+    if (useEngineStore.getState().shm !== null) return;
     // Only a module with a panel is asked. Asking any other gets a refusal, and a refused call is
     // shown in the status bar as an engine error, which it is not.
     if (!target.previewing().includes(moduleId)) return;

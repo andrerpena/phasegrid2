@@ -73,11 +73,14 @@ export const GridView = () => {
       stop.push(preview.stop);
       preview.refreshAll();
 
-      // The knobs something is modulating: read from the engine's segment on every frame the
-      // canvas draws, so a knob turns as its parameter does rather than sitting on the document's
-      // value while the sound moves.
+      // The knobs something is modulating, and every wave panel: read from the engine's segment on
+      // every frame the canvas draws, so a knob turns and a face redraws as the sound does rather
+      // than sitting on the document's values while it moves.
       const telemetry = startTelemetrySync(
-        { setLive: (id, param, fraction) => view.setLive(id, param, fraction) },
+        {
+          setLive: (id, param, fraction) => view.setLive(id, param, fraction),
+          setWave: (id, samples) => view.setPreview(id, samples),
+        },
         (tick) => {
           created.ticker.add(tick);
           return () => created.ticker.remove(tick);

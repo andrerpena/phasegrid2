@@ -24,6 +24,8 @@ beforeEach(() => {
     window: { engine: { onEvent: () => () => {} } },
   });
   useEngineStore.setState({
+    // No segment: the request path is the one in use. With a segment it asks for nothing.
+    shm: null,
     call: vi.fn(async (cmd: string, args: { module?: string }) => {
       calls.push(`${cmd} ${args.module ?? ""}`);
       return { samples: [-1, 0, 1], revision: 1 } as never;
@@ -83,6 +85,17 @@ describe("preview sync", () => {
     sync.stop();
     sync.refresh("saw");
     await flush();
+    expect(calls).toEqual([]);
+  });
+
+  it("asks for nothing once the engine publishes pictures itself", async () => {
+    useEngineStore.setState({
+      shm: { name: "/pg-test", size: 4096, layoutVersion: 1 },
+    });
+    const sync = startPreviewSync(target);
+    sync.refresh("saw");
+    await flush();
+    sync.stop();
     expect(calls).toEqual([]);
   });
 });

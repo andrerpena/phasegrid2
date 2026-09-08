@@ -16,6 +16,11 @@ import { paramFraction } from "./layout";
  * rate and hands it to the node as a *live* value, kept apart from the document's: the document is
  * what a drag edits and what the notch shows, and nothing here ever writes to it.
  *
+ * The faces come the same way: every module with a wave panel is asked for its picture, which the
+ * engine redraws from those same running values whenever they move, so a panel follows the sound
+ * under modulation exactly as a knob does. The request-per-edit path (`preview-sync.ts`) is only for
+ * an engine with no segment.
+ *
  * This is the one owner of the engine's subscription set. `telemetry.subscribe` replaces the whole
  * set on every call, so a second subscriber elsewhere would silently cancel this one; when meters
  * and scopes arrive they add their modules here.
@@ -23,6 +28,8 @@ import { paramFraction } from "./layout";
 
 export interface TelemetryTarget {
   setLive(moduleId: string, paramId: string, fraction: number | null): void;
+  /** A module's picture, one cycle -1..1, as the engine drew it for the values it is running with. */
+  setWave(moduleId: string, samples: ArrayLike<number>): void;
 }
 
 export interface TelemetrySync {
@@ -64,6 +71,17 @@ export function modulatedModules(
   return out;
 }
 
+/** The modules whose face has a wave panel: every one of them is asked for its picture. */
+export function previewedModules(
+  doc: PatchDoc,
+  catalog: Map<string, ModuleDescriptor>,
+): string[] {
+  return doc.modules
+    .filter((m) => catalog.get(m.type)?.flags.previewsWave === true)
+    .map((m) => m.id)
+    .sort();
+}
+
 /**
  * `schedule` runs `tick` once per frame and returns how to stop; the canvas passes its ticker, a
  * test calls the tick itself.
@@ -76,7 +94,10 @@ export function startTelemetrySync(
   let opened = false;
   /** What the engine has been asked to watch, and the slot it answered with, per module. */
   let slots = new Map<string, number>();
+  let previewSlots = new Map<string, number>();
   let live = new Map<string, LiveParam[]>();
+  /** The last picture drawn per module, by the engine's own count, so an unchanged one is not redrawn. */
+  const drawn = new Map<string, bigint>();
   let lastRequest = "";
 
   const openSegment = (): void => {
@@ -96,24 +117,32 @@ export function startTelemetrySync(
       useCatalogStore.getState().byId,
     );
     const modules = [...wanted.keys()].sort();
-    const request = modules.join("\n");
+    const previews = previewedModules(
+      usePatchStore.getState().doc,
+      useCatalogStore.getState().byId,
+    );
+    const request = `${modules.join("\n")}|${previews.join("\n")}`;
     if (!force && request === lastRequest) return;
     lastRequest = request;
     live = wanted;
-    // The old slot map is wrong from here: the engine numbers slots by the new list's order, so a
+    // The old slot maps are wrong from here: the engine numbers slots by the new lists' order, so a
     // module that kept its subscription may move. One empty frame beats a knob reading another's.
     slots = new Map();
+    previewSlots = new Map();
+    drawn.clear();
     afterSync(async () => {
       if (stopped) return;
       try {
-        const { slots: answer } = await useEngineStore
+        const answer = await useEngineStore
           .getState()
-          .call("telemetry.subscribe", { modules });
-        slots = new Map(Object.entries(answer));
+          .call("telemetry.subscribe", { modules, previews });
+        slots = new Map(Object.entries(answer.slots));
+        previewSlots = new Map(Object.entries(answer.previewSlots));
       } catch {
         // An engine with no segment, or a module gone between the ask and the answer. Nothing to
         // read either way; the knobs stay where the document has them.
         slots = new Map();
+        previewSlots = new Map();
       }
     });
   };
@@ -128,6 +157,15 @@ export function startTelemetrySync(
         if (value === undefined) continue;
         target.setLive(moduleId, param.id, paramFraction(param, value));
       }
+    }
+    for (const [moduleId, slot] of previewSlots) {
+      const reading = window.telemetry.read(slot);
+      if (reading === null || reading.kind !== TelemetryKind.Preview) continue;
+      // The engine only publishes when the picture changed, and numbers each publish; a picture
+      // already on the panel is not geometry worth rebuilding.
+      if (drawn.get(moduleId) === reading.blockIndex) continue;
+      drawn.set(moduleId, reading.blockIndex);
+      target.setWave(moduleId, reading.samples);
     }
   };
 

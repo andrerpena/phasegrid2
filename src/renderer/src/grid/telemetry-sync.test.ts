@@ -5,7 +5,11 @@ import { EMPTY_PATCH, type PatchDoc } from "@shared/protocol/patch";
 import { type SlotReading, TelemetryKind } from "@shared/protocol/telemetry";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DESCRIPTORS, moduleNode } from "./fixtures";
-import { modulatedModules, startTelemetrySync } from "./telemetry-sync";
+import {
+  modulatedModules,
+  previewedModules,
+  startTelemetrySync,
+} from "./telemetry-sync";
 
 /**
  * Which modules get watched, and what a frame does with what they publish.
@@ -42,14 +46,18 @@ const MODULATED: PatchDoc = {
 };
 
 const subscriptions: string[][] = [];
+const previewRequests: string[][] = [];
 const live: [string, string, number | null][] = [];
+const waves: [string, number[]][] = [];
 let readings = new Map<number, SlotReading | null>();
 let tick: (() => void) | null = null;
 const opened: string[] = [];
 
 beforeEach(() => {
   subscriptions.length = 0;
+  previewRequests.length = 0;
   live.length = 0;
+  waves.length = 0;
   opened.length = 0;
   readings = new Map();
   tick = null;
@@ -69,17 +77,25 @@ beforeEach(() => {
   useEngineStore.setState({
     status: "ready",
     shm: { name: "/pg-test", size: 4096, layoutVersion: 1 },
-    call: vi.fn(async (cmd: string, args: { modules?: string[] }) => {
-      if (cmd === "telemetry.subscribe") {
-        subscriptions.push(args.modules ?? []);
-        const slots: Record<string, number> = {};
-        (args.modules ?? []).forEach((m, i) => {
-          slots[m] = i;
-        });
-        return { slots } as never;
-      }
-      return {} as never;
-    }) as never,
+    call: vi.fn(
+      async (
+        cmd: string,
+        args: { modules?: string[]; previews?: string[] },
+      ) => {
+        if (cmd === "telemetry.subscribe") {
+          subscriptions.push(args.modules ?? []);
+          previewRequests.push(args.previews ?? []);
+          // Slots from one pool: modules first, then previews, as the engine hands them out.
+          const slots: Record<string, number> = {};
+          const previewSlots: Record<string, number> = {};
+          let next = 0;
+          for (const m of args.modules ?? []) slots[m] = next++;
+          for (const m of args.previews ?? []) previewSlots[m] = next++;
+          return { slots, previewSlots } as never;
+        }
+        return {} as never;
+      },
+    ) as never,
   });
   useCatalogStore.setState({ byId: DESCRIPTORS });
   usePatchStore.setState({ doc: MODULATED, version: 0 });
@@ -88,6 +104,8 @@ beforeEach(() => {
 const target = {
   setLive: (module: string, param: string, fraction: number | null) =>
     live.push([module, param, fraction]),
+  setWave: (module: string, samples: ArrayLike<number>) =>
+    waves.push([module, Array.from(samples)]),
 };
 const schedule = (fn: () => void) => {
   tick = fn;
@@ -108,6 +126,12 @@ describe("which modules are watched", () => {
     const plain: PatchDoc = { ...MODULATED, edges: [MODULATED.edges[1]] };
     expect(modulatedModules(plain, DESCRIPTORS).size).toBe(0);
   });
+
+  it("asks for a picture from every module that has a panel, cabled or not", () => {
+    // The LFO and the sine both draw their wave; the output does not. Modulation has nothing to do
+    // with it: a face follows its knobs through the same path.
+    expect(previewedModules(MODULATED, DESCRIPTORS)).toEqual(["lfo", "osc"]);
+  });
 });
 
 describe("telemetry sync", () => {
@@ -117,6 +141,30 @@ describe("telemetry sync", () => {
     sync.stop();
     expect(opened).toEqual(["/pg-test"]);
     expect(subscriptions).toEqual([["osc"]]);
+    expect(previewRequests).toEqual([["lfo", "osc"]]);
+  });
+
+  it("puts a published picture on the panel, and only a new one", async () => {
+    const sync = startTelemetrySync(target, schedule);
+    await flush();
+    // Slot 0 is the sine's knobs; 1 and 2 are the LFO's and the sine's pictures.
+    readings.set(2, {
+      kind: TelemetryKind.Preview,
+      blockIndex: 7n,
+      samples: Float32Array.from([-1, 0, 1]),
+    });
+    tick?.();
+    tick?.();
+    expect(waves).toEqual([["osc", [-1, 0, 1]]]);
+    readings.set(2, {
+      kind: TelemetryKind.Preview,
+      blockIndex: 8n,
+      samples: Float32Array.from([0, 1, 0]),
+    });
+    tick?.();
+    expect(waves).toHaveLength(2);
+    expect(waves[1]).toEqual(["osc", [0, 1, 0]]);
+    sync.stop();
   });
 
   it("turns a published value into a knob position, every frame", async () => {
