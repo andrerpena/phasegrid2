@@ -472,6 +472,14 @@ json dispatchCommand(const std::string& cmd, const json& id, const json& args, P
     ctx.engine.setOutputGain(static_cast<float>(gain));
     return okResponse(id, json{{"gain", ctx.engine.outputGain()}});
   }
+  // Play and Stop for the patch itself. The transport is a clock and the gain is a level; neither
+  // stops a modular graph, because nothing gates it. This does.
+  if (cmd == "audio.setRunning") {
+    if (!args.is_object() || !args.contains("running") || !args["running"].is_boolean())
+      return errorResponse(id, "E_SCHEMA", "running must be a boolean");
+    ctx.engine.setRunning(args["running"].get<bool>());
+    return okResponse(id, json{{"running", ctx.engine.running()}});
+  }
   if (cmd == "transport.stop") { ctx.transport.stop(); return okResponse(id, positionJson(ctx.transport)); }
   if (cmd == "transport.setTempo") {
     ArgReader a(args);

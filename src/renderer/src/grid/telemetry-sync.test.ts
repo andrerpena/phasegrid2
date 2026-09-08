@@ -76,6 +76,7 @@ beforeEach(() => {
   });
   useEngineStore.setState({
     status: "ready",
+    running: true,
     shm: { name: "/pg-test", size: 4096, layoutVersion: 1 },
     call: vi.fn(
       async (
@@ -207,6 +208,39 @@ describe("telemetry sync", () => {
     });
     tick?.();
     expect(live).toEqual([["osc", "fold", 0.25]]);
+    sync.stop();
+  });
+
+  it("puts the knobs back where they are set when the patch is held", async () => {
+    // Stop stops the patch, so there is nothing live: the last value is where the modulation happened
+    // to stop rather than anything the knob means now. The pictures keep arriving, because the engine
+    // draws those from what the patch is set to.
+    const sync = startTelemetrySync(target, schedule);
+    await flush();
+    readings.set(0, {
+      kind: TelemetryKind.Params,
+      blockIndex: 1n,
+      values: [12],
+    });
+    tick?.();
+    expect(live).toEqual([["osc", "fold", 0.25]]);
+
+    useEngineStore.setState({ running: false });
+    expect(live.at(-1)).toEqual(["osc", "fold", null]);
+    live.length = 0;
+    readings.set(0, {
+      kind: TelemetryKind.Params,
+      blockIndex: 2n,
+      values: [36],
+    });
+    readings.set(2, {
+      kind: TelemetryKind.Preview,
+      blockIndex: 5n,
+      samples: Float32Array.from([1, 0, -1]),
+    });
+    tick?.();
+    expect(live).toEqual([]);
+    expect(waves).toEqual([["osc", [1, 0, -1]]]);
     sync.stop();
   });
 

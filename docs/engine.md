@@ -320,6 +320,28 @@ it. Anything that changes model params without going through `Engine::setParam` 
 each difference through the param queue, exactly as a knob does. `setParam` keeps the snapshot current on its own path.
 A dropped `E_QUEUE_FULL` enqueue leaves the snapshot unchanged, so the next commit retries it.
 
+## Play and Stop
+
+`Engine::setRunning(false)` **holds** the patch: `renderBlock` swaps a pending program and drains the
+param queue as usual, then writes silence and runs no module at all. It is not the transport's `playing`
+and must never become it -- an offline render has a stopped transport and has to run, and `phase.clock`
+and `notes.clip` deliberately free-run off `samplePos` so a patch keeps moving with nothing rolling.
+
+The distinction is the whole point. A modular graph is not gated by its clock, so stopping the transport
+leaves an oscillator droning, and `setOutputGain(0)` leaves it droning unheard: everything a running
+patch drives goes on running. That was invisible until the interface began drawing what the engine is
+doing, at which point a stopped project sat there with its modulated knobs turning and its faces
+animating with nothing to hear. Holding is what actually stops it, and because every module keeps the
+state it had, Play continues rather than restarts -- `test_hold.cpp` proves that by rendering the same
+patch twice, once straight through and once held in the middle, and requiring every sample after the
+hold to match.
+
+A held patch publishes nothing (the scheduler is what writes `Params`), so the knobs stop where the
+document has them; `PreviewPublisher` switches to the model's values, so a face shows what the patch is
+SET to and follows a knob turned in the silence, which is how a patch gets built before anyone presses
+Play. `audio.setRunning` is the command; the interface's one transport button sends it along with
+`transport.play`/`stop` and the gain.
+
 ## Feedback
 
 Tarjan SCCs. Nodes in an SCC (or with a self loop) form a cluster run once per sample (`feedbackMode: sample`) or per block (`block`).

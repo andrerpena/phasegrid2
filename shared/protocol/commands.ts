@@ -239,6 +239,19 @@ export const COMMANDS = {
     result: z.object({ gain: z.number() }),
   },
 
+  /**
+   * Whether the patch advances at all: Play and Stop.
+   *
+   * A modular graph is not gated by its clock, so stopping the transport leaves an oscillator
+   * droning and silencing the output leaves it droning unheard -- with everything a running patch
+   * drives, a modulated knob and the picture on a face, still moving. A held engine runs no module:
+   * nothing sounds, nothing moves, and every module keeps the state Play resumes from.
+   */
+  "audio.setRunning": {
+    args: z.object({ running: z.boolean() }),
+    result: z.object({ running: z.boolean() }),
+  },
+
   "device.list": { args: NoArgs, result: DeviceListResultSchema },
   /** Empty id selects the system default. Reopens the device, so the audio stream stops and restarts. */
   "device.select": {

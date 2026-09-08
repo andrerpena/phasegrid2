@@ -20,9 +20,12 @@ void PreviewPublisher::tick() {
     seen.insert(inst.serial);
 
     // The values the sound is made with, when the module has run under this subscription; the
-    // document's until then, so a face is never blank while the first block is on its way.
+    // document's until then, so a face is never blank while the first block is on its way -- and
+    // again while the patch is held, because nothing is running to have a live value: a face then
+    // shows what the patch is SET to, and follows a knob turned in the silence, which is how a
+    // patch gets built before anyone presses Play.
     std::vector<float> values(d.numParams);
-    if (inst.liveBlock.load(std::memory_order_relaxed) > 0) {
+    if (inst.liveBlock.load(std::memory_order_relaxed) > 0 && engine_.running()) {
       for (uint32_t i = 0; i < d.numParams; ++i) values[i] = inst.liveValues[i].load(std::memory_order_relaxed);
     } else {
       const ParamValues model = engine_.paramValuesFor(inst.id);

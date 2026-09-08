@@ -92,6 +92,8 @@ export function startTelemetrySync(
 ): TelemetrySync {
   let stopped = false;
   let opened = false;
+  /** Whether the patch is advancing. Held, there is nothing live and the knobs show what they are set to. */
+  let running = useEngineStore.getState().running;
   /** What the engine has been asked to watch, and the slot it answered with, per module. */
   let slots = new Map<string, number>();
   let previewSlots = new Map<string, number>();
@@ -148,9 +150,18 @@ export function startTelemetrySync(
     });
   };
 
+  /** Back to the document's values: a held patch has no live value, only the one it is set to. */
+  const clearLive = (): void => {
+    for (const [moduleId, params] of live)
+      for (const { param } of params) target.setLive(moduleId, param.id, null);
+  };
+
   const tick = (): void => {
     if (stopped || !opened) return;
-    for (const [moduleId, slot] of slots) {
+    // A held patch publishes no new values, and the last ones are where the modulation happened to
+    // stop rather than anything the knob means now. The pictures still arrive: the engine redraws
+    // those from what the patch is set to, so a face follows a knob turned in the silence.
+    for (const [moduleId, slot] of running ? slots : []) {
       const reading = window.telemetry.read(slot);
       if (reading === null || reading.kind !== TelemetryKind.Params) continue;
       for (const { param, index } of live.get(moduleId) ?? []) {
@@ -185,6 +196,10 @@ export function startTelemetrySync(
   const stopStore = useEngineStore.subscribe((state, previous) => {
     if (state.shm !== previous.shm || state.status !== previous.status) {
       if (state.status === "ready") openSegment();
+    }
+    if (state.running !== previous.running) {
+      running = state.running;
+      if (!running) clearLive();
     }
   });
   const stopCatalog = useCatalogStore.subscribe(() => resubscribe());

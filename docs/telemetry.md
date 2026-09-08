@@ -31,7 +31,9 @@ trips per second per meter.
   into a `Preview` slot. That is how a face follows the sound under modulation, under a hand, and while a
   smoother is still ramping. `hello` lists `previews` among the capabilities when this is on; a renderer
   falls back to `module.preview` over the socket when it is not, which is also what keeps a hot-reloaded
-  renderer working against an engine that predates pictures.
+  renderer working against an engine that predates pictures. A held patch (`audio.setRunning`) runs no
+  module, so nothing publishes `Params` and the knobs rest where the document has them; the pictures keep
+  coming, drawn from the model's values, so a face still follows a knob turned while the patch is stopped.
 - The renderer owns the subscription set in one place (`src/renderer/src/grid/telemetry-sync.ts`):
   `telemetry.subscribe` replaces the whole set, so two subscribers would cancel each other.
 - `telemetry.subscribe` decides which module writes into which slot and returns the map.

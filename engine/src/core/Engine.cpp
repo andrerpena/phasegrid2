@@ -164,6 +164,14 @@ void Engine::renderBlock(float* const* out, uint32_t channels, uint32_t numFrame
   numFrames = std::min(numFrames, kMaxBlockSize);
   swapIfPending();
   drainParams();
+  // Held: the two lines above still run, so a program compiled and a knob turned while the patch is
+  // stopped are already applied the instant it plays, and neither queue backs up. What is skipped is
+  // every module. Nothing advances, so nothing moves on the interface either, and the state each
+  // module holds is the state Play resumes from.
+  if (!running_.load(std::memory_order_relaxed)) {
+    for (uint32_t c = 0; c < channels; ++c) std::fill_n(out[c], numFrames, 0.f);
+    return;
+  }
   for (uint32_t i = 0; i < numFrames; ++i) bus_.data[i] = Sample(0.f);
   AudioBus bus{bus_.data.data(), numFrames};
   scheduler_.run(*current_, numFrames, t, &bus, telemetry_);

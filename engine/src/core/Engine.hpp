@@ -54,6 +54,23 @@ public:
   void setOutputGain(float gain) noexcept { outputGain_.store(gain, std::memory_order_relaxed); }
   float outputGain() const noexcept { return outputGain_.load(std::memory_order_relaxed); }
 
+  /**
+   * Whether the patch advances at all: Play and Stop, as against the master level above.
+   *
+   * A modular is not gated by its clock -- an oscillator wired to the output drones whether or not
+   * the transport is rolling, and that is deliberate: `phase.clock` and `notes.clip` free-run off
+   * `samplePos` so a patch keeps moving with nothing rolling, which is also what makes `--render`
+   * audible. Silencing the output therefore hides a patch without stopping it, and everything a
+   * running patch drives -- a modulated knob, the picture on a face -- goes on moving with nothing
+   * to hear. That is what this stops. A held engine writes silence and runs no module, so every one
+   * of them keeps the state it had and Play continues rather than restarts.
+   *
+   * It is NOT the transport's `playing`, and must not become it: an offline render has a stopped
+   * transport and has to run. Message thread writes, audio thread reads.
+   */
+  void setRunning(bool running) noexcept { running_.store(running, std::memory_order_relaxed); }
+  bool running() const noexcept { return running_.load(std::memory_order_relaxed); }
+
   void setTelemetry(TelemetryWriter* t) { telemetry_ = t; }
   TelemetryWriter* telemetry() const { return telemetry_; }
   /// Message thread. Points a module at a slot, or `kNoTelemetrySlot` to stop it publishing.
@@ -87,6 +104,8 @@ private:
   /// thread thereafter; a null writer simply means telemetry is off and every display module is a no-op.
   TelemetryWriter* telemetry_ = nullptr;
   std::atomic<float> outputGain_{1.f};
+  /// True unless someone has held the patch. Default true, so a render, a tone and every test run.
+  std::atomic<bool> running_{true};
   uint64_t revision_ = 0;
 
   std::unique_ptr<Program> initial_;

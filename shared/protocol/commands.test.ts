@@ -95,6 +95,7 @@ const cases: Record<CommandName, { valid: unknown; invalid: unknown }> = {
   },
   "transport.seek": { valid: { ppq: 16 }, invalid: { ppq: -1 } },
   "audio.setOutputGain": { valid: { gain: 0 }, invalid: { gain: 4 } },
+  "audio.setRunning": { valid: { running: false }, invalid: { running: "no" } },
   "device.list": { valid: {}, invalid: "all" },
   "device.select": { valid: { id: "" }, invalid: { id: 3 } },
 };
@@ -125,6 +126,7 @@ describe("command table", () => {
       "transport.setTimeSignature",
       "transport.seek",
       "audio.setOutputGain",
+      "audio.setRunning",
       "device.list",
       "device.select",
     ]);

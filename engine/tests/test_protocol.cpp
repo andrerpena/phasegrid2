@@ -126,6 +126,17 @@ TEST_CASE("hello names the audio device as a capability only when there is one",
   REQUIRE(std::find(with.begin(), with.end(), "device") != with.end());
 }
 
+TEST_CASE("the patch can be held and let run again", "[protocol]") {
+  Fixture f;
+  REQUIRE(f.ctx.engine.running());   // a fresh engine runs, or a render would be silence
+  REQUIRE(f.call("audio.setRunning", json{{"running", false}})["result"]["running"] == false);
+  REQUIRE_FALSE(f.ctx.engine.running());
+  REQUIRE(f.call("audio.setRunning", json{{"running", true}})["result"]["running"] == true);
+  REQUIRE(f.ctx.engine.running());
+  REQUIRE(errorCode(f.call("audio.setRunning", json{{"running", "no"}})) == "E_SCHEMA");
+  REQUIRE(errorCode(f.call("audio.setRunning")) == "E_SCHEMA");
+}
+
 TEST_CASE("an unknown command is an error, not a throw", "[protocol]") {
   Fixture f;
   const json response = f.call("patch.explode");
@@ -151,6 +162,7 @@ TEST_CASE("every command in the shared table has a handler", "[protocol]") {
                           "module.add", "module.remove", "edge.add", "edge.remove", "param.set",
                           "transport.play", "transport.stop", "transport.setTempo", "transport.setTimeSignature",
                           "transport.seek",
+                          "audio.setOutputGain", "audio.setRunning",
                           "device.list", "device.select"}) {
     const json response = f.call(cmd);
     if (response["ok"] == false) {
