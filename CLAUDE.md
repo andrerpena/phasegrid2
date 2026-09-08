@@ -7,6 +7,7 @@ Spec: docs/superpowers/specs/2026-09-07-phasegrid2-architecture-design.md. Engin
 - `npm run dev` — build engine (incremental) and start Electron with HMR
 - `npm run typecheck && npm run lint:fix` — REQUIRED after any TypeScript change
 - `npm test` — vitest unit project
+- `npx electron-vite build && node scripts/e2e-workspace.mjs` — drives the built app over CDP through the workspace, save and settings
 - `npm run engine:build` / `npm run engine:test` — CMake build and Catch2 tests; REQUIRED after any C++ change
 - `npm run engine:render -- patch.json --seconds 2 --out out.wav` — headless render
 
