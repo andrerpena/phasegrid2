@@ -1,6 +1,7 @@
 import { useModalStore } from "@renderer/components/floating/modal/modal-store";
 import { useConfigStore } from "@renderer/config/config-store";
 import { useEngineStore } from "@renderer/engine/engine-store";
+import { useSelectionStore } from "@renderer/selection/selection-store";
 import { useEffect } from "react";
 import { commandRegistry } from "../commands/registry";
 import { bindingsFromConfig } from "./from-config";
@@ -51,7 +52,7 @@ export function useKeybindings(): void {
       const context: KeybindingContext = {
         focus: focusScope(document.activeElement),
         modalOpen: useModalStore.getState().anyOpen(),
-        hasSelection: false,
+        hasSelection: !useSelectionStore.getState().isEmpty(),
         engineReady: useEngineStore.getState().status === "ready",
       };
       const binding = keybindingRegistry.resolve(eventToKey(event), context);

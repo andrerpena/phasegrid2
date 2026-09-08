@@ -2,6 +2,7 @@ import { useModalStore } from "@renderer/components/floating/modal/modal-store";
 import { allExamples, projectForExample } from "@renderer/examples/registry";
 import { useHistoryStore } from "@renderer/history/history-store";
 import { useLayoutStore } from "@renderer/layout/layout-store";
+import { deleteSelection } from "@renderer/patch/delete-selection";
 import { emptyProject, useProjectStore } from "@renderer/project/project-store";
 import { useThemeStore } from "@renderer/theming/theme-store";
 import { THEMES } from "@renderer/theming/themes";
@@ -137,6 +138,17 @@ const PROJECT_COMMANDS: CommandDefinition<never>[] = [
   },
 ];
 
+const PATCH_COMMANDS: CommandDefinition<never>[] = [
+  {
+    id: "patch.deleteSelection",
+    name: "Delete Selection",
+    category: "Patch",
+    description:
+      "Removes the selected modules, and the cables attached to them",
+    execute: () => deleteSelection(),
+  },
+];
+
 const WORKSPACE_COMMANDS: CommandDefinition<never>[] = [
   {
     id: "workspace.open",
@@ -155,6 +167,7 @@ const WORKSPACE_COMMANDS: CommandDefinition<never>[] = [
 export function registerShellCommands(): void {
   commandRegistry.registerAll(SHELL_COMMANDS);
   commandRegistry.registerAll(PROJECT_COMMANDS);
+  commandRegistry.registerAll(PATCH_COMMANDS);
   commandRegistry.registerAll(WORKSPACE_COMMANDS);
   commandRegistry.registerAll(exampleCommands());
 }

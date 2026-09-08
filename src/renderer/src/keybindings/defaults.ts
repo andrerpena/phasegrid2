@@ -19,4 +19,19 @@ export const DEFAULT_KEYBINDINGS: Keybinding[] = [
   { key: "mod+alt+t", command: "workbench.cycleTheme" },
   { key: "mod+s", command: "project.save" },
   { key: "mod+shift+s", command: "project.saveAs" },
+  // Scoped to the grid and conditional on a selection, because a shortcut that deletes with nothing
+  // selected is a shortcut that eventually deletes the wrong thing. Backspace as well as delete: the
+  // key a laptop keyboard actually has is the one people press.
+  {
+    key: "delete",
+    command: "patch.deleteSelection",
+    scope: "grid",
+    when: "hasSelection",
+  },
+  {
+    key: "backspace",
+    command: "patch.deleteSelection",
+    scope: "grid",
+    when: "hasSelection",
+  },
 ];

@@ -1,19 +1,26 @@
 #!/usr/bin/env node
 /**
- * Drives the built application through the workspace, three launches deep.
+ * Drives the built application: the workspace, saving, settings, and editing a patch.
  *
- * Run `npx electron-vite build` first, then `node scripts/e2e-workspace.mjs`. It launches the real
+ * Run `npx electron-vite build` first, then `node scripts/e2e.mjs`. It launches the real
  * application against a throwaway user-data directory and a throwaway folder, and talks to it over the
  * Chrome DevTools protocol — no Playwright, no test-only code in the product.
  *
- * Three launches rather than one, because the things worth checking here only happen at startup: the
+ * Several launches rather than one, because much of what is worth checking only happens at startup: the
  * gate with nothing remembered, the shell with a workspace remembered, and the tabs coming back.
  *
  * The folder chooser and the unsaved-work box are the platform's own and cannot be answered from here.
  * The chooser is stood in for by calling the bridge directly, once; the box is covered by unit tests.
  */
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, readFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -84,6 +91,20 @@ async function launch(run) {
     });
     socket.addEventListener("message", (event) => {
       const message = JSON.parse(event.data);
+      // The page's own console. A driver that cannot see an exception in the renderer reports the
+      // symptom and hides the cause, which is most of an afternoon.
+      if (message.method === "Runtime.consoleAPICalled")
+        console.log(
+          `      [page:${message.params.type}]`,
+          message.params.args
+            .map((a) => a.value ?? a.description ?? a.type)
+            .join(" "),
+        );
+      if (message.method === "Runtime.exceptionThrown")
+        console.log(
+          "      [page:error]",
+          message.params.exceptionDetails?.exception?.description ?? "",
+        );
       const waiter = pending.get(message.id);
       if (waiter) {
         pending.delete(message.id);
@@ -112,9 +133,27 @@ async function launch(run) {
     };
     const text = () => evaluate("return document.body.innerText;");
 
+    /**
+     * A real mouse, through the browser rather than through JavaScript.
+     *
+     * The grid listens for pointer events on its canvas, and a `new PointerEvent(...)` dispatched from
+     * a script is not trusted and does not become one. Chromium synthesises pointer events from these,
+     * so the interaction under test is the one a hand would drive.
+     */
+    const mouse = async (type, x, y) =>
+      send("Input.dispatchMouseEvent", {
+        type,
+        x,
+        y,
+        button: "left",
+        buttons: type === "mouseReleased" ? 0 : 1,
+        clickCount: 1,
+        pointerType: "mouse",
+      });
+
     await send("Runtime.enable");
     await sleep(1800);
-    await run({ evaluate, text });
+    await run({ evaluate, text, mouse, sleep });
   } finally {
     try {
       socket?.close();
@@ -343,6 +382,138 @@ try {
         JSON.parse(readFileSync(join(ws, "workspace.json"), "utf8")).settings[
           "grid.snap"
         ] === 16,
+    );
+  });
+  // ── Fourth launch: editing a patch, and taking it apart again ────────────
+  mkdirSync(join(ws, "projects", "wiring"), { recursive: true });
+  writeFileSync(
+    join(ws, "projects", "wiring", "project.json"),
+    JSON.stringify(
+      {
+        schemaVersion: 1,
+        id: "wiring",
+        name: "Wiring",
+        tempo: 120,
+        timeSignature: { numerator: 4, denominator: 4 },
+        scale: { root: 0, name: "chromatic" },
+        kind: "user",
+        patch: {
+          schemaVersion: 1,
+          voiceCount: 1,
+          feedbackMode: "sample",
+          modules: [
+            {
+              id: "osc",
+              type: "osc.wavetable",
+              x: 48,
+              y: 48,
+              params: { level: 0.7 },
+            },
+            {
+              id: "out",
+              type: "io.audioOut",
+              x: 384,
+              y: 72,
+              params: { gain: 0.5 },
+            },
+          ],
+          edges: [
+            {
+              id: "e1",
+              from: { module: "osc", port: "out" },
+              to: { module: "out", port: "inL" },
+            },
+          ],
+        },
+      },
+      null,
+      2,
+    ),
+  );
+
+  await launch(async ({ evaluate, text, mouse }) => {
+    await evaluate(`click("button", "Wiring");`);
+    await sleep(1500);
+    // The selected tab, not the Projects list: the list shows the name whether or not it opened, which
+    // is how a project that failed to parse looked exactly like one that had. The dock has more than
+    // one tablist, so this asks the tabs themselves which is selected.
+    const opened = await evaluate(
+      `return [...document.querySelectorAll('[role="tab"]')].some((t) => t.textContent.includes("Wiring") && t.getAttribute("aria-selected") === "true");`,
+    );
+    check("9. a saved patch opens", opened === true);
+
+    const box = await evaluate(`
+      const el = document.querySelector('[data-kb-scope="grid"] canvas');
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return { x: r.x, y: r.y, w: r.width, h: r.height };`);
+    check("9. the grid has a canvas", box !== null, JSON.stringify(box));
+    if (box === null) throw new Error("no canvas to drag on");
+
+    // A marquee across the whole surface. The viewport starts unmoved, so patch coordinates and canvas
+    // coordinates agree and both modules are inside it.
+    await mouse("mousePressed", box.x + 20, box.y + 20);
+    await sleep(80);
+    for (let i = 1; i <= 6; i++) {
+      await mouse(
+        "mouseMoved",
+        box.x + 20 + ((box.w - 40) * i) / 6,
+        box.y + 20 + ((box.h - 40) * i) / 6,
+      );
+      await sleep(40);
+    }
+    await mouse("mouseReleased", box.x + box.w - 20, box.y + box.h - 20);
+    await sleep(300);
+    // The grid must actually hold focus, or a binding scoped to it can never match.
+    check(
+      "9. clicking the grid gives it focus",
+      (await evaluate(
+        `return document.activeElement?.closest("[data-kb-scope]")?.dataset.kbScope ?? "(none)";`,
+      )) === "grid",
+    );
+
+    await evaluate(`press("Delete");`);
+    await sleep(300);
+    check(
+      "9. deleting marks the project unsaved",
+      (await text()).includes("•"),
+    );
+
+    await evaluate(`press("s", { metaKey: true });`);
+    await sleep(700);
+    const afterDelete = JSON.parse(
+      readFileSync(join(ws, "projects", "wiring", "project.json"), "utf8"),
+    );
+    check(
+      "9. the modules are gone",
+      afterDelete.patch.modules.length === 0,
+      JSON.stringify(afterDelete.patch.modules),
+    );
+    check(
+      "9. and so is the cable between them",
+      afterDelete.patch.edges.length === 0,
+      JSON.stringify(afterDelete.patch.edges),
+    );
+
+    await evaluate(`press("z", { metaKey: true });`);
+    await sleep(400);
+    await evaluate(`press("s", { metaKey: true });`);
+    await sleep(700);
+    const afterUndo = JSON.parse(
+      readFileSync(join(ws, "projects", "wiring", "project.json"), "utf8"),
+    );
+    check(
+      "9. undo brings the modules back",
+      afterUndo.patch.modules
+        .map((m) => m.id)
+        .sort()
+        .join(",") === "osc,out",
+      JSON.stringify(afterUndo.patch.modules.map((m) => m.id)),
+    );
+    check(
+      "9. undo brings the cable back too",
+      afterUndo.patch.edges.length === 1,
+      JSON.stringify(afterUndo.patch.edges),
     );
   });
 } catch (error) {

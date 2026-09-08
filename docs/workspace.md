@@ -106,6 +106,17 @@ name, writes it into the workspace, and the tab stops being an example.
 Deleting a project from the Projects panel removes its folder. A tab open on it stays open, as a project
 that has never been saved — deleting the file is not a reason to throw away what is on screen.
 
+## Editing
+
+Select modules on the grid — click one, shift-click to add, or drag a marquee across the canvas — and
+press Delete or Backspace to remove them. The cables attached to them go with them, as one undo entry:
+removing a module already takes its edges in `applyOps`, in `invert`, and in the engine's own
+`GraphModel::removeNode`, so nothing describes that twice.
+
+Deleting does nothing in an example, whose wiring is fixed. Saving an example under a name makes it a
+project of your own, and it unlocks in the same moment — the canvas is asked each gesture rather than
+told once when it was built.
+
 ## Boundaries
 
 The renderer never touches the filesystem. It picks a workspace through a dialog the main process owns

@@ -42,8 +42,12 @@ export interface GridOptions {
    * What an example project uses. Knob drags are deliberately still allowed, because changing values is
    * the entire point of a demonstration; what is withheld is only the wiring, which is what makes the
    * example an example rather than a document someone starts working in.
+   *
+   * A value or a function of one. It became a function when saving an example turned it into a project
+   * of the user's own without the canvas being rebuilt: read once, the wiring would have stayed locked
+   * in a document that was no longer an example.
    */
-  parametersOnly?: boolean;
+  parametersOnly?: boolean | (() => boolean);
 }
 
 export interface GridCallbacks {
@@ -108,6 +112,12 @@ export class GridInteraction {
     private readonly callbacks: GridCallbacks = {},
     private readonly options: GridOptions = {},
   ) {}
+
+  /** Asked at every gesture rather than remembered, so a document that stops being an example unlocks. */
+  private get parametersOnly(): boolean {
+    const value = this.options.parametersOnly;
+    return typeof value === "function" ? value() : value === true;
+  }
 
   attach(): () => void {
     const down = (event: PointerEvent) => this.onDown(event);
@@ -185,7 +195,7 @@ export class GridInteraction {
 
     // A socket before anything else: they sit on the borders, where a module's own hit box and the
     // gap beside it meet, and grabbing one has to work from either side of that line.
-    if (this.options.parametersOnly !== true) {
+    if (!this.parametersOnly) {
       const socket = this.renderer.portAt(point);
       if (socket !== null) {
         this.state = this.pickUpCable(socket.module, socket.port, point);
@@ -217,7 +227,7 @@ export class GridInteraction {
       this.select(event.shiftKey ? [...this.selection, hit.id] : [hit.id]);
       // Selecting still works, because selecting is how the inspector knows what to show. Only the
       // dragging is withheld.
-      if (this.options.parametersOnly === true) return;
+      if (this.parametersOnly) return;
       this.dragOrigins.clear();
       for (const id of this.selection) {
         const node = this.renderer.allNodes().get(id);
@@ -231,7 +241,7 @@ export class GridInteraction {
       return;
     }
 
-    if (this.options.parametersOnly === true) {
+    if (this.parametersOnly) {
       if (!event.shiftKey) this.select([]);
       return;
     }

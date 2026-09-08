@@ -10,6 +10,7 @@ import { Application } from "pixi.js";
 // This module swaps in an interpreted path. Without it the application never initialises and the only
 // symptom is a canvas that never appears.
 import "pixi.js/unsafe-eval";
+import { useSelectionStore } from "@renderer/selection/selection-store";
 import { useEffect, useRef } from "react";
 import { GridInteraction } from "./GridInteraction";
 import { GridRenderer } from "./GridRenderer";
@@ -110,6 +111,9 @@ export const GridView = () => {
         view,
         created.canvas,
         {
+          // The selection is made here and acted on elsewhere: a keybinding cannot ask a Pixi class
+          // what is selected, and neither can a command.
+          onSelectionChanged: (ids) => useSelectionStore.getState().set(ids),
           onNodesMoved: (moves) => {
             usePatchStore.getState().apply(
               moves.map(
@@ -195,10 +199,11 @@ export const GridView = () => {
             );
           },
         },
-        // An example demonstrates a module: its wiring is fixed and its knobs are live. Read once,
-        // when the canvas is built, because a project's kind never changes while it is open.
+        // An example demonstrates a module: its wiring is fixed and its knobs are live. Asked each
+        // time rather than read once, because saving an example makes it a project of the user's own
+        // and the canvas is not rebuilt for that — the tab is the same tab.
         {
-          parametersOnly:
+          parametersOnly: () =>
             useProjectStore.getState().active()?.kind === "example",
         },
       );
@@ -209,11 +214,25 @@ export const GridView = () => {
 
     return () => {
       cancelled = true;
+      // The canvas is rebuilt per project, so a selection outliving it would be a set of ids belonging
+      // to a patch nobody is looking at — and Delete would act on them.
+      useSelectionStore.getState().clear();
       for (const off of stop) off();
       renderer?.destroy();
       app?.destroy(true, { children: true });
     };
   }, []);
 
-  return <div ref={host} className={styles.host} data-kb-scope="grid" />;
+  // Focusable, and focused when it is clicked, so that `data-kb-scope="grid"` resolves to anything.
+  // The scope is read from the focused element's nearest declaring ancestor, and a canvas cannot hold
+  // focus, so before this a binding scoped to the grid could never match.
+  return (
+    <div
+      ref={host}
+      className={styles.host}
+      data-kb-scope="grid"
+      tabIndex={-1}
+      onPointerDown={() => host.current?.focus()}
+    />
+  );
 };
