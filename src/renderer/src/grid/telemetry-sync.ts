@@ -100,6 +100,9 @@ export function startTelemetrySync(
     if (!force && request === lastRequest) return;
     lastRequest = request;
     live = wanted;
+    // The old slot map is wrong from here: the engine numbers slots by the new list's order, so a
+    // module that kept its subscription may move. One empty frame beats a knob reading another's.
+    slots = new Map();
     afterSync(async () => {
       if (stopped) return;
       try {

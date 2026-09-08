@@ -4,6 +4,9 @@
 
 namespace pg {
 
+static_assert(kMaxParamsPerModule <= kTelemetryMaxParams,
+              "a params slot must hold every parameter a module can have");
+
 void Scheduler::run(Program& p, uint32_t numFrames, const TransportSnapshot& t, AudioBus* bus,
                     TelemetryWriter* telemetry) noexcept {
   p.buffers[kSilentBuffer].clear();

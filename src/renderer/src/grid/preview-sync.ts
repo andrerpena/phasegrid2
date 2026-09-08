@@ -63,6 +63,9 @@ export function startPreviewSync(target: PreviewTarget): PreviewSync {
 
   const refresh = (moduleId: string): void => {
     if (stopped) return;
+    // Only a module with a panel is asked. Asking any other gets a refusal, and a refused call is
+    // shown in the status bar as an engine error, which it is not.
+    if (!target.previewing().includes(moduleId)) return;
     if (inFlight.has(moduleId)) wanted.add(moduleId);
     else fetch(moduleId);
   };

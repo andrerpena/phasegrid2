@@ -1,6 +1,5 @@
 import { Container } from "pixi.js";
-import type { ControlLayout } from "../layout";
-import { KNOB_CELL_WIDTH } from "../layout";
+import { type ControlLayout, KNOB_CELL_WIDTH } from "../layout";
 import { Knob, type KnobStyle } from "./Knob";
 
 /**

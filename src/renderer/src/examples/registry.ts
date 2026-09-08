@@ -467,7 +467,7 @@ for (const [moduleId, name, description, params] of EFFECTS) {
  * Its output goes into the socket under the sine's Fold, so the knob turns on its own: the pointer
  * follows the engine's effective value while the notch stays where the knob is set. Fold sits at
  * twelve semitones and the LFO swings it half its range either side, so the sound sweeps from a
- * plain sine into folded lobes and back twice a second... slowly enough to watch.
+ * plain sine into folded lobes and back once every two seconds: slowly enough to watch.
  */
 register({
   moduleId: "mod.lfo",
