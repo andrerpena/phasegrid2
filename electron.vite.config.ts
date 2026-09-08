@@ -26,9 +26,10 @@ export default defineConfig({
       outDir: "out/renderer",
       rollupOptions: {
         output: {
-          // Naming a package here also pulls it into the graph, so a chunk is only declared
-          // once something actually imports it -- Monaco's entry arrives with the settings
-          // widget in the phase that needs it.
+          // Deliberately no entry for Monaco. Naming a package here force-includes it, and the
+          // name that would go here is the `monaco-editor` barrel -- the very thing the narrow
+          // imports in `components/monaco-editor.ts` exist to avoid. It gets its own chunk by being
+          // reached only through the settings widget's dynamic import.
           manualChunks: {
             pixi: ["pixi.js"],
             "react-vendor": ["react", "react-dom"],

@@ -28,7 +28,7 @@ export const VerticalResizeHandle: React.FC<VerticalResizeHandleProps> = ({
         "cursor-row-resize",
         align === "top" ? "top-0" : "bottom-0",
         "transition-all duration-200",
-        isDragging ? "bg-blue-500/50" : "bg-transparent",
+        isDragging ? "bg-ring/50" : "bg-transparent",
       )}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}

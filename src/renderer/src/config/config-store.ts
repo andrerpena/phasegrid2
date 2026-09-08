@@ -1,5 +1,9 @@
 import type { ConfigRecord, ConfigValue } from "@shared/protocol/storage";
 import { create } from "zustand";
+import { ConfigOverridesSchema } from "./config-schema";
+import { DEFAULT_CONFIG } from "./defaults";
+
+export { DEFAULT_CONFIG };
 
 /**
  * Configuration: built-in defaults, the user's overrides on top, and the merged result everything reads.
@@ -38,50 +42,6 @@ export interface ConfigActions {
   load(): Promise<void>;
   save(): Promise<void>;
 }
-
-export const DEFAULT_CONFIG: ConfigRecord = {
-  "ui.theme": "dark",
-  /**
-   * Which panel is in which slot.
-   *
-   * In the settings rather than beside the window geometry, because it is a statement about how you
-   * work rather than about the size of your monitor -- and because it means rearranging the window
-   * and editing this file are the same operation reached two ways. The geometry itself (column
-   * widths, split ratios) stays under `userData`, so a workspace copied to another machine arrives
-   * with your panels and that machine's proportions.
-   */
-  "layout.widgets": {
-    "left-top": ["catalog"],
-    "left-bottom": ["projects", "history"],
-    center: ["grid", "settings"],
-    "center-bottom": ["log"],
-    "right-top": ["inspector"],
-    "right-bottom": ["scope", "performance"],
-  },
-  "layout.statusBars": {
-    left: ["workspace", "engine", "run-command"],
-    right: ["theme", "version"],
-  },
-  /**
-   * Colour overrides, as flat dot-paths: `grid.gridLine`, `signal.audio`, `ui.background`.
-   *
-   * Empty by default -- what ships is the active theme, and this says what you changed about it.
-   */
-  theme: {},
-  "grid.snap": 8,
-  "grid.showParamPorts": "hover",
-  "engine.blockSize": 64,
-  "engine.voiceCount": 4,
-  "telemetry.fps": 30,
-  /**
-   * Keybindings are a setting like any other, so they are one key here rather than a file of their own.
-   *
-   * Empty by default: what ships is `DEFAULT_KEYBINDINGS`, and what is written here is added after it,
-   * so a user's file says what they changed rather than restating everything they did not. The key is
-   * listed all the same, so the settings editor shows it exists.
-   */
-  keybindings: [],
-};
 
 function merge(defaults: ConfigRecord, overrides: ConfigRecord): ConfigRecord {
   return { ...defaults, ...overrides };
@@ -146,7 +106,25 @@ export const useConfigStore = create<ConfigState & ConfigActions>(
       } catch (error) {
         parseError = (error as Error).message;
       }
-      // On a parse failure the text and the error change and nothing else does: the application keeps
+
+      // Valid JSON is not yet valid settings. The schema is what catches a misspelled key or a slot
+      // name from a build with one more panel in it -- both of which parse perfectly and mean
+      // nothing. Reported the same way a syntax error is: the text stays, the application does not
+      // move.
+      if (parsed !== null) {
+        const checked = ConfigOverridesSchema.safeParse(parsed);
+        if (!checked.success) {
+          parseError = checked.error.issues
+            .map((issue) => {
+              const at = issue.path.join(".");
+              return at === "" ? issue.message : `${at}: ${issue.message}`;
+            })
+            .join("; ");
+          parsed = null;
+        }
+      }
+
+      // On a failure the text and the error change and nothing else does: the application keeps
       // running on the last configuration that made sense, which is what lets someone edit freely.
       if (parsed === null) {
         set({ overridesText: text, parseError });

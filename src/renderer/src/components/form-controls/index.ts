@@ -1,3 +1,5 @@
+export type { FormControlProps } from "./FormControl";
+export { FormControl } from "./FormControl";
 export type { LabelProps } from "./Label";
 export { Label } from "./Label";
 export type { TextInputProps } from "./TextInput";

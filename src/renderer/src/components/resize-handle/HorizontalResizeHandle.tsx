@@ -28,7 +28,7 @@ export const HorizontalResizeHandle: React.FC<HorizontalResizeHandleProps> = ({
         "cursor-col-resize",
         align === "left" ? "left-0" : "right-0",
         "transition-all duration-200",
-        isDragging ? "bg-blue-500/50" : "bg-transparent",
+        isDragging ? "bg-ring/50" : "bg-transparent",
       )}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}

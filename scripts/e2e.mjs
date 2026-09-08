@@ -170,10 +170,74 @@ async function launch(run) {
       return file;
     };
 
+    /**
+     * A modifier chord, formed well enough for an editor's own keymap to recognise it.
+     *
+     * Two things do not work here and both were tried. Chromium's named editing commands
+     * (`commands: ["selectAll"]`) act on a textarea or a contenteditable, and the settings editor
+     * uses the EditContext API instead, so they are silently ignored. A bare
+     * `windowsVirtualKeyCode` with a modifier bitmask is not enough either: the editor reads `key`
+     * and `code` off the event, and without them the chord arrives as an unrecognised keypress --
+     * which looks exactly like select-all working and then the typing replacing nothing.
+     */
+    const chord = async (keyName, code, virtualKeyCode, modifiers) => {
+      for (const type of ["rawKeyDown", "keyUp"]) {
+        await send("Input.dispatchKeyEvent", {
+          type,
+          modifiers,
+          key: keyName,
+          code,
+          windowsVirtualKeyCode: virtualKeyCode,
+          nativeVirtualKeyCode: virtualKeyCode,
+        });
+      }
+    };
+
+    const META = process.platform === "darwin" ? 4 : 2;
+    const SHIFT = 8;
+
+    /** Select everything, whichever platform's modifier that is. */
+    const selectAll = () => chord("a", "KeyA", 65, META);
+
+    /**
+     * Replaces a code editor's whole document with `value`.
+     *
+     * The delete at the end is not ceremony. The editor closes brackets and quotes as you type, so
+     * inserting `{"a": 1}` leaves the auto-inserted `"}` sitting past the cursor and the document
+     * is not valid JSON. A person typing would see that and remove it; this does the same, by
+     * selecting from the cursor to the end and deleting.
+     */
+    const replaceDocument = async (value) => {
+      await selectAll();
+      await sleep(80);
+      await insertText(value);
+      await sleep(200);
+      await chord("ArrowDown", "ArrowDown", 40, META | SHIFT);
+      await sleep(80);
+      await chord("Delete", "Delete", 46, 0);
+      await sleep(400);
+    };
+
+    /**
+     * Types text into whatever has focus.
+     *
+     * The settings editor owns its own DOM and its own model, so there is no textarea to set a value
+     * on: the only honest way to change it is to type, which is also the path a person takes.
+     */
+    const insertText = (value) => send("Input.insertText", { text: value });
+
     await send("Runtime.enable");
     await send("Page.enable");
     await sleep(1800);
-    await run({ evaluate, text, mouse, sleep, screenshot });
+    await run({
+      evaluate,
+      text,
+      mouse,
+      replaceDocument,
+      insertText,
+      sleep,
+      screenshot,
+    });
   } finally {
     try {
       socket?.close();
@@ -223,268 +287,295 @@ try {
   });
 
   // ── Second launch: the pointer is remembered, so the shell opens ──────────
-  await launch(async ({ evaluate, text, screenshot }) => {
-    const shell = await text();
-    const isShell = await evaluate(
-      `return document.querySelector('[data-kb-scope="catalog"]') !== null;`,
-    );
-    check(
-      "3. relaunching reopens the workspace",
-      isShell === true,
-      shell.slice(0, 150),
-    );
-    check("3. the status bar names it", shell.includes(ws.split("/").at(-1)));
-    check(
-      "3. the Projects panel says it is empty",
-      shell.includes("Nothing saved here yet"),
-      shell.slice(0, 150),
-    );
-
-    await evaluate(`click("button", "+");`);
-    await sleep(400);
-    await evaluate(
-      `setValue(document.querySelector('input[aria-label="Tempo"]'), "137");`,
-    );
-    await sleep(300);
-    check("4. the tab shows a dot once edited", (await text()).includes("•"));
-    check(
-      "4. the button offers Save As, having nowhere to save yet",
-      (await text()).includes("Save As…"),
-    );
-
-    await evaluate(`click("button", "Save As…");`);
-    await sleep(400);
-    await evaluate(
-      `setValue(document.querySelector("dialog input"), "My Track");`,
-    );
-    await sleep(250);
-    const hint = await evaluate(
-      "return document.querySelector('dialog')?.innerText ?? '';",
-    );
-    check(
-      "4. the dialog shows the folder it will make",
-      hint.includes("projects/my-track/"),
-      hint,
-    );
-    await evaluate(
-      `[...document.querySelectorAll("dialog button")].find((b) => b.textContent.trim() === "Save").click();`,
-    );
-    await sleep(700);
-
-    const file = join(ws, "projects", "my-track", "project.json");
-    check("4. the project is on disk", existsSync(file));
-    if (existsSync(file)) {
-      const doc = JSON.parse(readFileSync(file, "utf8"));
-      check(
-        "4. it saved the tempo that was typed",
-        doc.tempo === 137,
-        String(doc.tempo),
+  await launch(
+    async ({ evaluate, text, screenshot, replaceDocument, mouse }) => {
+      const shell = await text();
+      const isShell = await evaluate(
+        `return document.querySelector('[data-kb-scope="catalog"]') !== null;`,
       );
       check(
-        "4. it saved under the name given",
-        doc.name === "My Track",
-        doc.name,
+        "3. relaunching reopens the workspace",
+        isShell === true,
+        shell.slice(0, 150),
       );
-      check("4. it does not record its own path", doc.slug === undefined);
-    }
-    const after = await text();
-    check("4. the dot cleared", !after.includes("•"));
-    check("4. the Projects panel lists it", after.includes("My Track"));
-
-    const session = JSON.parse(
-      readFileSync(join(ws, ".phasegrid", "session.json"), "utf8"),
-    );
-    check(
-      "5. the session records the open tab",
-      session.open.includes("my-track") && session.active === "my-track",
-      JSON.stringify(session),
-    );
-
-    // Settings, and a keybinding taking effect without a relaunch.
-    // A widget's tab, not a button: the dock renders each slot as a tab strip now.
-    await evaluate(`click('[role="tab"]', "Settings");`);
-    await sleep(300);
-    // The catalogue's own search field: present exactly when the left column is. Matching on the panel
-    // title does not work, because the title is uppercased by the stylesheet and `innerText` says so.
-    const leftShown = `document.querySelector('[data-kb-scope="catalog"]') !== null`;
-    const toggled = await evaluate(
-      `press("b", { metaKey: true }); await new Promise(r => setTimeout(r, 250)); return ${leftShown};`,
-    );
-    check(
-      "6. mod+b toggles the left panel by default",
-      toggled === false,
-      String(toggled),
-    );
-    await evaluate(`press("b", { metaKey: true });`);
-    await sleep(300);
-    check("6. and toggles it back", await evaluate(`return ${leftShown};`));
-
-    // ── The dock: a panel can be closed, and put back from the slot it left ──
-    await screenshot("shell");
-    const tabNames = () =>
-      evaluate(
-        `return [...document.querySelectorAll('[role="tab"]')].map((t) => t.textContent.trim());`,
+      check("3. the status bar names it", shell.includes(ws.split("/").at(-1)));
+      check(
+        "3. the Projects panel says it is empty",
+        shell.includes("Nothing saved here yet"),
+        shell.slice(0, 150),
       );
-    const tabs = await tabNames();
-    check(
-      "6. every slot renders its panels as tabs",
-      [
-        "Catalog",
-        "Projects",
-        "History",
-        "Grid",
-        "Settings",
-        "Log",
-        "Inspector",
-        "Scope",
-        "Performance",
-      ].every((name) => tabs.includes(name)),
-      JSON.stringify(tabs),
-    );
 
-    // Closing writes the layout to the workspace, which is the point of it living in the settings.
-    await evaluate(
-      `[...document.querySelectorAll('[aria-label="Close Performance"]')][0].click();`,
-    );
-    await sleep(400);
-    check(
-      "6. closing a panel removes its tab",
-      !(await tabNames()).includes("Performance"),
-    );
-    const savedLayout = JSON.parse(
-      readFileSync(join(ws, "workspace.json"), "utf8"),
-    ).settings["layout.widgets"];
-    check(
-      "6. and the workspace remembers the layout",
-      Array.isArray(savedLayout?.["right-bottom"]) &&
-        !savedLayout["right-bottom"].includes("performance"),
-      JSON.stringify(savedLayout),
-    );
+      await evaluate(`click("button", "+");`);
+      await sleep(400);
+      await evaluate(
+        `setValue(document.querySelector('input[aria-label="Tempo"]'), "137");`,
+      );
+      await sleep(300);
+      check("4. the tab shows a dot once edited", (await text()).includes("•"));
+      check(
+        "4. the button offers Save As, having nowhere to save yet",
+        (await text()).includes("Save As…"),
+      );
 
-    // The `+` on a slot's strip offers exactly what is missing. Opened with a pointerdown rather
-    // than a click: that is the event the menu listens for.
-    await evaluate(
-      `const add = document.querySelector('[aria-label="Add a panel to right-bottom"]');
+      await evaluate(`click("button", "Save As…");`);
+      await sleep(400);
+      await evaluate(
+        `setValue(document.querySelector("dialog input"), "My Track");`,
+      );
+      await sleep(250);
+      const hint = await evaluate(
+        "return document.querySelector('dialog')?.innerText ?? '';",
+      );
+      check(
+        "4. the dialog shows the folder it will make",
+        hint.includes("projects/my-track/"),
+        hint,
+      );
+      await evaluate(
+        `[...document.querySelectorAll("dialog button")].find((b) => b.textContent.trim() === "Save").click();`,
+      );
+      await sleep(700);
+
+      const file = join(ws, "projects", "my-track", "project.json");
+      check("4. the project is on disk", existsSync(file));
+      if (existsSync(file)) {
+        const doc = JSON.parse(readFileSync(file, "utf8"));
+        check(
+          "4. it saved the tempo that was typed",
+          doc.tempo === 137,
+          String(doc.tempo),
+        );
+        check(
+          "4. it saved under the name given",
+          doc.name === "My Track",
+          doc.name,
+        );
+        check("4. it does not record its own path", doc.slug === undefined);
+      }
+      const after = await text();
+      check("4. the dot cleared", !after.includes("•"));
+      check("4. the Projects panel lists it", after.includes("My Track"));
+
+      const session = JSON.parse(
+        readFileSync(join(ws, ".phasegrid", "session.json"), "utf8"),
+      );
+      check(
+        "5. the session records the open tab",
+        session.open.includes("my-track") && session.active === "my-track",
+        JSON.stringify(session),
+      );
+
+      // Settings, and a keybinding taking effect without a relaunch.
+      // A widget's tab, not a button: the dock renders each slot as a tab strip now.
+      await evaluate(`click('[role="tab"]', "Settings");`);
+      await sleep(300);
+      // The catalogue's own search field: present exactly when the left column is. Matching on the panel
+      // title does not work, because the title is uppercased by the stylesheet and `innerText` says so.
+      const leftShown = `document.querySelector('[data-kb-scope="catalog"]') !== null`;
+      const toggled = await evaluate(
+        `press("b", { metaKey: true }); await new Promise(r => setTimeout(r, 250)); return ${leftShown};`,
+      );
+      check(
+        "6. mod+b toggles the left panel by default",
+        toggled === false,
+        String(toggled),
+      );
+      await evaluate(`press("b", { metaKey: true });`);
+      await sleep(300);
+      check("6. and toggles it back", await evaluate(`return ${leftShown};`));
+
+      // ── The dock: a panel can be closed, and put back from the slot it left ──
+      await screenshot("shell");
+      const tabNames = () =>
+        evaluate(
+          `return [...document.querySelectorAll('[role="tab"]')].map((t) => t.textContent.trim());`,
+        );
+      const tabs = await tabNames();
+      check(
+        "6. every slot renders its panels as tabs",
+        [
+          "Catalog",
+          "Projects",
+          "History",
+          "Grid",
+          "Settings",
+          "Log",
+          "Inspector",
+          "Scope",
+          "Performance",
+        ].every((name) => tabs.includes(name)),
+        JSON.stringify(tabs),
+      );
+
+      // Closing writes the layout to the workspace, which is the point of it living in the settings.
+      await evaluate(
+        `[...document.querySelectorAll('[aria-label="Close Performance"]')][0].click();`,
+      );
+      await sleep(400);
+      check(
+        "6. closing a panel removes its tab",
+        !(await tabNames()).includes("Performance"),
+      );
+      const savedLayout = JSON.parse(
+        readFileSync(join(ws, "workspace.json"), "utf8"),
+      ).settings["layout.widgets"];
+      check(
+        "6. and the workspace remembers the layout",
+        Array.isArray(savedLayout?.["right-bottom"]) &&
+          !savedLayout["right-bottom"].includes("performance"),
+        JSON.stringify(savedLayout),
+      );
+
+      // The `+` on a slot's strip offers exactly what is missing. Opened with a pointerdown rather
+      // than a click: that is the event the menu listens for.
+      await evaluate(
+        `const add = document.querySelector('[aria-label="Add a panel to right-bottom"]');
        add.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, button: 0, isPrimary: true, pointerType: "mouse" }));
        add.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, cancelable: true, button: 0, isPrimary: true, pointerType: "mouse" }));`,
-    );
-    await sleep(400);
-    const offered = await evaluate(
-      `return [...document.querySelectorAll('[role="menuitem"]')].map((i) => i.textContent.trim());`,
-    );
-    check(
-      "6. the add-panel menu offers the one that was closed",
-      offered.includes("Performance"),
-      JSON.stringify(offered),
-    );
-    await evaluate(
-      `[...document.querySelectorAll('[role="menuitem"]')].find((i) => i.textContent.trim() === "Performance").click();`,
-    );
-    await sleep(400);
-    check(
-      "6. and adding it back restores the tab",
-      (await tabNames()).includes("Performance"),
-    );
+      );
+      await sleep(400);
+      const offered = await evaluate(
+        `return [...document.querySelectorAll('[role="menuitem"]')].map((i) => i.textContent.trim());`,
+      );
+      check(
+        "6. the add-panel menu offers the one that was closed",
+        offered.includes("Performance"),
+        JSON.stringify(offered),
+      );
+      await evaluate(
+        `[...document.querySelectorAll('[role="menuitem"]')].find((i) => i.textContent.trim() === "Performance").click();`,
+      );
+      await sleep(400);
+      check(
+        "6. and adding it back restores the tab",
+        (await tabNames()).includes("Performance"),
+      );
 
-    // A pinned panel has no close button at all: nothing in the interface could put the grid back.
-    check(
-      "6. the grid cannot be closed",
-      (await evaluate(
-        `return document.querySelector('[aria-label="Close Grid"]') === null;`,
-      )) === true,
-    );
+      // A pinned panel has no close button at all: nothing in the interface could put the grid back.
+      check(
+        "6. the grid cannot be closed",
+        (await evaluate(
+          `return document.querySelector('[aria-label="Close Grid"]') === null;`,
+        )) === true,
+      );
 
-    await evaluate(
-      `setValue(document.querySelector('textarea[aria-label="Workspace settings"]'), ${JSON.stringify('{"grid.snap": 16, "keybindings": [{"key": "mod+b", "remove": true}]}')});`,
-    );
-    await sleep(600);
-    const written = JSON.parse(
-      readFileSync(join(ws, "workspace.json"), "utf8"),
-    );
-    check(
-      "6. the settings reached workspace.json",
-      written.settings["grid.snap"] === 16,
-      JSON.stringify(written.settings),
-    );
-    check("6. the file kept its name field", typeof written.name === "string");
-    const stillThere = await evaluate(
-      `press("b", { metaKey: true }); await new Promise(r => setTimeout(r, 250)); return ${leftShown};`,
-    );
-    check(
-      "6. removing a binding takes effect without a relaunch",
-      stillThere === true,
-      String(stillThere),
-    );
+      // The settings editor owns its own DOM and model, so there is no value to set: the only honest
+      // way in is to click into it, select everything and type -- which is the path a person takes.
+      const mounted = await evaluate(
+        `return document.querySelector(".monaco-editor") !== null;`,
+      );
+      check(
+        "6. the settings editor mounts under the content policy",
+        mounted === true,
+      );
+      await screenshot("settings");
 
-    // And adding one does too, on the same read of the file.
-    await evaluate(
-      `setValue(document.querySelector('textarea[aria-label="Workspace settings"]'), ${JSON.stringify('{"grid.snap": 16, "keybindings": [{"key": "mod+b", "remove": true}, {"key": "mod+alt+j", "command": "workbench.setTheme"}]}')});`,
-    );
-    await sleep(500);
-    // The document says which theme is on -- the stylesheet keys off it -- so that is what to read.
-    const activeTheme = `document.documentElement.dataset.theme`;
-    const themeBefore = await evaluate(`return ${activeTheme};`);
-    await evaluate(`press("j", { metaKey: true, altKey: true });`);
-    await sleep(400);
-    check(
-      "6. adding a binding takes effect without a relaunch",
-      (await evaluate(
-        `return document.querySelector('[data-testid="theme-picker"]') !== null;`,
-      )) === true,
-      "the theme picker did not open",
-    );
-    // Arrowing through the picker previews each theme, and escape puts back the one you had.
-    // Twice: the list opens with the active theme first, so one press lands back on where you are.
-    await evaluate(
-      `const input = document.querySelector('[data-testid="theme-picker-navigator-search"]');
+      const typeSettings = async (json) => {
+        const box = await evaluate(`
+        const el = document.querySelector('[data-widget="settings"] .monaco-editor .view-lines');
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return { x: Math.round(r.x + 40), y: Math.round(r.y + 8) };`);
+        if (box === null) throw new Error("no settings editor to type into");
+        await mouse("mousePressed", box.x, box.y);
+        await mouse("mouseReleased", box.x, box.y);
+        await sleep(150);
+        await replaceDocument(json);
+      };
+
+      await typeSettings(
+        '{"grid.snap": 16, "keybindings": [{"key": "mod+b", "remove": true}]}',
+      );
+      await sleep(600);
+      const written = JSON.parse(
+        readFileSync(join(ws, "workspace.json"), "utf8"),
+      );
+      check(
+        "6. the settings reached workspace.json",
+        written.settings["grid.snap"] === 16,
+        JSON.stringify(written.settings),
+      );
+      check(
+        "6. the file kept its name field",
+        typeof written.name === "string",
+      );
+      const stillThere = await evaluate(
+        `press("b", { metaKey: true }); await new Promise(r => setTimeout(r, 250)); return ${leftShown};`,
+      );
+      check(
+        "6. removing a binding takes effect without a relaunch",
+        stillThere === true,
+        String(stillThere),
+      );
+
+      // And adding one does too, on the same read of the file.
+      await typeSettings(
+        '{"grid.snap": 16, "keybindings": [{"key": "mod+b", "remove": true}, {"key": "mod+alt+j", "command": "workbench.setTheme"}]}',
+      );
+      await sleep(500);
+      // The document says which theme is on -- the stylesheet keys off it -- so that is what to read.
+      const activeTheme = `document.documentElement.dataset.theme`;
+      const themeBefore = await evaluate(`return ${activeTheme};`);
+      await evaluate(`press("j", { metaKey: true, altKey: true });`);
+      await sleep(400);
+      check(
+        "6. adding a binding takes effect without a relaunch",
+        (await evaluate(
+          `return document.querySelector('[data-testid="theme-picker"]') !== null;`,
+        )) === true,
+        "the theme picker did not open",
+      );
+      // Arrowing through the picker previews each theme, and escape puts back the one you had.
+      // Twice: the list opens with the active theme first, so one press lands back on where you are.
+      await evaluate(
+        `const input = document.querySelector('[data-testid="theme-picker-navigator-search"]');
        input.focus();
        for (let i = 0; i < 2; i++) input.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));`,
-    );
-    await sleep(250);
-    const themePreviewed = await evaluate(`return ${activeTheme};`);
-    check(
-      "6. arrowing through the theme picker previews",
-      themePreviewed !== themeBefore,
-      `${themeBefore} -> ${themePreviewed}`,
-    );
-    await evaluate(
-      `document.querySelector("dialog").dispatchEvent(new Event("cancel", { cancelable: true }));`,
-    );
-    await sleep(250);
-    check(
-      "6. and escaping puts the old one back",
-      (await evaluate(`return ${activeTheme};`)) === themeBefore,
-    );
+      );
+      await sleep(250);
+      const themePreviewed = await evaluate(`return ${activeTheme};`);
+      check(
+        "6. arrowing through the theme picker previews",
+        themePreviewed !== themeBefore,
+        `${themeBefore} -> ${themePreviewed}`,
+      );
+      await evaluate(
+        `document.querySelector("dialog").dispatchEvent(new Event("cancel", { cancelable: true }));`,
+      );
+      await sleep(250);
+      check(
+        "6. and escaping puts the old one back",
+        (await evaluate(`return ${activeTheme};`)) === themeBefore,
+      );
 
-    // Text that does not parse never reaches the file.
-    await evaluate(
-      `setValue(document.querySelector('textarea[aria-label="Workspace settings"]'), '{"grid.snap": ');`,
-    );
-    await sleep(500);
-    check(
-      "6. text that does not parse is not written",
-      JSON.parse(readFileSync(join(ws, "workspace.json"), "utf8")).settings[
-        "grid.snap"
-      ] === 16,
-    );
-    check(
-      "6. and the editor says why",
-      (await text()).toLowerCase().includes("json"),
-    );
+      // Text that does not parse never reaches the file.
+      await typeSettings('{"grid.snap": ');
+      await sleep(500);
+      check(
+        "6. text that does not parse is not written",
+        JSON.parse(readFileSync(join(ws, "workspace.json"), "utf8")).settings[
+          "grid.snap"
+        ] === 16,
+      );
+      check(
+        "6. and the editor says why",
+        (await text()).toLowerCase().includes("json"),
+      );
 
-    const escaped = await evaluate(
-      `return await window.workspace.writeProject("../escaped", "{}");`,
-    );
-    check(
-      "7. a slug that climbs out of the workspace is refused",
-      escaped?.ok === false,
-      JSON.stringify(escaped),
-    );
-    check(
-      "7. and nothing was written outside it",
-      !existsSync(join(ws, "..", "escaped")),
-    );
-  });
+      const escaped = await evaluate(
+        `return await window.workspace.writeProject("../escaped", "{}");`,
+      );
+      check(
+        "7. a slug that climbs out of the workspace is refused",
+        escaped?.ok === false,
+        JSON.stringify(escaped),
+      );
+      check(
+        "7. and nothing was written outside it",
+        !existsSync(join(ws, "..", "escaped")),
+      );
+    },
+  );
 
   // ── Third launch: the tab that was open comes back ────────────────────────
   await launch(async ({ evaluate, text }) => {
