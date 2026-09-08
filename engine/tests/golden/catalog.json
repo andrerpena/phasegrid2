@@ -1,5 +1,5 @@
 {
-  "catalogHash": "4e2b9ab52e321648",
+  "catalogHash": "f04032f71dcdeeea",
   "conventions": {
     "blockSize": 128,
     "gateThreshold": 0,
@@ -5092,7 +5092,7 @@
     },
     {
       "category": "osc",
-      "doc": "A sine with a wavefolder. At Fold 0 it is the one wave with no harmonics at all; turning Fold up drives it past full scale and reflects it back on itself, filling the spectrum with odd harmonics. Fold is in semitones, so every twelve doubles the drive. The face shows the resulting shape.",
+      "doc": "A sine with a wavefolder. Turning Fold up drives the wave through a sine curve, which folds it back on itself in round lobes and fills the spectrum with odd harmonics. Fold is in semitones, so every twelve doubles the drive: at twelve, two lobes meet at the centre. The face shows the resulting shape.",
       "flags": {
         "needsTransport": false,
         "previewsWave": true,
