@@ -13,8 +13,8 @@ import { TitleBlock } from "./blocks/TitleBlock";
 import { WaveBlock } from "./blocks/WaveBlock";
 
 /**
- * One module on the grid: a framed panel with a title row and, under it, the blocks its face is
- * made of.
+ * One module on the grid: a framed panel of the blocks its face is made of, the title block across
+ * the top and the rest under it.
  *
  * Everything about how it looks comes from the engine's descriptor and the theme. There is no table
  * here mapping module ids to appearances, and no branch on what kind of module this is: the face
@@ -33,8 +33,14 @@ export interface NodeStyle {
 }
 
 /** One block component per kind of block geometry. Adding a kind is a line here and a file beside it. */
-function buildBlock(geometry: BlockGeometry, style: BlockStyle): Block {
+function buildBlock(
+  geometry: BlockGeometry,
+  style: BlockStyle,
+  label: string,
+): Block {
   switch (geometry.kind) {
+    case "title":
+      return new TitleBlock(geometry, label, style);
     case "jack":
       return new JackBlock(geometry, style);
     case "knob":
@@ -49,7 +55,6 @@ export class NodeView {
   readonly face: Face;
 
   private readonly frame = new Graphics();
-  private readonly title: TitleBlock;
   private readonly blocks: Block[] = [];
   private readonly jacks = new Map<string, JackBlock>();
   private readonly knobs = new Map<string, KnobBlock>();
@@ -73,15 +78,10 @@ export class NodeView {
 
     this.view.addChild(this.frame);
     this.drawFrame();
-    this.title = new TitleBlock(
-      module.label ?? descriptor.name,
-      this.face.width,
-      colors,
-    );
-    this.view.addChild(this.title.view);
 
+    const label = module.label ?? descriptor.name;
     for (const geometry of this.face.blocks) {
-      const block = buildBlock(geometry, colors);
+      const block = buildBlock(geometry, colors, label);
       this.blocks.push(block);
       this.view.addChild(block.view);
       if (block instanceof JackBlock)
@@ -116,6 +116,14 @@ export class NodeView {
     this.knobs.get(paramId)?.setLive(fraction);
   }
 
+  /**
+   * Where modulation has a knob right now, 0..1, or null: for a script that wants to know whether
+   * a knob is turning. Null too for a parameter with no knob on the face.
+   */
+  liveOf(paramId: string): number | null {
+    return this.knobs.get(paramId)?.liveFraction ?? null;
+  }
+
   /** Every knob to the document's value for it. */
   private applyValues(module: PatchModule): void {
     for (const [paramId, knob] of this.knobs)
@@ -131,7 +139,7 @@ export class NodeView {
     const { width, height } = this.face;
     this.frame
       .clear()
-      .roundRect(0, 0, width, height, 6)
+      .rect(0, 0, width, height)
       .fill({ color: hexToNumber(this.style.colors.nodeFill) })
       // Always the node's own border. Selection is the ring the renderer draws outside the node, and
       // a node that also recoloured its border would wear the selection twice.
@@ -182,12 +190,10 @@ export class NodeView {
     this.style = style;
     this.drawFrame();
     const colors = blockStyle(style.colors, style.accent);
-    this.title.setStyle(colors);
     for (const block of this.blocks) block.setStyle(colors);
   }
 
   destroy(): void {
-    this.title.destroy();
     for (const block of this.blocks) block.destroy();
     this.view.destroy({ children: true });
   }

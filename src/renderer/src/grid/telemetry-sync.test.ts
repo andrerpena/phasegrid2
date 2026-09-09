@@ -278,4 +278,81 @@ describe("telemetry sync", () => {
     sync.stop();
     expect(subscriptions).toEqual([["osc"]]);
   });
+
+  /** A second LFO with the first one in its Shape socket: a watched module with room for more. */
+  const withSecondLfo = (): void => {
+    usePatchStore.setState({
+      doc: {
+        ...MODULATED,
+        modules: [...MODULATED.modules, moduleNode("lfo2", "mod.lfo")],
+        edges: [
+          ...MODULATED.edges,
+          {
+            id: "e3",
+            from: { module: "lfo", port: "out" },
+            to: { module: "lfo2", port: "param:shape" },
+          },
+        ],
+      },
+      version: 0,
+    });
+  };
+
+  it("drives a second knob on a module already watched, without asking the engine again", async () => {
+    withSecondLfo();
+    const sync = startTelemetrySync(target, schedule);
+    await flush();
+    expect(subscriptions).toEqual([["lfo2", "osc"]]);
+    usePatchStore.getState().apply([
+      {
+        op: "edgeAdd",
+        id: "e4",
+        from: { module: "lfo", port: "out" },
+        to: { module: "lfo2", port: "param:depth" },
+      },
+    ]);
+    await flush();
+    // The engine publishes every parameter of a watched module, so it has nothing new to hear.
+    expect(subscriptions).toHaveLength(1);
+    // Slot 0 is lfo2's knobs: rate, shape, depth in descriptor order.
+    readings.set(0, {
+      kind: TelemetryKind.Params,
+      blockIndex: 1n,
+      values: [2, 0.5, 0.25],
+    });
+    tick?.();
+    expect(live).toEqual([
+      ["lfo2", "shape", 0.5],
+      ["lfo2", "depth", 0.25],
+    ]);
+    sync.stop();
+  });
+
+  it("rests a knob whose cable was removed while its module stays watched", async () => {
+    withSecondLfo();
+    usePatchStore.getState().apply([
+      {
+        op: "edgeAdd",
+        id: "e4",
+        from: { module: "lfo", port: "out" },
+        to: { module: "lfo2", port: "param:depth" },
+      },
+    ]);
+    const sync = startTelemetrySync(target, schedule);
+    await flush();
+    usePatchStore.getState().apply([{ op: "edgeRemove", id: "e4" }]);
+    await flush();
+    // Told to rest at once, and not again: the engine still publishes a depth, and nothing
+    // feeds it, so a value read for it would be a knob turning on its own.
+    expect(live).toEqual([["lfo2", "depth", null]]);
+    expect(subscriptions).toHaveLength(1);
+    readings.set(0, {
+      kind: TelemetryKind.Params,
+      blockIndex: 1n,
+      values: [2, 0.5, 0.25],
+    });
+    tick?.();
+    expect(live.slice(1)).toEqual([["lfo2", "shape", 0.5]]);
+    sync.stop();
+  });
 });

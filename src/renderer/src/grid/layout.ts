@@ -18,15 +18,18 @@ import type { ModuleDescriptor, ParamDesc } from "@shared/protocol/catalog";
  */
 export const CELL = 24;
 
-/** The title bar: one cell. */
-export const HEADER_ROWS = 1;
-export const HEADER_HEIGHT = HEADER_ROWS * CELL;
+/** The title block: one row across the module's whole width, above the rows the face declares. */
+export const TITLE_ROWS = 1;
+export const TITLE_HEIGHT = TITLE_ROWS * CELL;
 
 /** A socket's ring. */
 export const PORT_RADIUS = 4;
 
-/** The gutter a tile leaves around itself in its cells, so two neighbours show a seam between them. */
-export const TILE_GUTTER = 1.5;
+/**
+ * The gutter a tile leaves around itself in its cells. Zero for now: an experiment in saving space,
+ * so a block fills its cells to the edge and neighbours meet at their hairlines.
+ */
+export const TILE_GUTTER = 0;
 /** How far from a socket a click still counts, in patch units at 100% zoom. */
 export const PORT_HIT_RADIUS = 9;
 

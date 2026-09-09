@@ -6,19 +6,9 @@ import {
   type BlockStyle,
   drawSocket,
   drawTile,
+  fitText,
   type SocketState,
 } from "./Block";
-
-/** Cuts a name down until it fits its tile, ending in an ellipsis so it reads as shortened rather than wrong. */
-function trimToWidth(text: string, width: number, probe: Text): string {
-  let candidate = text;
-  while (candidate.length > 1) {
-    candidate = candidate.slice(0, -1);
-    probe.text = `${candidate}…`;
-    if (probe.width <= width) return `${candidate}…`;
-  }
-  return candidate;
-}
 
 /**
  * A jack: one cell with the port's name at the top and a socket under it.
@@ -56,13 +46,7 @@ export class JackBlock implements Block {
     });
     // A cell is narrow and port names come from the descriptor; one that does not fit is trimmed
     // rather than spilling into the neighbouring tile.
-    const labelWidth = geometry.width - 2;
-    if (this.label.width > labelWidth)
-      this.label.text = trimToWidth(
-        geometry.socket.port.name,
-        labelWidth,
-        this.label,
-      );
+    fitText(this.label, geometry.width - 2);
     this.label.anchor.set(0.5, 1);
     this.label.position.set(geometry.width / 2, JACK_LABEL_Y);
     this.view.addChild(this.tile, this.label, this.ring);

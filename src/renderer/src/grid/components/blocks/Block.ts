@@ -1,7 +1,7 @@
 import { hexToNumber } from "@renderer/lib/color";
 import type { GridColors } from "@renderer/theming/theme";
 import type { SignalRole } from "@shared/protocol/catalog";
-import type { Container, Graphics } from "pixi.js";
+import type { Container, Graphics, Text } from "pixi.js";
 import type { BlockBase } from "../../face";
 import { TILE_GUTTER } from "../../layout";
 
@@ -88,11 +88,11 @@ export interface SocketState {
   hovered: boolean;
 }
 
-/** A tile's corner. */
-export const TILE_RADIUS = 4;
+/** A tile's corner. Square for now, with the gutter at zero: see `TILE_GUTTER`. */
+export const TILE_RADIUS = 0;
 
 /**
- * The tile: the filled, rounded key a block sits on, inset from its cells by the gutter.
+ * The tile: the filled key a block sits on, inset from its cells by the gutter.
  *
  * It is what turns a module from a frame with things floating in it into a panel of keys, the way a
  * hardware surface is: a step lighter than the node, with a hairline, and the node's own colour
@@ -114,6 +114,24 @@ export function drawTile(
     )
     .fill({ color: tile.fill })
     .stroke({ width: 1, color: tile.stroke });
+}
+
+/**
+ * Cuts a label down until it fits, ending in an ellipsis so it reads as shortened rather than wrong.
+ *
+ * Names come from the descriptor and the document, and a tile is as wide as the face made it; one
+ * that does not fit is trimmed rather than spilling into the neighbouring tile or off the module.
+ */
+export function fitText(label: Text, width: number): void {
+  const full = label.text;
+  if (label.width <= width) return;
+  let candidate = full;
+  while (candidate.length > 1) {
+    candidate = candidate.slice(0, -1);
+    label.text = `${candidate}…`;
+    if (label.width <= width) return;
+  }
+  label.text = candidate;
 }
 
 /**

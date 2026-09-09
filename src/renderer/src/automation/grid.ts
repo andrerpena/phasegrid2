@@ -57,13 +57,15 @@ function rectOf(
 /** One block of a face, as a script sees it: what it is, what it is for, and where. */
 export interface FaceBlock {
   kind: Block["kind"];
-  /** The face token: the port id, the param id, or `wave`. */
+  /** The face token: the port id, the param id, `wave`, or `title`. */
   name: string;
   rect: Rect;
-  /** A jack's socket, or a knob's modulation socket; absent on a wave and an unmodulatable knob. */
+  /** A jack's socket, or a knob's modulation socket; absent on the title, a wave and an unmodulatable knob. */
   socket?: Point & { port: string; side: "input" | "output"; facing: Facing };
   /** A knob's centre. */
   centre?: Point;
+  /** Where modulation has a knob this frame, 0..1, or null with nothing in its socket. */
+  live?: number | null;
 }
 
 export function createGridApi(source: GridSource = fromRegistry) {
@@ -85,7 +87,7 @@ export function createGridApi(source: GridSource = fromRegistry) {
     },
 
     /**
-     * A module's box on screen, and a point on its title bar: the place to press to select or drag
+     * A module's box on screen, and a point on its title block: the place to press to select or drag
      * it without landing on a knob or a socket.
      */
     node(id: string): { rect: Rect; title: Point } | null {
@@ -96,10 +98,10 @@ export function createGridApi(source: GridSource = fromRegistry) {
       const origin = { x: node.view.position.x, y: node.view.position.y };
       return {
         rect: rectOf(grid, origin, { x: 0, y: 0, ...node.face }),
-        // The title bar is the first cell; its middle is clear of every control.
+        // The title block's middle is clear of every control.
         title: toWindow(grid, {
-          x: origin.x + node.face.width / 2,
-          y: origin.y + 12,
+          x: origin.x + node.face.title.x + node.face.title.width / 2,
+          y: origin.y + node.face.title.y + node.face.title.height / 2,
         }),
       };
     },
@@ -148,8 +150,15 @@ export function createGridApi(source: GridSource = fromRegistry) {
       return null;
     },
 
-    /** A knob's centre, for a parameter on the module's face. Null for one kept in the inspector. */
-    knob(module: string, param: string): (Point & { radius: number }) | null {
+    /**
+     * A knob's centre, for a parameter on the module's face, and where modulation has it this
+     * frame (0..1, or null with nothing in its socket): the one way a script can see a knob turn.
+     * Null for a parameter kept in the inspector.
+     */
+    knob(
+      module: string,
+      param: string,
+    ): (Point & { radius: number; live: number | null }) | null {
       const grid = source.live();
       const node = grid?.renderer.allNodes().get(module);
       if (grid === null || grid === undefined || node === undefined)
@@ -160,7 +169,11 @@ export function createGridApi(source: GridSource = fromRegistry) {
         x: node.view.position.x + knob.centre.x,
         y: node.view.position.y + knob.centre.y,
       });
-      return { ...at, radius: knob.radius * grid.renderer.viewport.zoom };
+      return {
+        ...at,
+        radius: knob.radius * grid.renderer.viewport.zoom,
+        live: node.liveOf(param),
+      };
     },
 
     /**
@@ -179,7 +192,8 @@ export function createGridApi(source: GridSource = fromRegistry) {
           name: block.name,
           rect: rectOf(grid, origin, block),
         };
-        const socket = block.kind === "wave" ? null : block.socket;
+        const socket =
+          block.kind === "jack" || block.kind === "knob" ? block.socket : null;
         if (socket !== null)
           out.socket = {
             ...toWindow(grid, {
@@ -190,11 +204,13 @@ export function createGridApi(source: GridSource = fromRegistry) {
             side: socket.side,
             facing: socket.facing,
           };
-        if (block.kind === "knob")
+        if (block.kind === "knob") {
           out.centre = toWindow(grid, {
             x: origin.x + block.centre.x,
             y: origin.y + block.centre.y,
           });
+          out.live = node.liveOf(block.name);
+        }
         return out;
       });
     },

@@ -7,8 +7,6 @@ import {
 import {
   CELL,
   faceParams,
-  HEADER_HEIGHT,
-  HEADER_ROWS,
   KNOB_COLS,
   KNOB_HIT_RADIUS,
   KNOB_RADIUS,
@@ -18,6 +16,7 @@ import {
   PORT_HIT_RADIUS,
   type Point,
   TILE_GUTTER,
+  TITLE_ROWS,
 } from "./layout";
 
 /**
@@ -28,7 +27,8 @@ import {
  * of tiles. There is no table here of how any particular module looks. The engine says which blocks
  * and where (`descriptor.face`, rows of tokens in the manner of CSS `grid-template-areas`), and a
  * module that says nothing gets a face composed by rule from its ports and its primary params. The
- * only thing added here is the title row above.
+ * only thing added here is the title block: one row across the top, above the rows the engine
+ * declared, so a module's grid is the title's row and then the face's.
  *
  * Pure geometry, separate from anything that draws. The renderer needs these numbers, the hit test
  * needs the same numbers, the minimap and the automation API need the footprint, and a test needs
@@ -56,17 +56,27 @@ export interface Socket {
 
 /** What every block has: its cells, and the rectangle those cells cover. */
 export interface BlockBase {
-  /** The face token that placed it: a port id, a param id or `wave`. Unique on a face. */
+  /** The face token that placed it: a port id, a param id or `wave`; `title` for the title. Unique on a face. */
   name: string;
+  /** Cells on the module's grid, whose row 0 is the title's; the face the engine declared starts at `TITLE_ROWS`. */
   col: number;
   row: number;
   cols: number;
   rows: number;
-  /** Top left, in patch units from the node's top left. The title row is above `y` 0's row. */
+  /** Top left, in patch units from the node's top left: the cells times `CELL`. */
   x: number;
   y: number;
   width: number;
   height: number;
+}
+
+/**
+ * The title: one row across the module, the block the face language does not describe because every
+ * module has one. What it says is the module's label, which is the document's and not the face's,
+ * so the node supplies it when it builds the block.
+ */
+export interface TitleBlock extends BlockBase {
+  kind: "title";
 }
 
 export interface JackBlock extends BlockBase {
@@ -97,15 +107,17 @@ export interface WaveBlock extends BlockBase {
   panel: { x: number; y: number; width: number; height: number };
 }
 
-export type Block = JackBlock | KnobBlock | WaveBlock;
+export type Block = TitleBlock | JackBlock | KnobBlock | WaveBlock;
 
 export interface Face {
-  /** Size in grid cells, title row included. The pixel size is these times `CELL` and nothing else. */
+  /** Size in grid cells, the title's row included. The pixel size is these times `CELL` and nothing else. */
   cols: number;
   rows: number;
   width: number;
   height: number;
+  /** Every block, the title first, then the face's in reading order. */
   blocks: Block[];
+  title: TitleBlock;
   jacks: JackBlock[];
   knobs: KnobBlock[];
   wave: WaveBlock | null;
@@ -120,6 +132,8 @@ export const WAVE_MIN_CELLS = 2;
 /** The wave block a composed face gives a module: wider than tall, the shape of a scope screen. */
 export const WAVE_COLS = 3;
 export const WAVE_ROWS = 2;
+/** The face token the title block answers to, so a script can ask for it like any other. */
+export const TITLE_NAME = "title";
 
 /** The wave's screen is its tile: the picture goes right to the tile's edge. */
 const WAVE_INSET = TILE_GUTTER;
@@ -295,9 +309,21 @@ function placeBlocks(cells: Cell[][], descriptor: ModuleDescriptor): Face {
     });
   });
 
-  const rows = HEADER_ROWS + gridRows;
+  const rows = TITLE_ROWS + gridRows;
   const width = cols * CELL;
   const height = rows * CELL;
+  const title: TitleBlock = {
+    kind: "title",
+    name: TITLE_NAME,
+    col: 0,
+    row: 0,
+    cols,
+    rows: TITLE_ROWS,
+    x: 0,
+    y: 0,
+    width,
+    height: TITLE_ROWS * CELL,
+  };
   const blocks: Block[] = [];
 
   for (const area of areas.values()) {
@@ -311,11 +337,11 @@ function placeBlocks(cells: Cell[][], descriptor: ModuleDescriptor): Face {
     const base: BlockBase = {
       name,
       col: area.minCol,
-      row: area.minRow,
+      row: TITLE_ROWS + area.minRow,
       cols: blockCols,
       rows: blockRows,
       x: area.minCol * CELL,
-      y: HEADER_HEIGHT + area.minRow * CELL,
+      y: (TITLE_ROWS + area.minRow) * CELL,
       width: blockCols * CELL,
       height: blockRows * CELL,
     };
@@ -326,7 +352,7 @@ function placeBlocks(cells: Cell[][], descriptor: ModuleDescriptor): Face {
         blocks.push({
           ...base,
           kind: "jack",
-          socket: jackSocket(area.cell.port, side, base, cols, gridRows),
+          socket: jackSocket(area.cell.port, side, base, cols, rows),
         });
         break;
       }
@@ -391,6 +417,7 @@ function placeBlocks(cells: Cell[][], descriptor: ModuleDescriptor): Face {
 
   // In reading order, so a script listing the face and a person looking at it agree on what comes first.
   blocks.sort((a, b) => a.row - b.row || a.col - b.col);
+  blocks.unshift(title);
 
   const jacks = blocks.filter((b): b is JackBlock => b.kind === "jack");
   const knobs = blocks.filter((b): b is KnobBlock => b.kind === "knob");
@@ -406,6 +433,7 @@ function placeBlocks(cells: Cell[][], descriptor: ModuleDescriptor): Face {
     width,
     height,
     blocks,
+    title,
     jacks,
     knobs,
     wave: waves[0] ?? null,
@@ -429,7 +457,7 @@ function jackSocket(
   side: "input" | "output",
   block: BlockBase,
   cols: number,
-  gridRows: number,
+  rows: number,
 ): Socket {
   const at = {
     x: block.x + block.width / 2,
@@ -438,9 +466,10 @@ function jackSocket(
   if (block.col === 0) return { port, side, facing: "left", ...at };
   if (block.col + block.cols === cols)
     return { port, side, facing: "right", ...at };
-  if (block.row + block.rows === gridRows)
+  if (block.row + block.rows === rows)
     return { port, side, facing: "down", ...at };
-  if (block.row === 0) return { port, side, facing: "up", ...at };
+  // The top row of the face, which is the row under the title.
+  if (block.row === TITLE_ROWS) return { port, side, facing: "up", ...at };
   return { port, side, facing: side === "input" ? "left" : "right", ...at };
 }
 
@@ -532,7 +561,7 @@ export function hitKnob(
   return null;
 }
 
-/** The block whose cells cover a point, or null on the title row or an empty cell. */
+/** The block whose cells cover a point, the title included, or null on an empty cell. */
 export function hitBlock(
   point: Point,
   origin: Point,

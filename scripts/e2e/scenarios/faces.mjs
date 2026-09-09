@@ -76,10 +76,11 @@ export default {
       const blocks = await pg(`grid.face(${JSON.stringify(id)})`);
       const named = new Set(rows.flat().filter((t) => t !== "."));
       check(
-        `${type} is drawn with one block per name on its face`,
+        `${type} is drawn with its title first and one block per name on its face`,
         blocks !== null &&
-          blocks.length === named.size &&
-          blocks.every((b) => named.has(b.name)),
+          blocks[0]?.kind === "title" &&
+          blocks.length === named.size + 1 &&
+          blocks.slice(1).every((b) => named.has(b.name)),
         JSON.stringify(blocks?.map((b) => `${b.kind}:${b.name}`)),
       );
       const node = await pg(`grid.node(${JSON.stringify(id)})`);

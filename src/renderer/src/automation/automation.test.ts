@@ -102,7 +102,7 @@ describe("waitFor", () => {
 
 describe("grid geometry", () => {
   /** A renderer with one node at (48, 48), 144 by 96, one output and one knob, seen at 2x. */
-  function fake(zoom = 2): LiveGrid {
+  function fake(zoom = 2, live: number | null = null): LiveGrid {
     const pitch = {
       port: { id: "pitch" },
       side: "input",
@@ -129,15 +129,26 @@ describe("grid geometry", () => {
       radius: 16,
       socket: null,
     };
+    const title = {
+      kind: "title",
+      name: "title",
+      x: 0,
+      y: 0,
+      width: 144,
+      height: 24,
+    };
     const node = {
       view: { position: { x: 48, y: 48 } },
       descriptor: { id: "osc.sine" },
+      liveOf: (param: string) => (param === "fold" ? live : null),
       face: {
         width: 144,
         height: 96,
         sockets: [pitch, out],
         knobs: [fold],
+        title,
         blocks: [
+          title,
           {
             kind: "jack",
             name: "pitch",
@@ -212,33 +223,45 @@ describe("grid geometry", () => {
       x: 406 + 144,
       y: 216 + 120,
       radius: 32,
+      live: null,
     });
     expect(api.knob("osc", "level")).toBeNull();
+  });
+
+  it("says where modulation has a knob, so a script can see it turn", () => {
+    const api = createGridApi({ live: () => fake(2, 0.75) });
+    expect(api.knob("osc", "fold")?.live).toBe(0.75);
+    expect(api.face("osc")?.find((b) => b.name === "fold")?.live).toBe(0.75);
+    expect(
+      api.face("osc")?.find((b) => b.name === "pitch")?.live,
+    ).toBeUndefined();
   });
 
   it("lists every block on a face by name, with its box and what it holds", () => {
     const api = createGridApi({ live: () => fake() });
     const blocks = api.face("osc");
     expect(blocks?.map((b) => `${b.kind}:${b.name}`)).toEqual([
+      "title:title",
       "jack:pitch",
       "knob:fold",
     ]);
+    expect(blocks?.[0].socket).toBeUndefined();
     // The jack at (0, 24) in a node at (48, 48), seen at 2x from (10, 20) on a canvas at (300, 100).
-    expect(blocks?.[0].rect).toEqual({
+    expect(blocks?.[1].rect).toEqual({
       x: 406,
       y: 216 + 48,
       width: 48,
       height: 48,
     });
-    expect(blocks?.[0].socket).toEqual({
+    expect(blocks?.[1].socket).toEqual({
       x: 406,
       y: 216 + 72,
       port: "pitch",
       side: "input",
       facing: "left",
     });
-    expect(blocks?.[1].centre).toEqual({ x: 406 + 144, y: 216 + 120 });
-    expect(blocks?.[1].socket).toBeUndefined();
+    expect(blocks?.[2].centre).toEqual({ x: 406 + 144, y: 216 + 120 });
+    expect(blocks?.[2].socket).toBeUndefined();
     expect(createGridApi({ live: () => null }).face("osc")).toBeNull();
   });
 });

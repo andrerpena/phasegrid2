@@ -62,7 +62,7 @@ export default {
     await screenshot("grid");
 
     // ── The inspector: a form built from the engine's own descriptors ────────
-    // The module is found by name and clicked on its title bar, wherever the view has put it.
+    // The module is found by name and clicked on its title block, wherever the view has put it.
     await evaluate(`click('[role="tab"]', "Inspector");`);
     await waitFor(
       `document.querySelector('[data-widget="inspector"]') !== null`,

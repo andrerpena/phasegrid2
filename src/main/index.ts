@@ -25,6 +25,11 @@ function createWindow(): BrowserWindow {
     webPreferences: {
       preload: join(__dirname, "../preload/index.mjs"),
       sandbox: false,
+      // A window nobody is looking at gets no animation frames, which is right for a person and wrong
+      // for a script: the canvas ticker stops, a modulated knob freezes, and `pg.idle()`, which
+      // waits for a frame, never returns. A driven application (one with a debugging port, which is
+      // how every script reaches it) keeps drawing whether or not its window is in front.
+      backgroundThrottling: !app.commandLine.hasSwitch("remote-debugging-port"),
     },
   });
   mainWindow.on("ready-to-show", () => mainWindow.show());

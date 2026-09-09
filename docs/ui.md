@@ -227,9 +227,10 @@ wide enough for the values is a sidebar that has taken the room the grid wanted.
 
 ## The canvas
 
-**A module is a face made of blocks.** On the canvas a module is a rectangle of 24 px cells with a
-title row on top, and what it wears is a composition of blocks — a jack, a knob, a wave panel — each
-covering a whole number of cells, the way a hardware panel is a grid of tiles. Which blocks and where
+**A module is a face made of blocks.** On the canvas a module is a rectangle of 24 px cells, and
+what it wears is a composition of blocks — the title, a jack, a knob, a wave panel — each covering a
+whole number of cells, the way a hardware panel is a grid of tiles. The title is a block like the
+others, one row across the module's whole width at row 0; the rows the engine declares sit under it. Which blocks and where
 is the engine's to say: the descriptor carries `face`, rows of tokens in the manner of CSS
 `grid-template-areas` (docs/adding-a-module.md), and `grid/face.ts` turns them into geometry —
 `composeFace(descriptor)` — or composes a face by rule for a module that declared none (ports down
@@ -240,9 +241,10 @@ and `pg.grid.face(module)` reports the blocks to a script. There is no table of 
 appearances anywhere, and no `instanceof` on what kind of module a node is: adding a kind of block is
 one file and a line in `NodeView`'s table, and adding a module is nothing here at all.
 
-Every block sits on a **tile**: a filled, rounded key in `tileFill` with a `tileStroke` hairline,
-inset from its cells by a gutter, so neighbours show a seam of the node's own colour between them
-and a face reads as a panel of keys. Empty cells stay bare. The wave's tile is its screen: the
+Every block sits on a **tile**: a filled key in `tileFill` with a `tileStroke` hairline, filling
+its cells edge to edge (the gutter and corner radius are constants, both zero for now, in
+`grid/layout.ts` and `blocks/Block.ts`), so a face reads as a panel of keys and the module's own
+frame, a square `nodeFill` rectangle with a `nodeStroke` border, shows only through empty cells. The wave's tile is its screen: the
 picture fills it and the tile's edge is the bezel.
 
 Every place a cable can plug in is a `Socket` with a `facing`: a jack's, inside its tile under the

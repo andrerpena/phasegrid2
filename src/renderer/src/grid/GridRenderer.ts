@@ -41,7 +41,8 @@ const CATEGORY_ACCENT: Record<string, keyof PhasegridTheme["grid"]["signal"]> =
  * The selection ring traces the node's own edge: same rectangle, same corner radius as `drawFrame`,
  * straddling the border so it reads as that border lit up rather than a second outline around it.
  */
-const SELECTION_RADIUS = 6;
+/** Square, like the node it rings. */
+const SELECTION_RADIUS = 0;
 const SELECTION_WIDTH = 2;
 
 /**

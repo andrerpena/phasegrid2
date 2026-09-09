@@ -17,11 +17,12 @@ import {
 import { CATALOG, descriptor } from "./fixtures";
 import {
   CELL,
-  HEADER_HEIGHT,
   KNOB_CELL_HEIGHT,
   KNOB_RADIUS,
   MIN_COLS,
   PORT_HIT_RADIUS,
+  TILE_GUTTER,
+  TITLE_HEIGHT,
 } from "./layout";
 
 function port(id: string, implicit = false) {
@@ -110,7 +111,7 @@ describe("every module in the catalogue", () => {
         expect(block.col + block.cols, module.id).toBeLessThanOrEqual(
           face.cols,
         );
-        expect(block.row + block.rows + 1, module.id).toBeLessThanOrEqual(
+        expect(block.row + block.rows, module.id).toBeLessThanOrEqual(
           face.rows,
         );
       }
@@ -139,12 +140,28 @@ describe("every module in the catalogue", () => {
     }
   });
 
-  it("is a whole number of cells, title row included", () => {
+  it("is a whole number of cells, with the title a block across the top row and everything else below it", () => {
     for (const module of CATALOG.modules) {
       const face = composeFace(module);
       expect(face.width).toBe(face.cols * CELL);
       expect(face.height).toBe(face.rows * CELL);
-      expect(face.blocks.every((b) => b.y >= HEADER_HEIGHT)).toBe(true);
+      expect(face.blocks[0]).toBe(face.title);
+      expect(face.title).toMatchObject({
+        kind: "title",
+        name: "title",
+        col: 0,
+        row: 0,
+        cols: face.cols,
+        rows: 1,
+        x: 0,
+        y: 0,
+        width: face.width,
+        height: TITLE_HEIGHT,
+      });
+      expect(
+        face.blocks.slice(1).every((b) => b.y >= TITLE_HEIGHT),
+        module.id,
+      ).toBe(true);
     }
   });
 
@@ -164,11 +181,12 @@ describe("a declared face", () => {
     expect(face.rows).toBe(1 + 3);
     const wave = face.wave;
     expect(wave).not.toBeNull();
-    expect(wave).toMatchObject({ col: 1, row: 0, cols: 3, rows: 2 });
+    // The face's first row is the module's second: the title is above it.
+    expect(wave).toMatchObject({ col: 1, row: 1, cols: 3, rows: 2 });
     expect(face.knobs[0]).toMatchObject({
       name: "fold",
       col: 4,
-      row: 0,
+      row: 1,
       cols: 2,
       rows: 2,
     });
@@ -186,12 +204,12 @@ describe("a declared face", () => {
     const out = socketOf(face, "out", "output");
     expect(reset).toMatchObject({
       x: CELL / 2,
-      y: HEADER_HEIGHT + CELL / 2 + JACK_SOCKET_DROP,
+      y: TITLE_HEIGHT + CELL / 2 + JACK_SOCKET_DROP,
       facing: "left",
     });
     expect(out).toMatchObject({
       x: face.width - CELL / 2,
-      y: HEADER_HEIGHT + CELL / 2 + JACK_SOCKET_DROP,
+      y: TITLE_HEIGHT + CELL / 2 + JACK_SOCKET_DROP,
       facing: "right",
     });
   });
@@ -305,8 +323,8 @@ describe("a composed face", () => {
     const inputs = face.jacks.filter((j) => j.socket.side === "input");
     expect(inputs.map((j) => j.socket.x)).toEqual([CELL / 2, CELL / 2]);
     expect(inputs.map((j) => j.socket.y)).toEqual([
-      HEADER_HEIGHT + CELL / 2 + JACK_SOCKET_DROP,
-      HEADER_HEIGHT + CELL * 1.5 + JACK_SOCKET_DROP,
+      TITLE_HEIGHT + CELL / 2 + JACK_SOCKET_DROP,
+      TITLE_HEIGHT + CELL * 1.5 + JACK_SOCKET_DROP,
     ]);
     expect(socketOf(face, "out", "output")).toMatchObject({
       x: face.width - CELL / 2,
@@ -374,7 +392,7 @@ describe("a composed face", () => {
       inputs: [port("in")],
       outputs: [port("out")],
     };
-    expect(defaultFace(shallow).height).toBe(HEADER_HEIGHT + KNOB_CELL_HEIGHT);
+    expect(defaultFace(shallow).height).toBe(TITLE_HEIGHT + KNOB_CELL_HEIGHT);
   });
 
   it("gives a wave block to the module that can draw itself, first in the row, and to no other", () => {
@@ -388,7 +406,9 @@ describe("a composed face", () => {
     const face = defaultFace(osc(true));
     expect(face.wave).not.toBeNull();
     expect(face.wave?.col).toBeLessThan(face.knobs[0].col);
-    expect(face.wave?.panel.width).toBeLessThan(face.wave?.width ?? 0);
+    expect(face.wave?.panel.width).toBe(
+      (face.wave?.width ?? 0) - 2 * TILE_GUTTER,
+    );
   });
 
   it("stands a module up on its wave alone", () => {
@@ -400,7 +420,7 @@ describe("a composed face", () => {
     });
     expect(face.knobs).toHaveLength(0);
     expect(face.wave).not.toBeNull();
-    expect(face.height).toBe(HEADER_HEIGHT + KNOB_CELL_HEIGHT);
+    expect(face.height).toBe(TITLE_HEIGHT + KNOB_CELL_HEIGHT);
   });
 });
 
@@ -445,10 +465,10 @@ describe("hit testing", () => {
     expect(
       hitKnob({ x: origin.x + 2, y: origin.y + 2 }, origin, face),
     ).toBeNull();
-    // The title row belongs to no block.
-    expect(
-      hitBlock({ x: origin.x + 50, y: origin.y + 10 }, origin, face),
-    ).toBeNull();
+    // The title row is the title block.
+    expect(hitBlock({ x: origin.x + 50, y: origin.y + 10 }, origin, face)).toBe(
+      face.title,
+    );
     expect(
       hitBlock(
         { x: origin.x + wave.x + 5, y: origin.y + wave.y + 5 },

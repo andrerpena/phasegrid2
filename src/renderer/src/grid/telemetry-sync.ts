@@ -109,8 +109,15 @@ export function startTelemetrySync(
   };
 
   /**
-   * Asks for the modules that need watching, when the set has changed. Behind the document queue,
-   * so the engine has been told about every module and cable before being asked about them.
+   * Refreshes which knobs to drive, and asks the engine for the modules that need watching when
+   * that set has changed.
+   *
+   * Two different things. Which knobs are live is per parameter, pure over the document, and free,
+   * so it is taken fresh on every structural edit: a second cable into a module already watched
+   * changes nothing the engine needs to hear (it publishes every parameter of a watched module
+   * anyway) but adds a knob to turn. The engine's subscription is per module and costs a round trip,
+   * so that is only redone when the module list moves. Behind the document queue, so the engine has
+   * been told about every module and cable before being asked about them.
    */
   const resubscribe = (force = false): void => {
     if (stopped) return;
@@ -118,6 +125,13 @@ export function startTelemetrySync(
       usePatchStore.getState().doc,
       useCatalogStore.getState().byId,
     );
+    // A knob whose cable went rests at once. Nothing else will put it back: its module may still be
+    // watched, and the engine keeps publishing a value for a parameter nothing feeds.
+    for (const [moduleId, params] of live)
+      for (const { param } of params)
+        if (!wanted.get(moduleId)?.some((l) => l.param.id === param.id))
+          target.setLive(moduleId, param.id, null);
+    live = wanted;
     const modules = [...wanted.keys()].sort();
     const previews = previewedModules(
       usePatchStore.getState().doc,
@@ -126,7 +140,6 @@ export function startTelemetrySync(
     const request = `${modules.join("\n")}|${previews.join("\n")}`;
     if (!force && request === lastRequest) return;
     lastRequest = request;
-    live = wanted;
     // The old slot maps are wrong from here: the engine numbers slots by the new lists' order, so a
     // module that kept its subscription may move. One empty frame beats a knob reading another's.
     slots = new Map();

@@ -43,8 +43,10 @@ is. `pg.help()` lists them.
   edits by the path the catalogue and the canvas take: undoable, and sent to the engine.
 - **`grid.canvas()`**, **`grid.viewport()`**, **`grid.node(id)`** (rect and a title point),
   **`grid.nodes()`**, **`grid.port(module, port, side?)`** (a socket's centre and which way it faces),
-  **`grid.knob(module, param)`**, **`grid.face(module)`** (every block on the module, in reading
-  order: kind, the name the engine gave it, its rect, its socket, a knob's centre) — where things
+  **`grid.knob(module, param)`** (its centre, and `live`: where modulation has it this frame, 0..1,
+  or null with nothing in its socket — the way a script sees a knob turn), **`grid.face(module)`**
+  (every block on the module, the title first and then the face's in reading order: kind, the name
+  the engine gave it, its rect, its socket, a knob's centre and `live`) — where things
   are, in window CSS pixels, ready for a real pointer event. Null when there is no such thing.
 - **`workspace.openAt(root)`**, **`openProject(slug)`**, **`save()`**, **`saveAs(name)`**,
   **`closeProject(id?)`**, **`openExample(moduleId)`**.
@@ -77,6 +79,12 @@ throwaway workspace and user-data directory, silent. `npm run e2e` builds first.
 some; `--list` names them; `--shots <dir>` says where pictures go; `--keep` leaves the last
 application running and prints its port; `--attach <port>` runs against an application already
 listening (scenarios that launch the application themselves are skipped).
+
+A driven application keeps drawing when its window is hidden or behind another: a debugging port
+switches off Electron's background throttling. Without that a covered window gets no animation
+frames, the canvas ticker stops, a modulated knob freezes on the canvas, and `pg.idle()`, which
+waits for a frame, never returns. A project opens with the transport stopped, and a held patch has
+nothing live: a scenario that wants to see a knob turn runs `transport.play` first.
 
 A scenario is a module under `scripts/e2e/scenarios/` exporting `{ name, description, run(driver) }`,
 plus `seed(workspace)` to put files in the folder first, or `launches: true` to start the application

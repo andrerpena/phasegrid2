@@ -61,6 +61,11 @@ export class KnobBlock implements Block {
    */
   private live: number | null = null;
 
+  /** Where modulation has the knob this frame, 0 to 1, or null with nothing plugged in. */
+  get liveFraction(): number | null {
+    return this.live;
+  }
+
   constructor(
     readonly geometry: KnobGeometry,
     style: BlockStyle,
