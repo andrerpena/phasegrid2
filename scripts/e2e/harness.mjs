@@ -7,7 +7,7 @@
  * protocol for a real pointer, keyboard and pictures, `pg` for everything that has a name, and a
  * few helpers that have earned their place.
  */
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -47,6 +47,31 @@ export async function until(
       throw new Error(`until: ${label} did not happen within ${timeoutMs} ms`);
     await sleep(intervalMs);
   }
+}
+
+/**
+ * The engine process an application spawned, found by the telemetry segment it was told to write.
+ *
+ * The segment is named for the main process that owns it, so this picks out one application's
+ * engine with several running: another scenario's, or a development session's. Matched on the whole
+ * argument rather than as text, because `/pg-123` is a substring of `/pg-1234`.
+ *
+ * Null when there is no such process, which is itself worth asserting: it is how a scenario knows
+ * the engine really did die.
+ */
+export function engineProcessId(shmName) {
+  const listing = execFileSync("ps", ["-ax", "-o", "pid=,command="], {
+    encoding: "utf8",
+  });
+  for (const line of listing.split("\n")) {
+    if (!line.includes("phasegrid-engine")) continue;
+    const parts = line.trim().split(/\s+/);
+    const at = parts.indexOf("--shm");
+    if (at < 0 || parts[at + 1] !== shmName) continue;
+    const pid = Number(parts[0]);
+    if (Number.isInteger(pid)) return pid;
+  }
+  return null;
 }
 
 export const newWorkspace = () => mkdtempSync(join(tmpdir(), "pg-ws-"));

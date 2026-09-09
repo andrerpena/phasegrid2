@@ -98,6 +98,13 @@ Wait on the slowest thing that has to be true, and assert the rest. The zoom rea
 times a second by design, so a check that reads it immediately after the viewport moved is racing
 something deliberate.
 
+**Killing the engine.** `engineProcessId(shmName)`, from the harness, finds the engine process an
+application spawned, identified by the telemetry segment it was told to write
+(`pg.stores.engine.getState().shm.name`). A scenario can `process.kill` it and watch the supervisor
+put it back. That is the only way to exercise restart, back-off and the resend of the whole patch
+against a genuinely dead process: `engine.shutdown` over the protocol is a clean exit the supervisor
+deliberately does not restart. See `scripts/e2e/scenarios/engine-restart.mjs`.
+
 **Every scenario fails on an unexpected error.** The harness collects everything the page reports as
 an error, the engine's included, since the log store echoes those to the console. Any that a
 scenario did not declare fails it. This exists because an application that recovers from its own
