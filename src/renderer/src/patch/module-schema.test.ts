@@ -84,6 +84,18 @@ describe("the form a module gets", () => {
     expect(field._meta.unit).toBeTruthy();
   });
 
+  it("carries the range, so the field can hold the digits on the way into it", () => {
+    const ranged = inspectableParams(osc).find((p) => !p.flags.enum);
+    expect(ranged, "the fixture has no numeric parameter").toBeDefined();
+    if (ranged === undefined) return;
+    const field = buildModuleSchema(osc).getFieldSchema(
+      `${PARAM_PREFIX}${ranged.id}`,
+    );
+    expect(field._meta.min).toBe(ranged.min);
+    expect(field._meta.max).toBe(ranged.max);
+    expect(field._meta.integer).toBe(ranged.flags.integer);
+  });
+
   it("renders an enum as a dropdown of its own labels", () => {
     const enumParam = inspectableParams(osc).find((p) => p.flags.enum);
     expect(enumParam, "the fixture has no enum parameter").toBeDefined();

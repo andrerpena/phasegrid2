@@ -57,7 +57,7 @@ export const PixiStage = ({
       });
       // React can unmount during the await; without this the canvas leaks and never gets destroyed.
       if (cancelled) {
-        created.destroy(true, { children: true });
+        created.destroy({ removeView: true }, { children: true });
         return;
       }
       app = created;
@@ -71,7 +71,7 @@ export const PixiStage = ({
     return () => {
       cancelled = true;
       teardown?.();
-      app?.destroy(true, { children: true });
+      app?.destroy({ removeView: true }, { children: true });
     };
   }, [build, width, height, gridBackground, theme]);
 

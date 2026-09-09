@@ -1,6 +1,5 @@
-import type React from "react";
 import { useRef } from "react";
-import { TextInput } from "../../form-controls";
+import { NumberInput } from "../../form-controls";
 import type {
   EditFieldLifecycle,
   EditFieldRendererProps,
@@ -33,17 +32,21 @@ export const NumberFieldRenderer = ({
     },
   };
 
+  const value = fieldState.state.value;
   const element = (
-    <TextInput
+    // What is typed is shown as typed, and only a value is handed to the form: see `NumberInput`.
+    // Before this, backspacing a `0` gave `Number("")`, which is `0`, and the `0` was back before
+    // the next key.
+    <NumberInput
       ref={inputRef}
       id={fieldState.name}
       name={fieldState.name}
       onBlur={fieldState.handleBlur}
-      type="number"
-      value={fieldState.state.value ?? 0}
-      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-        fieldState.handleChange(Number(e.target.value))
-      }
+      value={typeof value === "number" ? value : 0}
+      onChange={(next) => fieldState.handleChange(next)}
+      min={metadata.min}
+      max={metadata.max}
+      integer={metadata.integer}
       placeholder={metadata.description}
       hasError={hasError}
       autoFocus={autoFocus}

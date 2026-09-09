@@ -1,9 +1,15 @@
 import { commandRegistry } from "@renderer/commands/registry";
+import { useNumericDraft } from "@renderer/components/form-controls";
 import { useEngineStore } from "@renderer/engine/engine-store";
 import { useProjectStore } from "@renderer/project/project-store";
 import { useTransportStore } from "@renderer/transport/transport-store";
 import { cn } from "@renderer/utils/cn";
-import { NOTE_NAMES, SCALE_NAMES, scaleLabel } from "@shared/protocol/project";
+import {
+  DEFAULT_TIME_SIGNATURE,
+  NOTE_NAMES,
+  SCALE_NAMES,
+  scaleLabel,
+} from "@shared/protocol/project";
 import { useEffect, useState } from "react";
 
 /** Every number and picker in the strip shares this: tabular figures so a changing tempo does not
@@ -11,6 +17,8 @@ import { useEffect, useState } from "react";
 const FIELD =
   "rounded-sm border border-border bg-input px-0.5 font-[inherit] text-xs text-foreground tabular-nums";
 const CAPTION = "text-2xs uppercase tracking-wide text-muted-foreground";
+/** What the tempo field shows while there is no project, which is only the frame before there is one. */
+const DEFAULT_TEMPO = 120;
 
 /**
  * The strip above the grid: transport, tempo, meter, scale.
@@ -28,6 +36,27 @@ export const ProjectHeader = () => {
   const playing = useTransportStore((s) => s.playing);
   const toggle = useTransportStore((s) => s.toggle);
   const [position, setPosition] = useState({ bar: 0, beat: 0 });
+
+  // Typed numbers follow the one rule in `numeric-draft.ts`: the field shows what is being typed,
+  // and the project only hears a value. Before this, clearing the tempo sent `NaN` and the next
+  // digit was clamped to 20, so `137` came out as `20` -- and the meter could not be cleared at all.
+  // Declared before the early return below, because hooks cannot be skipped.
+  const tempo = useNumericDraft({
+    value: project?.tempo ?? DEFAULT_TEMPO,
+    onChange: setTempo,
+    min: 20,
+    max: 400,
+  });
+  const beatsPerBar = useNumericDraft({
+    value: project?.timeSignature.numerator ?? DEFAULT_TIME_SIGNATURE.numerator,
+    onChange: (numerator) => {
+      if (project === null) return;
+      setTimeSignature({ ...project.timeSignature, numerator });
+    },
+    min: 1,
+    max: 64,
+    integer: true,
+  });
 
   // The engine owns the playhead, so the header follows it rather than counting time itself. Two
   // clocks always drift, and the one that matters is the one making sound.
@@ -97,9 +126,8 @@ export const ProjectHeader = () => {
           min={20}
           max={400}
           step={0.01}
-          value={project.tempo}
           aria-label="Tempo"
-          onChange={(event) => setTempo(Number.parseFloat(event.target.value))}
+          {...tempo}
         />
       </label>
 
@@ -111,17 +139,8 @@ export const ProjectHeader = () => {
             type="number"
             min={1}
             max={64}
-            value={project.timeSignature.numerator}
             aria-label="Beats per bar"
-            onChange={(event) =>
-              setTimeSignature({
-                ...project.timeSignature,
-                numerator: Math.max(
-                  1,
-                  Math.min(64, Number.parseInt(event.target.value, 10) || 4),
-                ),
-              })
-            }
+            {...beatsPerBar}
           />
           <span aria-hidden>/</span>
           <select

@@ -24,6 +24,14 @@ export interface SchemaMetadata<Output = unknown> {
   enumValues?: Array<{ label: string; value: unknown }>;
   /** Unit suffix to display (e.g., "px", "%", "C") */
   unit?: string;
+  /**
+   * The range a number field holds, and whether only whole numbers are values. The field uses them
+   * to decide which of the things typed on the way to a number are worth handing on: see
+   * `form-controls/numeric-draft.ts`.
+   */
+  min?: number;
+  max?: number;
+  integer?: boolean;
   /** Whether the field is editable (for inspector) */
   editable?: boolean;
   /**

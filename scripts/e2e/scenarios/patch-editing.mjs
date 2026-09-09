@@ -95,6 +95,27 @@ export default {
     );
     await screenshot("inspector");
 
+    // A number field emptied on the way to a new value: the field shows the empty text and the
+    // document keeps what it had, then the new value lands once there is one.
+    const levelBefore = await pg(
+      'snapshot().patch.modules.find((m) => m.id === "osc").params?.level ?? null',
+    );
+    await evaluate(`setValue(document.getElementById("param:level"), "");`);
+    await idle();
+    const levelEmptied = await evaluate(`
+      return { shown: document.getElementById("param:level").value,
+               held: window.pg.snapshot().patch.modules.find((m) => m.id === "osc").params?.level ?? null };`);
+    check(
+      "an emptied inspector field stays empty and the parameter keeps its value",
+      levelEmptied.shown === "" && levelEmptied.held === levelBefore,
+      JSON.stringify({ before: levelBefore, ...levelEmptied }),
+    );
+    await evaluate(`setValue(document.getElementById("param:level"), "0.25");`);
+    await checkEventually(
+      "and the number typed after it reaches the document",
+      'window.pg.snapshot().patch.modules.find((m) => m.id === "osc").params?.level === 0.25',
+    );
+
     // A marquee across the whole surface, from empty canvas above and left of everything.
     await dragTo(
       { x: box.x + 20, y: box.y + 20 },

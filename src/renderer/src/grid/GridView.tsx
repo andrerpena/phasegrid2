@@ -63,7 +63,7 @@ export const GridView = () => {
         resolution: window.devicePixelRatio,
       });
       if (cancelled) {
-        created.destroy(true, { children: true });
+        created.destroy({ removeView: true }, { children: true });
         return;
       }
       app = created;
@@ -252,7 +252,13 @@ export const GridView = () => {
       useSelectionStore.getState().clear();
       for (const off of stop) off();
       renderer?.destroy();
-      app?.destroy(true, { children: true });
+      // Never `destroy(true)`. That also releases Pixi's GLOBAL pools -- the texture pool every
+      // `Text` in the page draws from -- and this component makes canvases repeatedly: one per
+      // project, and in development two per mount, of which the cancelled twin destroys itself
+      // after the live one has drawn. A twin that wiped the pools took the live canvas with it:
+      // its next text change returned a texture to a pool that no longer existed, and the grid
+      // went blank. The pools belong to the page, so no single canvas gets to release them.
+      app?.destroy({ removeView: true }, { children: true });
     };
   }, []);
 

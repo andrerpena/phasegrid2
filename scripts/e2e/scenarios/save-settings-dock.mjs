@@ -31,6 +31,21 @@ export default {
     await waitFor("window.pg.snapshot().projects.open.length === 1", {
       label: "a new project opens",
     });
+    // Emptied on the way to a new number, as anyone retyping it does. The field shows the empty
+    // text and the project keeps the tempo it had: `Number("")` is 0 and `parseFloat("")` is NaN,
+    // and either written straight back is a field that cannot be cleared.
+    await evaluate(
+      `setValue(document.querySelector('input[aria-label="Tempo"]'), "");`,
+    );
+    await idle();
+    const emptied = await evaluate(`
+      return { shown: document.querySelector('input[aria-label="Tempo"]').value,
+               held: window.pg.snapshot().projects.open[0].tempo };`);
+    check(
+      "an emptied tempo field stays empty and the project keeps its tempo",
+      emptied.shown === "" && emptied.held === 120,
+      JSON.stringify(emptied),
+    );
     await evaluate(
       `setValue(document.querySelector('input[aria-label="Tempo"]'), "137");`,
     );

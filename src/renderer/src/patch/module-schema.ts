@@ -131,6 +131,11 @@ export function buildModuleSchema(
       editable,
       ...(unit === "" ? {} : { unit }),
       defaultValue: param.default,
+      // The range, so the field holds `1` and `13` on the way to `137` rather than handing on a
+      // value the parameter cannot take. `numericValue` still clamps as the last line.
+      min: param.min,
+      max: param.max,
+      integer: param.flags.integer,
     });
   }
 
