@@ -40,7 +40,6 @@ export class NodeView {
    * layout's geometry and the theme and nothing else, so what a node is made of is decided here once.
    */
   private readonly face: OscillatorFace | KnobRow;
-  private selected = false;
 
   constructor(
     /**
@@ -133,12 +132,9 @@ export class NodeView {
       .clear()
       .roundRect(0, 0, width, height, 6)
       .fill({ color: hexToNumber(this.style.colors.nodeFill) })
-      .stroke({
-        width: this.selected ? 2 : 1,
-        color: this.selected
-          ? hexToNumber(this.style.colors.nodeSelected)
-          : hexToNumber(this.style.colors.nodeStroke),
-      })
+      // Always the node's own border. Selection is the ring the renderer draws outside the node, and
+      // a node that also recoloured its border would wear the selection twice.
+      .stroke({ width: 1, color: hexToNumber(this.style.colors.nodeStroke) })
       // A hairline under the title separates the name from the controls, which matters once a node has
       // four knobs and the title stops being the only text on it.
       .moveTo(1, 18)
@@ -148,12 +144,6 @@ export class NodeView {
         color: hexToNumber(this.style.colors.gridLine),
         alpha: 0.8,
       });
-  }
-
-  setSelected(selected: boolean): void {
-    if (selected === this.selected) return;
-    this.selected = selected;
-    this.drawFrame();
   }
 
   setPosition(x: number, y: number): void {

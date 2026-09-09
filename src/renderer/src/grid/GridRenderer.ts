@@ -37,10 +37,12 @@ const CATEGORY_ACCENT: Record<string, keyof PhasegridTheme["grid"]["signal"]> =
     sampler: "audio",
   };
 
-/** How far outside a node its selection ring sits, in patch units. */
-const SELECTION_GAP = 3;
-const SELECTION_RADIUS = 8;
-const SELECTION_WIDTH = 1.5;
+/**
+ * The selection ring traces the node's own edge: same rectangle, same corner radius as `drawFrame`,
+ * straddling the border so it reads as that border lit up rather than a second outline around it.
+ */
+const SELECTION_RADIUS = 6;
+const SELECTION_WIDTH = 2;
 
 export class GridRenderer {
   readonly viewport: Viewport;
@@ -69,6 +71,18 @@ export class GridRenderer {
     this.world.addChild(this.cableLayer, this.nodeLayer, this.selectionLayer);
     app.stage.addChild(this.background, this.world, this.overlay);
     this.viewport = new Viewport(this.world);
+    this.drawBackground();
+  }
+
+  /**
+   * The surface is now this big.
+   *
+   * The renderer holds both the application and the ground drawn across it, so it is the one place
+   * that can change the size and redraw against it in that order. Doing it the other way round
+   * leaves the rules drawn for the box the canvas used to be.
+   */
+  resize(width: number, height: number): void {
+    this.app.renderer.resize(width, height);
     this.drawBackground();
   }
 
@@ -122,7 +136,6 @@ export class GridRenderer {
         this.connectedPortsOf(doc, module.id),
         this.hoveredNode === module.id ? "" : null,
       );
-      node.setSelected(this.selection.has(module.id));
     }
     for (const [id, node] of this.nodes) {
       if (seen.has(id)) continue;
@@ -271,18 +284,14 @@ export class GridRenderer {
 
   setSelection(ids: Set<string>): void {
     this.selection = ids;
-    for (const [id, node] of this.nodes) node.setSelected(ids.has(id));
     this.drawSelection();
   }
 
   /**
-   * A ring around each selected node, drawn outside it with a gap.
+   * A ring on each selected node's edge, covering the border the node drew for itself.
    *
-   * Recolouring a node's own border was the previous approach and it conflated two things: at a
-   * glance you could not tell a selected module from one whose border simply happened to be that
-   * colour, and with several selected the shape of the selection did not read at all. An outset ring
-   * is separate from the module, so the module still looks like itself and the selection is plainly
-   * an annotation on top.
+   * It lives on its own layer rather than in the node's frame so that selecting something costs one
+   * redraw of this layer instead of a redraw of every node that changed state.
    *
    * Redrawn on selection and on every move, because the rings are in world space and follow the
    * nodes rather than the pointer.
@@ -297,13 +306,7 @@ export class GridRenderer {
       const { x, y } = node.view.position;
       const { width, height } = node.layout;
       this.selectionLayer
-        .roundRect(
-          x - SELECTION_GAP,
-          y - SELECTION_GAP,
-          width + SELECTION_GAP * 2,
-          height + SELECTION_GAP * 2,
-          SELECTION_RADIUS,
-        )
+        .roundRect(x, y, width, height, SELECTION_RADIUS)
         .stroke({ width: SELECTION_WIDTH, color, alignment: 0.5 });
     }
   }

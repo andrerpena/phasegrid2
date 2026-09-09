@@ -18,15 +18,21 @@ Spec: docs/superpowers/specs/2026-09-07-phasegrid2-architecture-design.md. Engin
 - `shared/` protocol schemas shared by main/preload/renderer.
 - `src/main`, `src/preload`, `src/renderer` Electron (electron-vite). Alias `@renderer` → `src/renderer/src`, `@shared` → `shared`.
 
-## Rules
+## Rules — general
+- Prefer the architecturally sound solution over the workaround, even when the right change breaks backwards compatibility. Great architecture is the thing being optimised for; migrating callers, formats or saved data is an acceptable cost.
+- Never commit. Leave the work in the tree; the user commits it.
+- `engine/vendor/vital` is vendored GPL code: never edit it (shims only), never use the names "Vital"/"Tytel" in ids, UI or binaries.
+
+## Rules — engine (C++)
 - Audio thread code (`Module::process`, scheduler, param drain, program swap): no allocation, locks, syscalls, exceptions, logging. Tests assert this.
 - Adding a module = one `.cpp` in `engine/src/modules` + one line in `builtin.cpp`. No TypeScript changes.
+- Descriptors are C-layout; never put std types in them.
+- Signals are `pg::Sample` (vital::poly_float, lanes v0.L v0.R v1.L v1.R). Never add channel counts to ports.
+
+## Rules — frontend (Electron)
 - Styling: Tailwind v4 utility classes over the tokens in `src/renderer/src/css/theme.css`. No CSS Modules. Use the theme's colour names (`bg-background`, `text-muted-foreground`, `border-border`, `text-signal-audio`); never a literal colour or a `[var(--x)]` escape hatch.
 - The palette lives once, in `theming/themes/*.ts`, and is injected as CSS at startup by `theming/theme-variables.ts`. `css/theme.css` holds only the `@theme` name mapping (plus two ground colours for the pre-paint frame) — never a palette value. `theming/theme-parity.test.ts` guards both. Grid colours must be `#rrggbb`; `hexToNumber` parses nothing else. A colour needed by something that cannot read CSS goes through `lib/css-color.ts`.
 - A workspace can set `ui.theme`, override colours via `theme` dot-paths, and define whole themes under `themes` — all resolved in `theming/workspace-themes.ts` into the one list the theme store holds. There is no separate store for canvas colours.
-- Descriptors are C-layout; never put std types in them.
-- Signals are `pg::Sample` (vital::poly_float, lanes v0.L v0.R v1.L v1.R). Never add channel counts to ports.
 - The renderer never touches the filesystem. It names a project by its slug; `src/main/workspace/path-guard.ts` is the only place that turns a name into a path, and every write is temp-file-then-rename.
 - Settings (including keybindings, and which panel is in which dock slot) live in the workspace's `workspace.json`; `config/defaults.ts` is the one table of what exists and `config/config-schema.ts` turns it into both the runtime validator and the editor's autocomplete. Only the dock's geometry — column widths and split ratios, which are about the display — and the workspace pointer live under `userData`.
 - A panel is a `WidgetDefinition`; adding one is a line in `config/registry-ids.ts`, a definition file, and a line in `register-widgets.ts`. Same shape for status bar items, control bars and minimap drawers. See docs/ui.md.
-- `engine/vendor/vital` is vendored GPL code: never edit it (shims only), never use the names "Vital"/"Tytel" in ids, UI or binaries.

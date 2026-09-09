@@ -12,6 +12,7 @@ import { Application } from "pixi.js";
 import "pixi.js/unsafe-eval";
 import { useSelectionStore } from "@renderer/selection/selection-store";
 import { useEffect, useRef } from "react";
+import { createSizeSync } from "./canvas-size";
 import { GridInteraction } from "./GridInteraction";
 import { GridRenderer } from "./GridRenderer";
 import { startPreviewSync } from "./preview-sync";
@@ -39,9 +40,18 @@ export const GridView = () => {
     const setup = async () => {
       const element = host.current;
       if (element === null) return;
+      // The content box, in CSS pixels: the one measurement of this canvas's size that everything
+      // downstream is derived from. `clientWidth` rather than a bounding rect, because a rect
+      // carries any transform an ancestor applies and the drawing surface does not.
+      const measure = () => ({
+        width: element.clientWidth,
+        height: element.clientHeight,
+      });
       const created = new Application();
       await created.init({
-        resizeTo: element,
+        // Sized here rather than through Pixi's `resizeTo`, which follows the window and nothing
+        // else -- see the resize observer below. This canvas is sized by the dock.
+        ...measure(),
         backgroundAlpha: 0,
         // WebGL rather than letting Pixi choose. Its WebGPU path fails to acquire a context in some
         // Electron configurations and the only symptom is a canvas that never appears; WebGL is
@@ -106,22 +116,29 @@ export const GridView = () => {
       // The view, reachable from outside the canvas: the minimap draws the visible rectangle and
       // drags it, and the zoom control reads and sets the zoom. Neither can be handed a Pixi object
       // through React, because all of this lives outside the tree.
-      const reportView = () => {
-        const box = element.getBoundingClientRect();
-        viewportStore.setView({ width: box.width, height: box.height });
-      };
-      viewportStore.set(view.viewport, {
-        width: element.clientWidth,
-        height: element.clientHeight,
-      });
+      viewportStore.set(view.viewport, measure());
       stop.push(() => viewportStore.set(null));
 
-      const observer = new ResizeObserver(() => {
-        reportView();
-        view.drawBackground();
+      // The one place the canvas learns how big it is.
+      //
+      // Pixi's own `resizeTo` listens to `window` and nothing else, so before this a dock drag grew
+      // the box and left the canvas at the size the window last made it: the rules stopped partway
+      // down, the strip past the canvas was dead to the pointer, and whatever the compositor had
+      // last painted there stayed on screen. Everything that needs the size is updated from this one
+      // measurement, in this order, so none of them can disagree.
+      const sync = createSizeSync(({ width, height }) => {
+        view.resize(width, height);
+        viewportStore.setView({ width, height });
+        // Drawn now rather than on the ticker's next frame, so a drag never shows a canvas that has
+        // been resized but not yet redrawn.
+        created.render();
       });
+      const observer = new ResizeObserver(() => sync.request(measure()));
       observer.observe(element);
-      stop.push(() => observer.disconnect());
+      stop.push(() => {
+        observer.disconnect();
+        sync.dispose();
+      });
 
       const interaction = new GridInteraction(
         view,
@@ -245,8 +262,11 @@ export const GridView = () => {
   return (
     <div
       ref={host}
-      // The canvas fills this; the element itself only ever provides the box and the focus scope.
-      className="absolute inset-0 overflow-hidden touch-none [&>canvas]:block"
+      // The canvas fills this; the element itself only ever provides the box, the ground and the
+      // focus scope. The ground is the grid's own, not the interface's, so that the frame before the
+      // canvas exists -- and the frame between a divider moving and the resize observer catching up
+      // -- shows the surface the canvas is about to draw rather than whatever was behind it.
+      className="absolute inset-0 overflow-hidden touch-none bg-grid-background [&>canvas]:block"
       data-kb-scope="grid"
       tabIndex={-1}
       onPointerDown={() => host.current?.focus()}

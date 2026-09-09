@@ -926,6 +926,56 @@ try {
       framed.before !== framed.after,
       JSON.stringify(framed),
     );
+
+    // ── The canvas following its panel ───────────────────────────────────────
+    // Pixi's own `resizeTo` follows the window and nothing else, so a dock drag used to leave the
+    // canvas at whatever size the window last made it: the rules stopped partway down and the strip
+    // past the canvas was dead to the pointer. Only a real drag of a real divider catches that --
+    // the unit tests cover when a size is applied, not whether anything told Pixi at all.
+    const handle = await evaluate(`
+      const inspector = document.querySelector('[data-widget="inspector"]');
+      const host = document.querySelector('[data-kb-scope="grid"]');
+      const grip = [...document.querySelectorAll('[data-component="ResizeHandle"]')]
+        .find((h) => h.parentElement.contains(inspector));
+      if (!grip || !host) return null;
+      const r = grip.getBoundingClientRect();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2, height: host.clientHeight };`);
+    check("9. the centre column has a divider to drag", handle !== null);
+    if (handle === null) throw new Error("no divider above the inspector");
+
+    // Downwards, which shrinks the bottom panel and gives the room to the grid -- the direction that
+    // exposes a canvas too small for its box.
+    await mouse("mousePressed", handle.x, handle.y);
+    await sleep(80);
+    for (let i = 1; i <= 5; i++) {
+      await mouse("mouseMoved", handle.x, handle.y + i * 20);
+      await sleep(40);
+    }
+    await mouse("mouseReleased", handle.x, handle.y + 100);
+    await sleep(400);
+
+    const resized = await evaluate(`
+      const host = document.querySelector('[data-kb-scope="grid"]');
+      const canvas = host?.querySelector("canvas");
+      if (!canvas) return null;
+      const r = canvas.getBoundingClientRect();
+      return {
+        host: { width: host.clientWidth, height: host.clientHeight },
+        canvas: { width: r.width, height: r.height },
+      };`);
+    check(
+      "9. dragging the divider gives the room to the grid",
+      resized !== null && resized.host.height > handle.height + 40,
+      JSON.stringify({ was: handle.height, now: resized?.host.height }),
+    );
+    check(
+      "9. and the canvas grows with it, filling its panel",
+      resized !== null &&
+        Math.abs(resized.canvas.height - resized.host.height) <= 1 &&
+        Math.abs(resized.canvas.width - resized.host.width) <= 1,
+      JSON.stringify(resized),
+    );
+    await screenshot("dock-resize");
   });
 } catch (error) {
   console.error("\ndriver failed:", error.message);
