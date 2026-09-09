@@ -22,6 +22,9 @@ inline constexpr uint32_t kMaxPortsPerModule = 32;
 /// anything above this with E_VOICES.
 inline constexpr uint32_t kMaxVoices = 32;
 inline constexpr uint32_t kMaxParamsPerModule = 64;
+/// Text properties a module may declare. A face has room for a handful and a module that wants
+/// more is telling us it wanted structured data instead.
+inline constexpr uint32_t kMaxTextsPerModule = 8;
 static_assert(vital::poly_float::kSize == 4, "phasegrid2 assumes 4 SIMD lanes: v0.L v0.R v1.L v1.R");
 
 inline constexpr float kOctavesPerUnit = 10.f;

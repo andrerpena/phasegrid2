@@ -58,6 +58,13 @@ function applyOpUnordered(doc: PatchDoc, op: PatchOp): PatchDoc {
     }
     case "moduleRemove":
       return withoutModule(doc, op.id);
+    case "moduleSetData":
+      return {
+        ...doc,
+        modules: doc.modules.map((m) =>
+          m.id === op.id ? { ...m, data: op.data } : m,
+        ),
+      };
     case "edgeAdd":
       return {
         ...doc,
@@ -139,6 +146,13 @@ function inverseOf(doc: PatchDoc, op: PatchOp): PatchOp[] {
           (e): PatchOp => ({ op: "edgeAdd", id: e.id, from: e.from, to: e.to }),
         ),
       ];
+    }
+    case "moduleSetData": {
+      const module = doc.modules.find((m) => m.id === op.id);
+      if (module === undefined) return [];
+      // The whole previous blob, including the case where there was none: a module that had no
+      // data undoes back to having none, not to an empty object the engine would still rebuild for.
+      return [{ op: "moduleSetData", id: op.id, data: module.data ?? {} }];
     }
     case "edgeAdd": {
       const existing = doc.edges.find((e) => e.id === op.id);

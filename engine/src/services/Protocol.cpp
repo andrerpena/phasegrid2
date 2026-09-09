@@ -152,6 +152,19 @@ Result applyModuleRemove(GraphModel& model, const json& o) {
   return model.removeNode(id);
 }
 
+/// A module's whole `data` blob, replaced.
+///
+/// Whole rather than merged: `data` is one value the module owns, `configure` reads all of it at
+/// once, and a merge would leave a caller unable to REMOVE a key. The undo entry carries the
+/// previous blob for the same reason.
+Result applyModuleSetData(GraphModel& model, const json& o) {
+  ArgReader a(o);
+  const std::string id = a.str("id");
+  const json& data = a.obj("data", true);
+  if (!a) return a.result();
+  return model.setNodeData(id, data);
+}
+
 Result applyEdgeAdd(GraphModel& model, const Registry& registry, const json& o) {
   ArgReader a(o);
   EdgeModel edge;
@@ -201,6 +214,7 @@ Result applyOp(GraphModel& model, const Registry& registry, const json& op) {
   const std::string name = kind->get<std::string>();
   if (name == "moduleAdd") return applyModuleAdd(model, registry, op);
   if (name == "moduleRemove") return applyModuleRemove(model, op);
+  if (name == "moduleSetData") return applyModuleSetData(model, op);
   if (name == "edgeAdd") return applyEdgeAdd(model, registry, op);
   if (name == "edgeRemove") return applyEdgeRemove(model, op);
   if (name == "paramSet") return applyParamSet(model, registry, op);
@@ -471,6 +485,14 @@ json dispatchCommand(const std::string& cmd, const json& id, const json& args, P
     return editGraph(ctx, id, [&](GraphModel& model) { return applyModuleAdd(model, ctx.registry, args); });
   if (cmd == "module.remove")
     return editGraph(ctx, id, [&](GraphModel& model) { return applyModuleRemove(model, args); });
+  if (cmd == "module.setData")
+    return editGraph(ctx, id, [&](GraphModel& model) {
+      ArgReader a(args);
+      const std::string node = a.str("module");
+      const json& data = a.obj("data", true);
+      if (!a) return a.result();
+      return model.setNodeData(node, data);
+    });
   if (cmd == "edge.add")
     return editGraph(ctx, id, [&](GraphModel& model) { return applyEdgeAdd(model, ctx.registry, args); });
   if (cmd == "edge.remove")

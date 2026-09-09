@@ -24,6 +24,13 @@ export const TELEMETRY_SCOPE_FRAMES = 1024;
 export const METER_FLOATS_PER_CHANNEL = 3;
 /** The most parameters a module can have, and so the most floats a params slot carries. */
 export const TELEMETRY_MAX_PARAMS = 64;
+/** Notes one slot may carry, and the bytes each takes. Both are fixed by the engine's record. */
+export const TELEMETRY_MAX_NOTES = 256;
+export const TELEMETRY_NOTE_BYTES = 32;
+/** Floats in front of the notes: quarters per cycle, quarters per bar, the playhead, and a spare. */
+export const TELEMETRY_NOTE_HEADER_FLOATS = 4;
+/** `flags` bit 0 of a note record: it is sounding right now. */
+export const TELEMETRY_NOTE_SOUNDING = 1;
 
 export enum TelemetryKind {
   None = 0,
@@ -45,6 +52,13 @@ export enum TelemetryKind {
    * it is not a meter: a meter's peak is a magnitude, and +0.5 and -0.5 read the same through one.
    */
   Value = 5,
+  /**
+   * The notes a note source is playing: the window it is in, in musical time, with the playhead
+   * and enough of the meter to rule a grid under them. What a piano roll on a module's face is
+   * drawn from -- the engine has already worked out where the notes are, and an interface that
+   * recomputed them would be guessing at a pattern it cannot parse.
+   */
+  Notes = 6,
 }
 
 export interface TelemetryHeader {
@@ -99,12 +113,38 @@ export interface ValueReading {
   values: number[];
 }
 
+/** One note in a `Notes` reading. Times are in cycles from the start of the window. */
+export interface TelemetryNote {
+  start: number;
+  length: number;
+  /** MIDI note number, after the module's transpose. */
+  pitch: number;
+  velocity: number;
+  /** The character range of the step in the module's text property `textIndex`. */
+  from: number;
+  to: number;
+  textIndex: number;
+  sounding: boolean;
+}
+
+export interface NotesReading {
+  kind: TelemetryKind.Notes;
+  blockIndex: bigint;
+  notes: TelemetryNote[];
+  /** How long the window is, and how long a bar is, both in quarter notes: enough to rule a grid. */
+  quartersPerCycle: number;
+  quartersPerBar: number;
+  /** Where the playhead is in the window, 0..1. */
+  phase: number;
+}
+
 export type SlotReading =
   | MeterReading
   | ScopeReading
   | ParamsReading
   | PreviewReading
-  | ValueReading;
+  | ValueReading
+  | NotesReading;
 
 /** Where a slot begins, given its index. */
 export function slotOffset(index: number): number {
@@ -219,6 +259,37 @@ export function decodeSlot(bytes: Uint8Array): SlotReading | null {
     for (let i = 0; i < channels; i++)
       values.push(view.getFloat32(payload + i * 4, true));
     return { kind, blockIndex, values };
+  }
+
+  if (kind === TelemetryKind.Notes) {
+    // `frames` carries the note count. Bounded before it is used as a length, like every other
+    // number that arrived from the engine's process.
+    if (frames > TELEMETRY_MAX_NOTES) return null;
+    const first = payload + TELEMETRY_NOTE_HEADER_FLOATS * 4;
+    if (first + frames * TELEMETRY_NOTE_BYTES > bytes.byteLength) return null;
+    const notes: TelemetryNote[] = [];
+    for (let i = 0; i < frames; i++) {
+      const at = first + i * TELEMETRY_NOTE_BYTES;
+      notes.push({
+        start: view.getFloat32(at, true),
+        length: view.getFloat32(at + 4, true),
+        pitch: view.getFloat32(at + 8, true),
+        velocity: view.getFloat32(at + 12, true),
+        from: view.getUint32(at + 16, true),
+        to: view.getUint32(at + 20, true),
+        textIndex: view.getUint32(at + 24, true),
+        sounding:
+          (view.getUint32(at + 28, true) & TELEMETRY_NOTE_SOUNDING) !== 0,
+      });
+    }
+    return {
+      kind,
+      blockIndex,
+      notes,
+      quartersPerCycle: view.getFloat32(payload, true),
+      quartersPerBar: view.getFloat32(payload + 4, true),
+      phase: view.getFloat32(payload + 8, true),
+    };
   }
 
   return null; // kind None, or one this build does not know

@@ -162,6 +162,21 @@ void TelemetryWriter::writeValue(uint32_t slot, const float* values, uint32_t ch
   });
 }
 
+void TelemetryWriter::writeNotes(uint32_t slot, const TelemetryNote* notes, uint32_t count,
+                                 float quartersPerCycle, float quartersPerBar, float phase,
+                                 uint64_t blockIndex) noexcept PG_RT_NONBLOCKING {
+  const uint32_t n = std::min(count, kTelemetryMaxNotes);
+  publish(slot, TelemetryKind::Notes, 1, n, blockIndex, [&](float* out) noexcept {
+    out[0] = quartersPerCycle;
+    out[1] = quartersPerBar;
+    out[2] = phase;
+    out[3] = 0.f;
+    // A plain copy of POD records into the payload, past the four floats of preamble. The record is
+    // the same 32 bytes on both sides of the segment; `telemetry.ts` decodes the same layout.
+    std::memcpy(out + kTelemetryNoteHeaderFloats, notes, static_cast<size_t>(n) * sizeof(TelemetryNote));
+  });
+}
+
 void TelemetryWriter::writePreview(uint32_t slot, const float* samples, uint32_t count,
                                    uint64_t index) noexcept {
   const uint32_t n = std::min(count, kTelemetryScopeFrames);

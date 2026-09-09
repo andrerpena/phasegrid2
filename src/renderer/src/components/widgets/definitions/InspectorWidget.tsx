@@ -1,16 +1,19 @@
 import { useCatalogStore } from "@renderer/catalog/catalog-store";
 import { SchemaFormBody } from "@renderer/components/form";
 import { useSchemaForm } from "@renderer/components/form/useSchemaForm";
+import { editModuleText } from "@renderer/patch/editor/edit-text";
 import {
   buildModuleSchema,
   flattenModule,
   numericValue,
   paramIdFor,
+  textIdFor,
 } from "@renderer/patch/module-schema";
 import { usePatchStore } from "@renderer/patch/patch-store";
+import { schema as schemaFactory } from "@renderer/schemas/core/schema";
 import { useSelectionStore } from "@renderer/selection/selection-store";
 import { SlidersHorizontal } from "lucide-react";
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { WidgetDefinition } from "../types";
 
 /**
@@ -35,11 +38,54 @@ const ModuleInspector = ({ moduleId }: { moduleId: string }) => {
   );
   const descriptor = useCatalogStore((s) => s.byId.get(module?.type ?? ""));
 
-  // The shape depends only on the module type, so it is rebuilt when the type changes and not when
-  // a value does -- which during a knob drag is every frame.
+  /**
+   * Writes a text property, as one undoable edit.
+   *
+   * Whole rather than merged, because `data` is one value the module owns: see
+   * `ModuleSetDataOpSchema`. Declared before the schema because the expand button closes over it.
+   */
+  const setText = useCallback(
+    (textId: string, value: string) => {
+      const current = usePatchStore
+        .getState()
+        .doc.modules.find((m) => m.id === moduleId);
+      if (current === undefined) return;
+      const before = current.data ?? {};
+      if (before[textId] === value) return;
+      usePatchStore.getState().apply(
+        [
+          {
+            op: "moduleSetData",
+            id: moduleId,
+            data: { ...before, [textId]: value },
+          },
+        ],
+        {
+          label: "Edit pattern",
+          inverse: [{ op: "moduleSetData", id: moduleId, data: before }],
+        },
+      );
+    },
+    [moduleId],
+  );
+
+  /**
+   * The shape depends only on the module type, so it is rebuilt when the type changes and not when
+   * a value does -- which during a knob drag is every frame.
+   *
+   * An empty form rather than null while the catalogue is still loading. `useSchemaForm` is a hook
+   * and so cannot be skipped, and it reads the shape as it mounts: handing it nothing crashes the
+   * panel in the one moment it is most likely to be on screen, when a restored session selects a
+   * module before the engine has answered.
+   */
   const schema = useMemo(
-    () => (descriptor === undefined ? null : buildModuleSchema(descriptor)),
-    [descriptor],
+    () =>
+      descriptor === undefined
+        ? schemaFactory.object({})
+        : buildModuleSchema(descriptor, (text) =>
+            editModuleText(moduleId, text.id),
+          ),
+    [descriptor, moduleId],
   );
   const values = useMemo(
     () =>
@@ -51,7 +97,7 @@ const ModuleInspector = ({ moduleId }: { moduleId: string }) => {
 
   // Declared unconditionally: hooks cannot be skipped, and the empty cases are handled after.
   const form = useSchemaForm({
-    schema: schema ?? (null as never),
+    schema,
     onSubmit: () => {},
     initialValues: (values ?? {}) as Record<string, unknown>,
   });
@@ -68,6 +114,14 @@ const ModuleInspector = ({ moduleId }: { moduleId: string }) => {
     if (module === undefined || descriptor === undefined) return;
     const state = form.formState as Record<string, unknown>;
     for (const [key, value] of Object.entries(state)) {
+      const textId = textIdFor(key);
+      if (textId !== null) {
+        if (typeof value !== "string") continue;
+        if (pushed.current[key] === value) continue;
+        pushed.current[key] = value;
+        setText(textId, value);
+        continue;
+      }
       const paramId = paramIdFor(key);
       if (paramId === null) continue;
       const param = descriptor.params.find((p) => p.id === paramId);
@@ -96,11 +150,11 @@ const ModuleInspector = ({ moduleId }: { moduleId: string }) => {
           },
         );
     }
-  }, [form.formState, module, descriptor]);
+  }, [form.formState, module, descriptor, setText]);
 
   if (module === undefined)
     return <Empty>That module is no longer in the patch.</Empty>;
-  if (descriptor === undefined || schema === null)
+  if (descriptor === undefined)
     return <Empty>The engine has no description of this module.</Empty>;
 
   return (

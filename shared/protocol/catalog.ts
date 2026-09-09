@@ -112,6 +112,27 @@ export const ParamDescSchema = z
     message: "a structural param can never be modulatable",
   });
 
+/**
+ * A string a module owns: a note pattern, a sample path, an expression.
+ *
+ * Params are numbers everywhere, because a number can be smoothed, modulated and swept. A string
+ * can do none of those, so it lives in the node's `data` under this id and is *structural* -- the
+ * engine rebuilds the node when it changes. Declaring it here is what lets the interface generate
+ * an editor for it, the same way it generates a knob from a param.
+ */
+export const TextDescSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string(),
+    default: z.string(),
+    flags: z.object({ multiline: z.boolean() }).strict(),
+    /** Which editor mode to open. Absent, or a name we do not know, is plain text. */
+    language: z.string().optional(),
+    placeholder: z.string().optional(),
+    doc: z.string(),
+  })
+  .strict();
+
 export const ModuleFlagsSchema = z
   .object({
     /** Writes to the engine output rather than to a port of its own. */
@@ -140,6 +161,8 @@ export const ModuleFlagsSchema = z
      * (`TelemetryKind.Meter`). The editor gives such a module a level meter on its face.
      */
     publishesMeter: z.boolean(),
+    /** Publishes the notes it is playing, which is what a piano roll on its face is drawn from. */
+    publishesNotes: z.boolean(),
   })
   .strict();
 
@@ -147,8 +170,8 @@ export const ModuleFlagsSchema = z
  * A module's face: rows of tokens, one per grid cell, as the engine padded them (every row the same
  * length). Equal neighbouring tokens form one rectangular block, as CSS `grid-template-areas`. `.` is
  * an empty cell, `wave` the wave panel, `scope` the scope panel, `value` the readout, `meter` the
- * level meter, anything else names a port (`in:`/`out:` when the two sides
- * share an id) or a param (`param:` when it collides with a port). The engine's registry has already
+ * level meter, `text:<id>` a text property, anything else names a port (`in:`/`out:` when the two
+ * sides share an id) or a param (`param:` when it collides with a port). The engine's registry has already
  * checked the geometry; the check here is only that every token still names something on the
  * module, which is what `composeFace` needs to be true.
  */
@@ -160,6 +183,7 @@ export function resolveFaceToken(
     inputs: { id: string }[];
     outputs: { id: string }[];
     params: { id: string }[];
+    texts?: { id: string }[];
   },
   token: string,
 ):
@@ -168,13 +192,15 @@ export function resolveFaceToken(
   | { kind: "scope" }
   | { kind: "value" }
   | { kind: "meter" }
-  | { kind: "input" | "output" | "param"; id: string }
+  | { kind: "pianoRoll" }
+  | { kind: "input" | "output" | "param" | "text"; id: string }
   | null {
   if (token === ".") return { kind: "empty" };
   if (token === "wave") return { kind: "wave" };
   if (token === "scope") return { kind: "scope" };
   if (token === "value") return { kind: "value" };
   if (token === "meter") return { kind: "meter" };
+  if (token === "pianoRoll") return { kind: "pianoRoll" };
   // Implicit modulation ports never sit on a face; they ride on their param's control, so only a
   // declared input is a jack.
   const declared = module.inputs.filter(
@@ -186,6 +212,10 @@ export function resolveFaceToken(
     ["in:", "input", declared],
     ["out:", "output", module.outputs],
     ["param:", "param", module.params],
+    // A text property is always written out in full. Unlike a port or a param it is not something
+    // a bare name could plausibly mean, and spelling it keeps a module with a `pattern` param and
+    // a `pattern` string from being ambiguous.
+    ["text:", "text", module.texts ?? []],
   ] as const) {
     if (!token.startsWith(prefix)) continue;
     const id = token.slice(prefix.length);
@@ -211,6 +241,7 @@ export const ModuleDescriptorSchema = z
     inputs: z.array(PortDescSchema),
     outputs: z.array(PortDescSchema),
     params: z.array(ParamDescSchema),
+    texts: z.array(TextDescSchema),
     /** The declared face, or null for a module that leaves its face to the interface. */
     face: FaceSchema.nullable(),
   })
@@ -258,6 +289,7 @@ export type ParamUnit = z.infer<typeof ParamUnitSchema>;
 export type ParamCurve = z.infer<typeof ParamCurveSchema>;
 export type PortDesc = z.infer<typeof PortDescSchema>;
 export type ParamDesc = z.infer<typeof ParamDescSchema>;
+export type TextDesc = z.infer<typeof TextDescSchema>;
 export type ModuleDescriptor = z.infer<typeof ModuleDescriptorSchema>;
 export type Catalog = z.infer<typeof CatalogSchema>;
 

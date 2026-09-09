@@ -44,7 +44,13 @@ inline constexpr uint32_t kTelemetryMaxSlots = 128;
 /// `PreviewPublisher` on the message thread: `channels` is 1 and `frames` is the cycle's length.
 /// `Value` is the last frame of the signal a `display.value` was fed, one float per channel: a signed
 /// reading, which no other kind carries (a meter's peak is a magnitude, and 0.5 and -0.5 read alike).
-enum class TelemetryKind : uint32_t { None = 0, Meter = 1, Scope = 2, Params = 3, Preview = 4, Value = 5 };
+/// `Notes` is the picture a note source draws of itself: the notes of the cycle it is playing, in
+/// musical time, with the playhead and enough of the meter to rule a grid under them. It is what a
+/// piano roll on a module's face is drawn from -- the engine has already worked out where the notes
+/// are, and an interface that recomputed them would be guessing at a pattern it cannot parse.
+enum class TelemetryKind : uint32_t {
+  None = 0, Meter = 1, Scope = 2, Params = 3, Preview = 4, Value = 5, Notes = 6
+};
 
 /// "nobody is watching this module". Not a valid slot index, and the default for every instance.
 inline constexpr uint32_t kNoTelemetrySlot = 0xFFFFFFFFu;
@@ -72,6 +78,28 @@ static_assert(std::atomic<uint32_t>::is_always_lock_free,
 inline constexpr uint32_t kMeterFloatsPerChannel = 3;
 /// Params payload: one float per parameter. Matches `kMaxParamsPerModule`, and a slot holds far more.
 inline constexpr uint32_t kTelemetryMaxParams = 64;
+
+/// One note in a `Notes` slot: where it is, what it is, and where it was written.
+///
+/// `from`/`to` are the character range of the step in the module's text property `textIndex`, which
+/// is what lets an interface light up the step in the pattern string as it sounds without parsing
+/// the string itself. `flags` bit 0 says the note is sounding right now.
+struct TelemetryNote {
+  float start;      // cycles from the start of the window
+  float length;     // cycles
+  float pitch;      // MIDI note number
+  float velocity;   // 0..1
+  uint32_t from;
+  uint32_t to;
+  uint32_t textIndex;
+  uint32_t flags;
+};
+static_assert(sizeof(TelemetryNote) == 32, "the TypeScript reader assumes a 32-byte note record");
+inline constexpr uint32_t kTelemetryNoteFlagSounding = 1u << 0;
+/// Floats in front of the notes: quarters per cycle, quarters per bar, the playhead, and a spare.
+inline constexpr uint32_t kTelemetryNoteHeaderFloats = 4;
+/// Notes one slot may carry. Matches the pattern engine's per-cycle cap, and a slot holds far more.
+inline constexpr uint32_t kTelemetryMaxNotes = 256;
 
 /**
  * The segment header. Written once, when the segment is created, and read by anyone attaching.
@@ -138,6 +166,10 @@ public:
   /// Audio thread. One float per channel: the last frame of the block, signed, as it was on the wire.
   void writeValue(uint32_t slot, const float* values, uint32_t channels, uint64_t blockIndex) noexcept
       PG_RT_NONBLOCKING;
+  /// Audio thread. The notes of the window a note source is playing, with the meter to rule a grid
+  /// under them and the playhead within it. Capped at `kTelemetryMaxNotes`.
+  void writeNotes(uint32_t slot, const TelemetryNote* notes, uint32_t count, float quartersPerCycle,
+                  float quartersPerBar, float phase, uint64_t blockIndex) noexcept PG_RT_NONBLOCKING;
   /// Message thread (it is the preview publisher's), but built the same way so a reader cannot tell.
   /// One channel of `count` samples, capped at `kTelemetryScopeFrames`; `index` counts publishes.
   void writePreview(uint32_t slot, const float* samples, uint32_t count, uint64_t index) noexcept;

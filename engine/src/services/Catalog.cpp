@@ -94,6 +94,21 @@ nlohmann::json paramJson(const ParamDesc& p) {
   return j;
 }
 
+/// A text property: the string a module owns and an interface generates an editor for.
+nlohmann::json textJson(const TextDesc& t) {
+  nlohmann::json j;
+  j["id"] = text(t.id);
+  j["name"] = text(t.name);
+  j["default"] = text(t.def);
+  j["flags"] = {{"multiline", (t.flags & kTextMultiline) != 0}};
+  // The editor mode to open. Null is plain text, and so is a name the interface has never heard
+  // of -- an unknown language should cost syntax colouring, not the ability to type.
+  if (t.language != nullptr) j["language"] = text(t.language);
+  if (t.placeholder != nullptr) j["placeholder"] = text(t.placeholder);
+  j["doc"] = text(t.doc);
+  return j;
+}
+
 nlohmann::json moduleJson(const RegisteredModule& m) {
   const ModuleDescriptor& d = *m.desc;
   nlohmann::json j;
@@ -109,6 +124,7 @@ nlohmann::json moduleJson(const RegisteredModule& m) {
     {"publishesScope", (d.flags & kModulePublishesScope) != 0},
     {"publishesValue", (d.flags & kModulePublishesValue) != 0},
     {"publishesMeter", (d.flags & kModulePublishesMeter) != 0},
+    {"publishesNotes", (d.flags & kModulePublishesNotes) != 0},
   };
   // The registry's input list is the declared ports followed by one implicit port per modulatable param,
   // in exactly the order the compiler assigns buffers, so the UI's port indices match the engine's.
@@ -121,6 +137,9 @@ nlohmann::json moduleJson(const RegisteredModule& m) {
   nlohmann::json params = nlohmann::json::array();
   for (uint32_t i = 0; i < d.numParams; ++i) params.push_back(paramJson(d.params[i]));
   j["params"] = params;
+  nlohmann::json texts = nlohmann::json::array();
+  for (uint32_t i = 0; i < d.numTexts; ++i) texts.push_back(textJson(d.texts[i]));
+  j["texts"] = texts;
   // The face as the registry padded it: rows of tokens, every row the same length, or null for a module
   // that leaves its face to the interface. See `ModuleDescriptor::face`.
   if (m.face.empty()) j["face"] = nullptr;

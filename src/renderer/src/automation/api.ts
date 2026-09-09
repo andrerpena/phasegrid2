@@ -4,7 +4,7 @@ import { useModalStore } from "@renderer/components/floating/modal/modal-store";
 import { useWidgetLayoutStore } from "@renderer/components/widgets/widget-layout-store";
 import { useConfigStore } from "@renderer/config/config-store";
 import { useEngineStore } from "@renderer/engine/engine-store";
-import { exampleFor, projectForExample } from "@renderer/examples/registry";
+import { exampleFor } from "@renderer/examples/registry";
 import { composeFace } from "@renderer/grid/face";
 import { useHistoryStore } from "@renderer/history/history-store";
 import { useLayoutStore } from "@renderer/layout/layout-store";
@@ -183,12 +183,17 @@ export function createAutomationApi() {
         const target = id ?? useProjectStore.getState().activeId;
         return target === null ? Promise.resolve() : closeProject(target);
       },
-      /** Opens a module's example project. */
-      openExample: (moduleId: string): void => {
+      /**
+       * Copies a module's example into the workspace and opens the copy, as the palette does.
+       *
+       * Resolves to whether it reached disk. The tab is there either way, so a scenario can go on
+       * editing what it opened even in a workspace that refused the write.
+       */
+      copyExample: (moduleId: string): Promise<boolean> => {
         const example = exampleFor(moduleId);
         if (example === undefined)
           throw new Error(`no example for ${moduleId}`);
-        useProjectStore.getState().open(projectForExample(example));
+        return useWorkspaceStore.getState().copyExample(example);
       },
     },
 
@@ -236,7 +241,7 @@ const HELP = [
   "pg.commands.list() / .run(id, payload?)",
   "pg.patch.apply(ops, label?) / .addModule(type, {id,x,y}?) / .connect(from, to) / .setParam(m, p, v) / .remove(ids) / .select(ids)",
   "pg.grid.canvas() / .viewport() / .node(id) / .nodes() / .port(module, port, side?) / .knob(module, param)   window pixels",
-  "pg.workspace.openAt(root) / .openProject(slug) / .save() / .saveAs(name) / .closeProject(id?) / .openExample(moduleId)",
+  "pg.workspace.openAt(root) / .openProject(slug) / .save() / .saveAs(name) / .closeProject(id?) / .copyExample(moduleId)",
   "pg.dialogs.answer(kind, answer)       the next native dialog of that kind answers this: confirmUnsaved save|discard|cancel, confirmDelete true|false, chooseWorkspace path|null",
   "pg.engine.call(cmd, args)             the protocol, raw",
   "pg.engine.render({seconds, out}?)     the loaded patch rendered offline: rms and peak per channel, a WAV at out",

@@ -57,7 +57,10 @@ function rectOf(
 /** One block of a face, as a script sees it: what it is, what it is for, and where. */
 export interface FaceBlock {
   kind: Block["kind"];
-  /** The face token: the port id, the param id, `wave`, `scope`, `value`, `meter`, or `title`. */
+  /**
+   * The face token: the port id, the param id, the text property's id, `wave`, `scope`, `value`,
+   * `meter`, `pianoRoll`, or `title`.
+   */
   name: string;
   rect: Rect;
   /** A jack's socket, or a knob's modulation socket; absent on the title, a wave and an unmodulatable knob. */
@@ -86,6 +89,19 @@ export interface FaceBlock {
     rms: number[];
     clipped: boolean[];
   } | null;
+  /**
+   * What a piano roll last drew: the engine's count of the publish, how many notes are in the
+   * window, how many of them are sounding right now, and where the playhead is. Null until the
+   * engine has published one. `sounding` is what a scenario watches move.
+   */
+  notes?: {
+    index: string;
+    count: number;
+    sounding: number;
+    phase: number;
+  } | null;
+  /** What a text property holds: the value from the document, or the module's default. */
+  text?: string | null;
 }
 
 export function createGridApi(source: GridSource = fromRegistry) {
@@ -234,6 +250,8 @@ export function createGridApi(source: GridSource = fromRegistry) {
         if (block.kind === "scope") out.trace = node.traceOf();
         if (block.kind === "value") out.reading = node.readingOf();
         if (block.kind === "meter") out.level = node.levelOf();
+        if (block.kind === "pianoRoll") out.notes = node.notesOf();
+        if (block.kind === "text") out.text = node.textOf(block.name);
         return out;
       });
     },

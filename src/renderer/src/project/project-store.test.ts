@@ -9,12 +9,8 @@ function withModule(id: string): PatchDoc {
   return { ...EMPTY_PATCH, modules: [{ id, type: "amp.vca", x: 0, y: 0 }] };
 }
 
-function project(
-  name: string,
-  patch: PatchDoc,
-  kind: ProjectDoc["kind"] = "user",
-): ProjectDoc {
-  return { ...emptyProject(name), patch, kind };
+function project(name: string, patch: PatchDoc): ProjectDoc {
+  return { ...emptyProject(name), patch };
 }
 
 beforeEach(() => {
@@ -126,13 +122,5 @@ describe("project properties", () => {
     );
     useProjectStore.getState().setTempo(10_000);
     expect(useProjectStore.getState().active()?.tempo).toBeLessThanOrEqual(400);
-  });
-
-  it("will not save an example, because it has nowhere to save to", () => {
-    // An example is an ordinary project in every other way: move things, rewire it, turn the knobs.
-    // Writing back over a shipped example would quietly change what the next person sees.
-    const example = project("Oscillator", EMPTY_PATCH, "example");
-    useProjectStore.getState().open(example);
-    expect(useProjectStore.getState().canSave(example.id)).toBe(false);
   });
 });

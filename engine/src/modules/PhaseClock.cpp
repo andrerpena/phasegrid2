@@ -1,5 +1,6 @@
 #include <cmath>
 #include "core/Module.hpp"
+#include "modules/Division.hpp"
 
 namespace pg::modules {
 namespace {
@@ -8,18 +9,9 @@ const PortDesc kOut[] = {
   {"phase", "Phase", PortKind::Continuous, 1, SignalRole::Phase, "Ramp from 0 to just under 1 over each cycle"},
   {"trigger", "Trigger", PortKind::Continuous, 1, SignalRole::Gate, "1 for a single frame at the start of every cycle"},
 };
-const char* const kDivisionLabels[] = {"1/16", "1/8", "1/4", "1/2", "1 bar", "2 bars", "4 bars"};
-/// How long one cycle lasts, per label. The first four are absolute note values in quarter notes; the last
-/// three are counted in BARS, so they follow the project's time signature -- 4/4 makes a bar four quarters,
-/// 6/8 makes it three, and the clock lines up with the meter either way.
-const double kQuartersPerCycle[] = {0.25, 0.5, 1.0, 2.0, 0.0, 0.0, 0.0};
-const double kBarsPerCycle[] = {0.0, 0.0, 0.0, 0.0, 1.0, 2.0, 4.0};
-static_assert(std::size(kQuartersPerCycle) == std::size(kDivisionLabels));
-static_assert(std::size(kBarsPerCycle) == std::size(kDivisionLabels));
-
 const ParamDesc kParams[] = {
-  {"division", "Division", 0.f, static_cast<float>(std::size(kDivisionLabels) - 1), 2.f, ParamUnit::None,
-   ParamCurve::Linear, kParamEnum | kParamInteger | kParamNoSmooth, kDivisionLabels, countOf(kDivisionLabels),
+  {"division", "Division", 0.f, static_cast<float>(kDivisionCount - 1), 2.f, ParamUnit::None,
+   ParamCurve::Linear, kParamEnum | kParamInteger | kParamNoSmooth, kDivisionLabels, kDivisionCount,
    "select", nullptr, "How long one cycle lasts, in musical time"},
   {"swing", "Swing", 0.f, 0.5f, 0.f, ParamUnit::Ratio, ParamCurve::Linear, kParamPrimary | kParamModulatable, nullptr, 0,
    "slider", nullptr, "Delays the start of every second cycle by this fraction of a cycle"},
@@ -66,10 +58,8 @@ class PhaseClock final : public VoicedModule<State> {
     Sample* phaseOut = c.out(0).data;
     Sample* triggerOut = c.out(1).data;
 
-    const uint32_t index = static_cast<uint32_t>(lanes::lane(c.param(0).at(0), 0));
-    const size_t division = index < std::size(kQuartersPerCycle) ? index : 0;
-    const double quarters = kBarsPerCycle[division] > 0.0 ? kBarsPerCycle[division] * t.quartersPerBar()
-                                                          : kQuartersPerCycle[division];
+    const double quarters =
+      quartersPerCycle(static_cast<uint32_t>(lanes::lane(c.param(0).at(0), 0)), t);
     const double samplesPerQuarter = 60.0 * c.sampleRate / (t.tempo > 0.0 ? t.tempo : 120.0);
     // Stopped, the clock free-runs off the sample position at the transport's tempo, so a patch still moves
     // while nothing is playing. Running, it follows the host's musical position exactly.

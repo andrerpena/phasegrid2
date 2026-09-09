@@ -10,7 +10,9 @@ import { type Block, type BlockStyle, blockStyle } from "./blocks/Block";
 import { JackBlock } from "./blocks/JackBlock";
 import { KnobBlock } from "./blocks/KnobBlock";
 import { type Level, MeterBlock } from "./blocks/MeterBlock";
+import { type NotesView, PianoRollBlock } from "./blocks/PianoRollBlock";
 import { ScopeBlock } from "./blocks/ScopeBlock";
+import { TextBlock } from "./blocks/TextBlock";
 import { TitleBlock } from "./blocks/TitleBlock";
 import { ValueBlock } from "./blocks/ValueBlock";
 import { WaveBlock } from "./blocks/WaveBlock";
@@ -51,6 +53,19 @@ export interface LevelSummary {
   clipped: boolean[];
 }
 
+/**
+ * What is on the piano roll right now, as a script sees it.
+ *
+ * A summary rather than the notes themselves: a scenario asks "is it playing, and is it moving",
+ * and the notes are the engine's business. `sounding` is what a test watches change.
+ */
+export interface NotesSummary {
+  index: string;
+  count: number;
+  sounding: number;
+  phase: number;
+}
+
 export interface NodeStyle {
   colors: GridColors;
   /** The module's accent, from its category, used for the title and the value arcs. */
@@ -78,6 +93,10 @@ function buildBlock(
       return new ValueBlock(geometry, style);
     case "meter":
       return new MeterBlock(geometry, style);
+    case "text":
+      return new TextBlock(geometry, style);
+    case "pianoRoll":
+      return new PianoRollBlock(geometry, style);
   }
 }
 
@@ -93,6 +112,12 @@ export class NodeView {
   private readonly scope: ScopeBlock | null = null;
   private readonly readout: ValueBlock | null = null;
   private readonly meter: MeterBlock | null = null;
+  private readonly texts = new Map<string, TextBlock>();
+  private readonly pianoRoll: PianoRollBlock | null = null;
+  /** The last notes put on the roll, by the engine's count: what a script asks about. */
+  private notes: NotesSummary | null = null;
+  /** The sounding steps of each text property, so the editor can light them up too. */
+  private sounding = new Map<string, { from: number; to: number }[]>();
   /** The last trace put on the scope, by the engine's count, and its size: what a script asks about. */
   private trace: TraceSummary | null = null;
   /** The last reading put on the readout, the same way. */
@@ -134,6 +159,8 @@ export class NodeView {
       else if (block instanceof ScopeBlock) this.scope = block;
       else if (block instanceof ValueBlock) this.readout = block;
       else if (block instanceof MeterBlock) this.meter = block;
+      else if (block instanceof TextBlock) this.texts.set(geometry.name, block);
+      else if (block instanceof PianoRollBlock) this.pianoRoll = block;
     }
     this.applyValues(module);
     this.view.position.set(module.x ?? 0, module.y ?? 0);
@@ -223,6 +250,49 @@ export class NodeView {
   }
 
   /** Every knob to the document's value for it. */
+  /**
+   * The notes the module is playing, as the engine published them.
+   *
+   * They go to two places at once, which is the point of publishing them rather than working them
+   * out here: the piano roll draws them, and every text property lights up the steps of its own
+   * string that are sounding. Neither could be done in the interface, which cannot parse a pattern.
+   */
+  setNotes(index: bigint, reading: NotesView): void {
+    this.pianoRoll?.setNotes(reading);
+    this.notes = {
+      index: index.toString(),
+      count: reading.notes.length,
+      sounding: reading.notes.filter((n) => n.sounding).length,
+      phase: reading.phase,
+    };
+    // Every text property, not only the ones the face shows: the editor lights up the same steps,
+    // and it opens on properties a face may have no room for.
+    for (const [index, text] of this.descriptor.texts.entries()) {
+      const ranges = reading.notes
+        .filter((n) => n.sounding && n.textIndex === index && n.to > n.from)
+        .map((n) => ({ from: n.from, to: n.to }));
+      this.sounding.set(text.id, ranges);
+      this.texts.get(text.id)?.setHighlights(ranges);
+    }
+  }
+
+  /** Which steps of a text property are sounding, for anything drawing it outside the canvas. */
+  soundingOf(textId: string): { from: number; to: number }[] {
+    return this.sounding.get(textId) ?? [];
+  }
+
+  /** What is on the roll right now, for a script. Null before the engine has said anything. */
+  notesOf(): NotesSummary | null {
+    return this.notes;
+  }
+
+  /** What a text property currently holds, from the document, for a script. */
+  textOf(textId: string): string | null {
+    const value = this.module.data?.[textId];
+    if (typeof value === "string") return value;
+    return this.descriptor.texts.find((t) => t.id === textId)?.default ?? null;
+  }
+
   private applyValues(module: PatchModule): void {
     for (const [paramId, knob] of this.knobs)
       knob.setValue(
@@ -231,6 +301,15 @@ export class NodeView {
           paramValue(module, this.descriptor, paramId),
         ),
       );
+    // A text property's value lives in the node's `data`, keyed by its id, and falls back to the
+    // default the module declared -- exactly the rule `configure` follows in the engine.
+    for (const [textId, block] of this.texts) {
+      const value = module.data?.[textId];
+      const declared = this.descriptor.texts.find((t) => t.id === textId);
+      block.setValue(
+        typeof value === "string" ? value : (declared?.default ?? ""),
+      );
+    }
   }
 
   private drawFrame(): void {

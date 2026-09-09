@@ -4,7 +4,7 @@
 
 namespace pg {
 
-inline constexpr uint32_t kModuleAbiVersion = 2;
+inline constexpr uint32_t kModuleAbiVersion = 3;
 
 enum class PortKind : uint8_t { Continuous = 0, Event = 1 };
 /// UI coloring hint only; the compiler accepts any output into any input.
@@ -54,6 +54,10 @@ inline constexpr uint32_t kModulePublishesValue = 1u << 5;
 /// An interface gives such a module a level meter on its face (`meter` in the face rows). Implies
 /// `kModuleWritesTelemetry`, like the scope and the readout.
 inline constexpr uint32_t kModulePublishesMeter = 1u << 6;
+/// The module's telemetry slot carries the `Notes` it is playing: a window of notes in musical
+/// time, with the playhead and the meter to rule a grid under them. An interface gives such a
+/// module a piano roll on its face (`pianoRoll` in the face rows). Implies `kModuleWritesTelemetry`.
+inline constexpr uint32_t kModulePublishesNotes = 1u << 7;
 
 // C-layout so descriptors can cross a dlopen boundary unchanged.
 struct PortDesc {
@@ -62,6 +66,37 @@ struct PortDesc {
   PortKind kind;
   uint8_t channels;     // ABI slot; always 1 for Continuous (signals are poly_float), 0 for Event
   SignalRole role;      // UI coloring hint only
+  const char* doc;
+};
+
+/// The property is edited as a block of lines rather than as one, so an interface gives it a
+/// code pane instead of a field.
+inline constexpr uint32_t kTextMultiline = 1u << 0;
+
+/**
+ * A named string a module owns.
+ *
+ * Params are numbers everywhere -- in the descriptor, in the graph model, on the wire -- and that
+ * is not an oversight: a number can be smoothed, modulated and swept, and a string can do none of
+ * those things. But a note pattern, a sample path or an expression is still the module's own
+ * knowledge, and until now the only way to give a module one was to put it in the node's `data`
+ * blob and hope an interface knew, per module, that it was there.
+ *
+ * So a module DECLARES its strings, next to its ports and params, and the interface generates an
+ * editor for each the same way it generates a knob. The value still lives in node `data` under
+ * `id`, and is still structural -- read once by `configure`, before `prepare` -- so changing one
+ * rebuilds the instance. A module with a text property must therefore derive its position from
+ * the transport, the way `notes.clip` does, or an edit will make it jump.
+ */
+struct TextDesc {
+  const char* id;           // the key the module reads out of the node's data
+  const char* name;
+  const char* def;          // what an unset property means; never null
+  uint32_t flags;
+  /// Which editor mode an interface should open: "mini" for Tidal/Strudel mini-notation, or null
+  /// for plain text. A name the interface does not know is plain text, not an error.
+  const char* language;
+  const char* placeholder;
   const char* doc;
 };
 
@@ -80,6 +115,10 @@ struct ParamDesc {
 };
 
 class Module;
+
+/// Longest a text property's value may be. Node data crosses the protocol and is parsed on the
+/// message thread inside a compile, so it is bounded there rather than left to the module.
+inline constexpr uint32_t kMaxTextLength = 4096;
 
 /// Widest a face may be, in cells, and the most rows it may have.
 inline constexpr uint32_t kMaxFaceCols = 32;
@@ -131,6 +170,16 @@ struct ModuleDescriptor {
    */
   const char* const* face;
   uint32_t faceRows;
+  /**
+   * The module's text properties. See `TextDesc`.
+   *
+   * Appended after `face`, with defaults, so a descriptor written against the previous layout
+   * still compiles -- the warning set here treats a merely value-initialised trailing member as
+   * an omission, so the default has to be written down rather than assumed. `abiVersion` moved to
+   * 3 all the same, so a module BUILT against the old layout is refused rather than read short.
+   */
+  const TextDesc* texts = nullptr;
+  uint32_t numTexts = 0;
 };
 
 template <class T, size_t N>

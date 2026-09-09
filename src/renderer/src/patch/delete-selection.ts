@@ -14,10 +14,7 @@ import type { PatchOp } from "@shared/protocol/patch";
  * One edit for the whole selection, so undo puts back everything that went, cables included.
  */
 export function deleteSelection(): void {
-  const project = useProjectStore.getState().active();
-  // An example's wiring is fixed: that is what makes it a demonstration rather than a document, and
-  // deleting from one would be the single most confusing way to find out it was never yours to edit.
-  if (project === null || project.kind === "example") return;
+  if (useProjectStore.getState().active() === null) return;
 
   const selected = useSelectionStore.getState().modules;
   if (selected.length === 0) return;

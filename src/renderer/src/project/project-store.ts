@@ -43,8 +43,6 @@ export interface ProjectActions {
   setTimeSignature: (signature: TimeSignature) => void;
   setScale: (scale: Scale) => void;
   rename: (id: string, name: string) => void;
-  /** Whether this project has somewhere to save to. An example never does, until it is saved. */
-  canSave: (id: string) => boolean;
   markDirty: (id: string) => void;
   markClean: (id: string) => void;
   isDirty: (id: string) => boolean;
@@ -56,23 +54,34 @@ export interface ProjectActions {
    * that writes a project to disk goes through here.
    */
   snapshot: (id: string) => ProjectDoc | null;
-  /** Records where a project now lives, and that it is a project rather than a demonstration. */
+  /** Records where a project now lives. */
   located: (id: string, slug: string, name?: string) => void;
 }
 
+let nextId = 1;
 let nextUntitled = 1;
+
+/**
+ * A new identity for a project inside this session.
+ *
+ * Not the slug: this identifies a tab, survives the project being renamed or filed somewhere else, and
+ * means nothing once the application closes. Counted as well as timed, because two projects can be
+ * created inside one millisecond and two tabs with one id would be one tab.
+ */
+export function projectId(): string {
+  return `project-${nextId++}-${Date.now().toString(36)}`;
+}
 
 export function emptyProject(name?: string): ProjectDoc {
   const n = nextUntitled++;
   return {
     schemaVersion: 1,
-    id: `project-${n}-${Date.now().toString(36)}`,
+    id: projectId(),
     name: name ?? (n === 1 ? "Untitled" : `Untitled ${n}`),
     tempo: 120,
     timeSignature: DEFAULT_TIME_SIGNATURE,
     scale: DEFAULT_SCALE,
     patch: EMPTY_PATCH,
-    kind: "user",
   };
 }
 
@@ -170,8 +179,6 @@ export const useProjectStore = create<ProjectState & ProjectActions>(
       get().markDirty(id);
     },
 
-    canSave: (id) => get().projects.find((p) => p.id === id)?.kind === "user",
-
     markDirty: (id) => {
       if (get().dirtyIds.includes(id)) return;
       set({ dirtyIds: [...get().dirtyIds, id] });
@@ -192,7 +199,7 @@ export const useProjectStore = create<ProjectState & ProjectActions>(
     located: (id, slug, name) =>
       set({
         projects: get().projects.map((p) =>
-          p.id === id ? { ...p, slug, kind: "user", name: name ?? p.name } : p,
+          p.id === id ? { ...p, slug, name: name ?? p.name } : p,
         ),
       }),
   }),

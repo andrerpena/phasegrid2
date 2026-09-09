@@ -31,6 +31,16 @@ std::shared_ptr<ModuleInstance> InstanceTable::acquire(const std::string& id, co
 
   auto inst = std::make_shared<ModuleInstance>();
   inst->id = id;
+  // A telemetry subscription is about the NODE, not the instance that happens to be serving it, so
+  // it is carried across a rebuild. Without this, editing a module's structural data silently
+  // unsubscribes it: `telemetry.subscribe` only reassigns when the SET of watched modules changes,
+  // and an edit does not change that set -- so nothing would ever hand the new instance a slot.
+  if (it != byId_.end()) {
+    inst->telemetrySlot.store(it->second->telemetrySlot.load(std::memory_order_relaxed),
+                              std::memory_order_relaxed);
+    inst->previewSlot.store(it->second->previewSlot.load(std::memory_order_relaxed),
+                            std::memory_order_relaxed);
+  }
   inst->serial = nextSerial_++;
   inst->type = &type;
   {

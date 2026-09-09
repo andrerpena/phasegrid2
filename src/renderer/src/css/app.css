@@ -85,3 +85,21 @@
     background-clip: content-box;
   }
 }
+
+@layer components {
+  /**
+   * The step of a pattern that is sounding right now, in the pattern editor.
+   *
+   * A wash behind the characters rather than a colour on them: the text has already been coloured
+   * by the language, and recolouring it as it plays would make the notation itself flicker. Monaco
+   * owns the element, so this is a class it is handed rather than a style on a component.
+   */
+  .pg-step-sounding {
+    background-color: color-mix(
+      in oklch,
+      var(--color-signal-note) 40%,
+      transparent
+    );
+    border-radius: 2px;
+  }
+}

@@ -20,6 +20,7 @@ const oneOfEach: PatchOp[] = [
     data: { table: "saw" },
   },
   { op: "moduleRemove", id: "osc1" },
+  { op: "moduleSetData", id: "pat1", data: { pattern: "c e g" } },
   {
     op: "edgeAdd",
     id: "e1",

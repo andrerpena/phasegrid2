@@ -193,6 +193,11 @@ export const COMMANDS = {
     args: z.object({ id: z.string().min(1) }),
     result: RevisionResultSchema,
   },
+  /** Replaces a module's structured state. See `ModuleSetDataOpSchema`. */
+  "module.setData": {
+    args: z.object({ module: z.string().min(1), data: NodeDataSchema }),
+    result: RevisionResultSchema,
+  },
   "edge.add": {
     args: z.object({
       id: z.string().min(1),

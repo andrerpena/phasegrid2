@@ -4,6 +4,7 @@ import type { ModuleDescriptor } from "@shared/protocol/catalog";
 import type { PatchDoc } from "@shared/protocol/patch";
 import { type Application, Container, Graphics } from "pixi.js";
 import type { Level } from "./components/blocks/MeterBlock";
+import type { NotesView } from "./components/blocks/PianoRollBlock";
 import { Cable, cableShape, drawCableShape } from "./components/Cable";
 import { NodeView } from "./components/NodeView";
 import { type Facing, hitKnob, hitSocket, type Socket, socketOf } from "./face";
@@ -448,6 +449,10 @@ export class GridRenderer {
   }
 
   /** Puts the level the engine published onto a module's meter. Ignored for a module not drawn. */
+  setNotes(moduleId: string, index: bigint, reading: NotesView): void {
+    this.nodes.get(moduleId)?.setNotes(index, reading);
+  }
+
   setLevel(moduleId: string, index: bigint, level: Level): void {
     this.nodes.get(moduleId)?.setLevel(index, level);
   }

@@ -73,28 +73,15 @@ export const ProjectDocSchema = z.object({
   scale: ScaleSchema,
   patch: PatchDocSchema,
   /**
-   * Where this project came from, and therefore what can be done to it.
-   *
-   * An `example` ships with the application and demonstrates one module. Its wiring is fixed — nothing
-   * can be moved, added, removed or reconnected — but every knob and property can be changed, because
-   * turning them is how you find out what the module does and that it works. It opens framed on its
-   * own modules rather than on an open canvas.
-   *
-   * The restriction is deliberate and is about honesty rather than protection. An example has nowhere
-   * to save to, so if it behaved like an ordinary project people would build in one and discover only
-   * afterwards that the work cannot be kept. Making it plainly a demonstration means nobody starts.
-   */
-  kind: z.enum(["example", "user"]).default("user"),
-  /**
    * Where it lives inside the workspace: the name of its folder under `projects/`.
    *
-   * Absent for an example, and for a user project that has never been saved. Assigned when a project is
-   * loaded or first written, and stripped again before it is serialised, so the folder name is the only
-   * record of where a project is. That is what lets someone rename or move the folder and have the
-   * project follow, rather than leaving a document that confidently points at nothing.
+   * Absent only for a project that has never been saved. Assigned when a project is loaded or first
+   * written, and stripped again before it is serialised, so the folder name is the only record of where
+   * a project is. That is what lets someone rename or move the folder and have the project follow,
+   * rather than leaving a document that confidently points at nothing.
    */
   slug: z.string().optional(),
-  /** Shown above the grid. An example says what it is demonstrating. */
+  /** Shown above the grid. A project made from an example starts with the example's own sentence. */
   description: z.string().optional(),
 });
 

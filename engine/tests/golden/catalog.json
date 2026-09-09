@@ -1,5 +1,5 @@
 {
-  "catalogHash": "120dd508bdaeb2c1",
+  "catalogHash": "395061bf00eb2588",
   "conventions": {
     "blockSize": 128,
     "gateThreshold": 0,
@@ -21,6 +21,7 @@
         "needsTransport": false,
         "previewsWave": false,
         "publishesMeter": false,
+        "publishesNotes": false,
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
@@ -110,7 +111,8 @@
           "uiWidget": "select",
           "unit": "none"
         }
-      ]
+      ],
+      "texts": []
     },
     {
       "category": "display",
@@ -133,6 +135,7 @@
         "needsTransport": false,
         "previewsWave": false,
         "publishesMeter": true,
+        "publishesNotes": false,
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
@@ -151,7 +154,8 @@
       ],
       "name": "Meter",
       "outputs": [],
-      "params": []
+      "params": [],
+      "texts": []
     },
     {
       "category": "display",
@@ -189,6 +193,7 @@
         "needsTransport": false,
         "previewsWave": false,
         "publishesMeter": false,
+        "publishesNotes": false,
         "publishesScope": true,
         "publishesValue": false,
         "terminal": false,
@@ -228,7 +233,8 @@
           "uiWidget": "knob",
           "unit": "none"
         }
-      ]
+      ],
+      "texts": []
     },
     {
       "category": "display",
@@ -251,6 +257,7 @@
         "needsTransport": false,
         "previewsWave": false,
         "publishesMeter": false,
+        "publishesNotes": false,
         "publishesScope": false,
         "publishesValue": true,
         "terminal": false,
@@ -269,7 +276,8 @@
       ],
       "name": "Value",
       "outputs": [],
-      "params": []
+      "params": [],
+      "texts": []
     },
     {
       "category": "mod",
@@ -279,6 +287,7 @@
         "needsTransport": false,
         "previewsWave": false,
         "publishesMeter": false,
+        "publishesNotes": false,
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
@@ -549,7 +558,8 @@
           "uiWidget": "slider",
           "unit": "none"
         }
-      ]
+      ],
+      "texts": []
     },
     {
       "category": "filter",
@@ -559,6 +569,7 @@
         "needsTransport": false,
         "previewsWave": false,
         "publishesMeter": false,
+        "publishesNotes": false,
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
@@ -1009,7 +1020,8 @@
           "uiWidget": "slider",
           "unit": "none"
         }
-      ]
+      ],
+      "texts": []
     },
     {
       "category": "fx",
@@ -1019,6 +1031,7 @@
         "needsTransport": false,
         "previewsWave": false,
         "publishesMeter": false,
+        "publishesNotes": false,
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
@@ -1358,7 +1371,8 @@
           "uiWidget": "slider",
           "unit": "none"
         }
-      ]
+      ],
+      "texts": []
     },
     {
       "category": "fx",
@@ -1368,6 +1382,7 @@
         "needsTransport": false,
         "previewsWave": false,
         "publishesMeter": false,
+        "publishesNotes": false,
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
@@ -1884,7 +1899,8 @@
           "uiWidget": "slider",
           "unit": "percent"
         }
-      ]
+      ],
+      "texts": []
     },
     {
       "category": "fx",
@@ -1894,6 +1910,7 @@
         "needsTransport": false,
         "previewsWave": false,
         "publishesMeter": false,
+        "publishesNotes": false,
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
@@ -2236,7 +2253,8 @@
           "uiWidget": "select",
           "unit": "none"
         }
-      ]
+      ],
+      "texts": []
     },
     {
       "category": "fx",
@@ -2246,6 +2264,7 @@
         "needsTransport": false,
         "previewsWave": false,
         "publishesMeter": false,
+        "publishesNotes": false,
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
@@ -2472,7 +2491,8 @@
           "uiWidget": "select",
           "unit": "none"
         }
-      ]
+      ],
+      "texts": []
     },
     {
       "category": "fx",
@@ -2482,6 +2502,7 @@
         "needsTransport": false,
         "previewsWave": false,
         "publishesMeter": false,
+        "publishesNotes": false,
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
@@ -2843,7 +2864,8 @@
           "uiWidget": "slider",
           "unit": "percent"
         }
-      ]
+      ],
+      "texts": []
     },
     {
       "category": "fx",
@@ -2853,6 +2875,7 @@
         "needsTransport": false,
         "previewsWave": false,
         "publishesMeter": false,
+        "publishesNotes": false,
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
@@ -3122,7 +3145,8 @@
           "uiWidget": "select",
           "unit": "none"
         }
-      ]
+      ],
+      "texts": []
     },
     {
       "category": "fx",
@@ -3132,6 +3156,7 @@
         "needsTransport": false,
         "previewsWave": false,
         "publishesMeter": false,
+        "publishesNotes": false,
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
@@ -3430,7 +3455,8 @@
           "uiWidget": "select",
           "unit": "none"
         }
-      ]
+      ],
+      "texts": []
     },
     {
       "category": "fx",
@@ -3440,6 +3466,7 @@
         "needsTransport": false,
         "previewsWave": false,
         "publishesMeter": false,
+        "publishesNotes": false,
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
@@ -3816,7 +3843,8 @@
           "uiWidget": "slider",
           "unit": "percent"
         }
-      ]
+      ],
+      "texts": []
     },
     {
       "category": "io",
@@ -3837,6 +3865,7 @@
         "needsTransport": false,
         "previewsWave": false,
         "publishesMeter": false,
+        "publishesNotes": false,
         "publishesScope": false,
         "publishesValue": false,
         "terminal": true,
@@ -3893,7 +3922,8 @@
           "uiWidget": "slider",
           "unit": "ratio"
         }
-      ]
+      ],
+      "texts": []
     },
     {
       "category": "math",
@@ -3903,6 +3933,7 @@
         "needsTransport": false,
         "previewsWave": false,
         "publishesMeter": false,
+        "publishesNotes": false,
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
@@ -3989,7 +4020,8 @@
           "uiWidget": "slider",
           "unit": "none"
         }
-      ]
+      ],
+      "texts": []
     },
     {
       "category": "mix",
@@ -3999,6 +4031,7 @@
         "needsTransport": false,
         "previewsWave": false,
         "publishesMeter": false,
+        "publishesNotes": false,
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
@@ -4167,7 +4200,8 @@
           "uiWidget": "slider",
           "unit": "ratio"
         }
-      ]
+      ],
+      "texts": []
     },
     {
       "category": "mod",
@@ -4204,6 +4238,7 @@
         "needsTransport": false,
         "previewsWave": true,
         "publishesMeter": false,
+        "publishesNotes": false,
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
@@ -4319,7 +4354,8 @@
           "uiWidget": "knob",
           "unit": "ratio"
         }
-      ]
+      ],
+      "texts": []
     },
     {
       "category": "mod",
@@ -4329,6 +4365,7 @@
         "needsTransport": false,
         "previewsWave": false,
         "publishesMeter": false,
+        "publishesNotes": false,
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
@@ -4579,7 +4616,8 @@
           "uiWidget": "select",
           "unit": "none"
         }
-      ]
+      ],
+      "texts": []
     },
     {
       "category": "note",
@@ -4589,6 +4627,7 @@
         "needsTransport": false,
         "previewsWave": false,
         "publishesMeter": false,
+        "publishesNotes": false,
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
@@ -4687,7 +4726,8 @@
           "uiWidget": "slider",
           "unit": "seconds"
         }
-      ]
+      ],
+      "texts": []
     },
     {
       "category": "note",
@@ -4697,6 +4737,7 @@
         "needsTransport": false,
         "previewsWave": false,
         "publishesMeter": false,
+        "publishesNotes": false,
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
@@ -4740,7 +4781,8 @@
           "role": "cv"
         }
       ],
-      "params": []
+      "params": [],
+      "texts": []
     },
     {
       "category": "note",
@@ -4750,6 +4792,7 @@
         "needsTransport": true,
         "previewsWave": false,
         "publishesMeter": false,
+        "publishesNotes": false,
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
@@ -4846,6 +4889,246 @@
           "uiWidget": "slider",
           "unit": "semitones"
         }
+      ],
+      "texts": []
+    },
+    {
+      "category": "note",
+      "doc": "A note source written as a string, in the mini-notation TidalCycles invented and Strudel carries: `<c4 eb4> g3*2 [~ bb3]` is a whole musical idea in a text field. The pattern is played against the transport, one cycle at a time, and comes out as a note stream. A second string patterns the velocity, aligned to the notes rather than to itself. A pattern that will not parse plays nothing rather than half of itself.",
+      "face": [
+        [
+          "play",
+          "text:pattern",
+          "text:pattern",
+          "text:pattern",
+          "text:pattern",
+          "text:pattern",
+          "text:pattern",
+          "notes"
+        ],
+        [
+          ".",
+          "text:velocity",
+          "text:velocity",
+          "text:velocity",
+          "text:velocity",
+          "text:velocity",
+          "text:velocity",
+          "phase"
+        ],
+        [
+          ".",
+          "pianoRoll",
+          "pianoRoll",
+          "pianoRoll",
+          "pianoRoll",
+          "pianoRoll",
+          "pianoRoll",
+          "."
+        ],
+        [
+          ".",
+          "pianoRoll",
+          "pianoRoll",
+          "pianoRoll",
+          "pianoRoll",
+          "pianoRoll",
+          "pianoRoll",
+          "."
+        ],
+        [
+          ".",
+          "legato",
+          "legato",
+          "transpose",
+          "transpose",
+          "gain",
+          "gain",
+          "."
+        ],
+        [
+          ".",
+          "legato",
+          "legato",
+          "transpose",
+          "transpose",
+          "gain",
+          "gain",
+          "."
+        ]
+      ],
+      "flags": {
+        "needsTransport": true,
+        "previewsWave": false,
+        "publishesMeter": false,
+        "publishesNotes": true,
+        "publishesScope": false,
+        "publishesValue": false,
+        "terminal": false,
+        "writesTelemetry": true
+      },
+      "id": "notes.pattern",
+      "inputs": [
+        {
+          "doc": "High runs the pattern; low stops it and releases every note it is holding. Unconnected, it runs",
+          "id": "play",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Play",
+          "role": "gate"
+        },
+        {
+          "doc": "How much of its step each note holds. Below 1 there is a gap before the next one",
+          "id": "param:legato",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Legato",
+          "param": "legato",
+          "role": "cv"
+        },
+        {
+          "doc": "What every note's velocity is multiplied by. With no Velocity pattern this IS the velocity",
+          "id": "param:gain",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Gain",
+          "param": "gain",
+          "role": "cv"
+        }
+      ],
+      "name": "Pattern",
+      "outputs": [
+        {
+          "doc": "Note on and note off events for the steps that are sounding",
+          "id": "notes",
+          "implicit": false,
+          "kind": "event",
+          "name": "Notes",
+          "role": "note"
+        },
+        {
+          "doc": "Position within the cycle: 0 at its start, just under 1 at its end",
+          "id": "phase",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Phase",
+          "role": "phase"
+        }
+      ],
+      "params": [
+        {
+          "curve": "linear",
+          "default": 4.0,
+          "doc": "How long one cycle of the pattern lasts, in musical time",
+          "enumLabels": [
+            "1/16",
+            "1/8",
+            "1/4",
+            "1/2",
+            "1 bar",
+            "2 bars",
+            "4 bars"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "primary": false,
+            "structural": false
+          },
+          "id": "cycle",
+          "max": 6.0,
+          "min": 0.0,
+          "name": "Cycle",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.8999999761581421,
+          "doc": "How much of its step each note holds. Below 1 there is a gap before the next one",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "id": "legato",
+          "max": 1.0,
+          "min": 0.009999999776482582,
+          "name": "Legato",
+          "uiWidget": "slider",
+          "unit": "ratio"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Semitones added to each note as it starts",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "primary": true,
+            "structural": false
+          },
+          "id": "transpose",
+          "max": 48.0,
+          "min": -48.0,
+          "name": "Transpose",
+          "uiWidget": "slider",
+          "unit": "semitones"
+        },
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "What every note's velocity is multiplied by. With no Velocity pattern this IS the velocity",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "id": "gain",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Gain",
+          "uiWidget": "slider",
+          "unit": "none"
+        }
+      ],
+      "texts": [
+        {
+          "default": "c3 e3 g3 b3",
+          "doc": "The notes, in Tidal/Strudel mini-notation. Note names or MIDI numbers, `~` for a rest, `[ ]` to subdivide a step, `< >` to take one per cycle, `,` to stack, `*` and `/` to speed up and slow down, `!` to repeat, `@` to lengthen, `( )` for a euclidean rhythm, `?` to drop notes at random and `|` to choose one. A bare note name is octave 3, so middle C is written `c4`",
+          "flags": {
+            "multiline": false
+          },
+          "id": "pattern",
+          "language": "mini",
+          "name": "Pattern",
+          "placeholder": "c3 e3 g3 b3"
+        },
+        {
+          "default": "",
+          "doc": "How hard each note is struck, in the same notation, as numbers from 0 to 1. Each note takes whichever value is running when it starts, so this need not have the same number of steps as the notes do. Empty means every note is struck at full velocity, and the Gain knob alone decides",
+          "flags": {
+            "multiline": false
+          },
+          "id": "velocity",
+          "language": "mini",
+          "name": "Velocity pattern",
+          "placeholder": "1 .5 .8 .3"
+        }
       ]
     },
     {
@@ -4884,6 +5167,7 @@
         "needsTransport": false,
         "previewsWave": true,
         "publishesMeter": false,
+        "publishesNotes": false,
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
@@ -4957,7 +5241,8 @@
           "uiWidget": "knob",
           "unit": "semitones"
         }
-      ]
+      ],
+      "texts": []
     },
     {
       "category": "osc",
@@ -4995,6 +5280,7 @@
         "needsTransport": false,
         "previewsWave": true,
         "publishesMeter": false,
+        "publishesNotes": false,
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
@@ -5068,7 +5354,8 @@
           "uiWidget": "knob",
           "unit": "semitones"
         }
-      ]
+      ],
+      "texts": []
     },
     {
       "category": "osc",
@@ -5106,6 +5393,7 @@
         "needsTransport": false,
         "previewsWave": true,
         "publishesMeter": false,
+        "publishesNotes": false,
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
@@ -5179,7 +5467,8 @@
           "uiWidget": "knob",
           "unit": "semitones"
         }
-      ]
+      ],
+      "texts": []
     },
     {
       "category": "osc",
@@ -5189,6 +5478,7 @@
         "needsTransport": false,
         "previewsWave": true,
         "publishesMeter": false,
+        "publishesNotes": false,
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
@@ -6005,7 +6295,8 @@
           "uiWidget": "slider",
           "unit": "none"
         }
-      ]
+      ],
+      "texts": []
     },
     {
       "category": "time",
@@ -6015,6 +6306,7 @@
         "needsTransport": true,
         "previewsWave": false,
         "publishesMeter": false,
+        "publishesNotes": false,
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
@@ -6101,7 +6393,8 @@
           "uiWidget": "slider",
           "unit": "ratio"
         }
-      ]
+      ],
+      "texts": []
     },
     {
       "category": "osc",
@@ -6111,6 +6404,7 @@
         "needsTransport": false,
         "previewsWave": false,
         "publishesMeter": false,
+        "publishesNotes": false,
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
@@ -6386,7 +6680,8 @@
           "uiWidget": "slider",
           "unit": "none"
         }
-      ]
+      ],
+      "texts": []
     }
   ]
 }

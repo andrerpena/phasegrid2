@@ -1,5 +1,5 @@
 import type { PortRef } from "@shared/protocol/patch";
-import { hitKnob, type Socket } from "./face";
+import { hitBlock, hitKnob, type Socket } from "./face";
 import type { GridRenderer } from "./GridRenderer";
 import {
   beginDragCable,
@@ -49,21 +49,6 @@ function touchCentre(touches: TouchList): { x: number; y: number } {
  * operation, an undo entry and a message to the engine, or just a value in a story's state.
  */
 
-export interface GridOptions {
-  /**
-   * Parameters only: no moving, no marquee, no connecting.
-   *
-   * What an example project uses. Knob drags are deliberately still allowed, because changing values is
-   * the entire point of a demonstration; what is withheld is only the wiring, which is what makes the
-   * example an example rather than a document someone starts working in.
-   *
-   * A value or a function of one. It became a function when saving an example turned it into a project
-   * of the user's own without the canvas being rebuilt: read once, the wiring would have stayed locked
-   * in a document that was no longer an example.
-   */
-  parametersOnly?: boolean | (() => boolean);
-}
-
 export interface GridCallbacks {
   /**
    * What a parameter is set to right now.
@@ -112,6 +97,13 @@ export interface GridCallbacks {
   ) => void;
   /** A cable picked up off an input and dropped on nothing. */
   onDisconnect?: (edgeId: string) => void;
+  /**
+   * A text property on a face was double-clicked.
+   *
+   * The interaction says WHICH, and nothing more: opening an editor is a command, and the canvas
+   * has no business knowing what a module's language is or which editor understands it.
+   */
+  onEditText?: (target: { module: string; text: string }) => void;
 }
 
 export class GridInteraction {
@@ -128,14 +120,7 @@ export class GridInteraction {
     private readonly renderer: GridRenderer,
     private readonly canvas: HTMLCanvasElement,
     private readonly callbacks: GridCallbacks = {},
-    private readonly options: GridOptions = {},
   ) {}
-
-  /** Asked at every gesture rather than remembered, so a document that stops being an example unlocks. */
-  private get parametersOnly(): boolean {
-    const value = this.options.parametersOnly;
-    return typeof value === "function" ? value() : value === true;
-  }
 
   attach(): () => void {
     const down = (event: PointerEvent) => this.onDown(event);
@@ -197,10 +182,12 @@ export class GridInteraction {
   }
 
   /**
-   * Double-clicking a knob puts it back to the value the module was built with.
+   * Double-clicking a knob puts it back to the value the module was built with; double-clicking a
+   * text property opens it in an editor.
    *
-   * The gesture every plug-in has, and it is an ordinary edit: written to the document, sent to the
-   * engine and stepped back by undo like anything else. Reported as finished, because it is.
+   * Both are the gesture the thing under the pointer already suggests -- a knob has a default, and
+   * a string on a face is too small to type into. The knob's reset is an ordinary edit: written to
+   * the document, sent to the engine and stepped back by undo like anything else.
    */
   private onDoubleClick(event: MouseEvent): void {
     const point = this.renderer.viewport.toWorld({
@@ -210,6 +197,11 @@ export class GridInteraction {
     const hit = this.renderer.nodeAt(point);
     if (hit === null) return;
     const origin = { x: hit.node.view.position.x, y: hit.node.view.position.y };
+    const block = hitBlock(point, origin, hit.node.face);
+    if (block !== null && block.kind === "text") {
+      this.callbacks.onEditText?.({ module: hit.id, text: block.name });
+      return;
+    }
     const knob = hitKnob(point, origin, hit.node.face);
     if (knob === null) return;
     const previous =
@@ -244,12 +236,10 @@ export class GridInteraction {
 
     // A socket before anything else: they sit on the borders, where a module's own hit box and the
     // gap beside it meet, and grabbing one has to work from either side of that line.
-    if (!this.parametersOnly) {
-      const hit = this.renderer.portAt(point);
-      if (hit !== null) {
-        this.state = this.pickUpCable(hit.module, hit.socket, point);
-        return;
-      }
+    const socket = this.renderer.portAt(point);
+    if (socket !== null) {
+      this.state = this.pickUpCable(socket.module, socket.socket, point);
+      return;
     }
 
     const hit = this.renderer.nodeAt(point);
@@ -274,9 +264,6 @@ export class GridInteraction {
       }
 
       this.select(event.shiftKey ? [...this.selection, hit.id] : [hit.id]);
-      // Selecting still works, because selecting is how the inspector knows what to show. Only the
-      // dragging is withheld.
-      if (this.parametersOnly) return;
       this.dragOrigins.clear();
       for (const id of this.selection) {
         const node = this.renderer.allNodes().get(id);
@@ -290,10 +277,6 @@ export class GridInteraction {
       return;
     }
 
-    if (this.parametersOnly) {
-      if (!event.shiftKey) this.select([]);
-      return;
-    }
     this.state = beginMarquee(point, event.shiftKey);
     if (!event.shiftKey) this.select([]);
   }

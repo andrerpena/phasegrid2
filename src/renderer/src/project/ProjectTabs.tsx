@@ -54,11 +54,6 @@ export const ProjectTabs = () => {
                   •
                 </span>
               )}
-              {project.kind === "example" && (
-                <span className="rounded-sm border border-border px-1 text-2xs uppercase tracking-wide text-signal-note">
-                  example
-                </span>
-              )}
             </button>
             <button
               type="button"

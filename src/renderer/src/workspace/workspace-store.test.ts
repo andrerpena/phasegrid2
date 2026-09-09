@@ -1,3 +1,4 @@
+import { exampleFor } from "@renderer/examples/registry";
 import { usePatchStore } from "@renderer/patch/patch-store";
 import { emptyProject, useProjectStore } from "@renderer/project/project-store";
 import { EMPTY_PATCH } from "@shared/protocol/patch";
@@ -32,7 +33,6 @@ function project(over: Partial<ProjectDoc> = {}): string {
     timeSignature: { numerator: 4, denominator: 4 },
     scale: { root: 0, name: "chromatic" },
     patch: EMPTY_PATCH,
-    kind: "user",
     ...over,
   });
 }
@@ -242,16 +242,13 @@ describe("saving", () => {
     ]);
   });
 
-  it("turns an example into a project when it is saved under a name", async () => {
-    const example: ProjectDoc = { ...emptyProject("Sine"), kind: "example" };
+  it("saves an example's copy under a name of its own", async () => {
+    const example: ProjectDoc = emptyProject("Sine");
     useProjectStore.getState().open(example);
-    expect(useProjectStore.getState().canSave(example.id)).toBe(false);
     await useWorkspaceStore.getState().saveProjectAs(example.id, "My Sine");
     const saved = useProjectStore.getState().projects[0];
-    expect(saved?.kind).toBe("user");
     expect(saved?.name).toBe("My Sine");
     expect(saved?.slug).toBe("my-sine");
-    expect(JSON.parse(disk.projects.get("my-sine") ?? "").kind).toBe("user");
   });
 
   it("keeps the project dirty when the write fails", async () => {
@@ -273,6 +270,65 @@ describe("saving", () => {
       await useWorkspaceStore.getState().saveProjectAs(doc.id, "   "),
     ).toBe(false);
     expect(disk.projects.size).toBe(0);
+  });
+});
+
+describe("copying an example", () => {
+  beforeEach(async () => {
+    disk.current = { root: "/w", name: "w" };
+    await useWorkspaceStore.getState().boot();
+  });
+
+  const example = () => {
+    const found = exampleFor("osc.sine");
+    if (found === undefined) throw new Error("no example for osc.sine");
+    return found;
+  };
+
+  it("lands in the workspace as an ordinary project", async () => {
+    expect(await useWorkspaceStore.getState().copyExample(example())).toBe(
+      true,
+    );
+    const tab = useProjectStore.getState().projects[0];
+    expect(tab?.name).toBe("Sine");
+    expect(tab?.slug).toBe("sine");
+    expect(useProjectStore.getState().isDirty(tab?.id ?? "")).toBe(false);
+    expect(
+      JSON.parse(disk.projects.get("sine") ?? "").patch.modules,
+    ).toHaveLength(2);
+  });
+
+  it("copies the patch rather than handing out the registry's own", async () => {
+    // Two copies of one example are two documents. Editing the first must not reach the second, and
+    // must not reach the example the next copy will be made from.
+    await useWorkspaceStore.getState().copyExample(example());
+    usePatchStore
+      .getState()
+      .apply([{ op: "moduleAdd", id: "extra", type: "osc.sine" }]);
+    await useWorkspaceStore.getState().copyExample(example());
+    expect(usePatchStore.getState().doc.modules.map((m) => m.id)).not.toContain(
+      "extra",
+    );
+  });
+
+  it("gives the second copy a name and a folder of its own", async () => {
+    await useWorkspaceStore.getState().copyExample(example());
+    await useWorkspaceStore.getState().copyExample(example());
+    expect(useProjectStore.getState().projects.map((p) => p.name)).toEqual([
+      "Sine",
+      "Sine 2",
+    ]);
+    expect([...disk.projects.keys()].sort()).toEqual(["sine", "sine-2"]);
+  });
+
+  it("keeps the copy open, and dirty, when it cannot be written", async () => {
+    disk.failWrites = true;
+    expect(await useWorkspaceStore.getState().copyExample(example())).toBe(
+      false,
+    );
+    const tab = useProjectStore.getState().projects[0];
+    expect(tab?.slug).toBeUndefined();
+    expect(useProjectStore.getState().isDirty(tab?.id ?? "")).toBe(true);
   });
 });
 

@@ -73,6 +73,10 @@ const cases: Record<CommandName, { valid: unknown; invalid: unknown }> = {
     invalid: { id: "osc1", type: "osc.wavetable", params: { level: "loud" } },
   },
   "module.remove": { valid: { id: "osc1" }, invalid: { id: 1 } },
+  "module.setData": {
+    valid: { module: "pat", data: { pattern: "c e g" } },
+    invalid: { module: "pat", data: "c e g" },
+  },
   "edge.add": {
     valid: {
       id: "e1",
@@ -119,6 +123,7 @@ describe("command table", () => {
       "patch.setFeedbackMode",
       "module.add",
       "module.remove",
+      "module.setData",
       "edge.add",
       "edge.remove",
       "param.set",
@@ -219,6 +224,7 @@ describe("command results", () => {
       "patch.setFeedbackMode",
       "module.add",
       "module.remove",
+      "module.setData",
       "edge.add",
       "edge.remove",
       "param.set",

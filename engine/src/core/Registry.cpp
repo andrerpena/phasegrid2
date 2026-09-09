@@ -1,5 +1,6 @@
 #include "core/Registry.hpp"
 #include <algorithm>
+#include <cstring>
 #include <map>
 #include <set>
 #include <utility>
@@ -20,7 +21,7 @@ bool hasImplicitPort(const ParamDesc& p) {
 }
 
 /// What one face token names, once resolved against the descriptor.
-enum class Cell : uint8_t { Empty, Input, Output, Param, Wave, Scope, Value, Meter };
+enum class Cell : uint8_t { Empty, Input, Output, Param, Text, Wave, Scope, Value, Meter, PianoRoll };
 
 struct Resolved {
   Cell cell = Cell::Empty;
@@ -33,6 +34,10 @@ int32_t indexOf(const PortDesc* ports, uint32_t count, const std::string& id) {
 }
 int32_t paramIndexOf(const ModuleDescriptor& d, const std::string& id) {
   for (uint32_t i = 0; i < d.numParams; ++i) if (id == d.params[i].id) return static_cast<int32_t>(i);
+  return -1;
+}
+int32_t textIndexOf(const ModuleDescriptor& d, const std::string& id) {
+  for (uint32_t i = 0; i < d.numTexts; ++i) if (id == d.texts[i].id) return static_cast<int32_t>(i);
   return -1;
 }
 
@@ -59,6 +64,21 @@ std::optional<std::string> resolveToken(const ModuleDescriptor& d, const std::st
   if (token == "meter") {
     if (!(d.flags & kModulePublishesMeter)) return "face names `meter` but the module does not publish one";
     out = {Cell::Meter, -1};
+    return std::nullopt;
+  }
+  if (token == "pianoRoll") {
+    if (!(d.flags & kModulePublishesNotes)) return "face names `pianoRoll` but the module publishes no notes";
+    out = {Cell::PianoRoll, -1};
+    return std::nullopt;
+  }
+  // A text property is always written `text:<id>`, never bare. Unlike a port or a param it is
+  // not something the face could plausibly mean by a bare name, and spelling it out keeps a
+  // module that has a `pattern` param and a `pattern` string from being ambiguous.
+  if (token.compare(0, 5, "text:") == 0) {
+    const std::string textId = token.substr(5);
+    const int32_t i = textIndexOf(d, textId);
+    if (i < 0) return "face names text `" + textId + "`, which the module does not declare";
+    out = {Cell::Text, i};
     return std::nullopt;
   }
   auto prefixed = [&](const char* prefix) -> std::optional<std::string> {
@@ -166,7 +186,13 @@ std::optional<std::string> validateFace(const ModuleDescriptor& d, std::vector<s
     if (a.what.cell == Cell::Scope && (h < 2 || w < 2)) return "face gives `scope` less than two cells by two";
     // A readout is a line of text: it needs width for the digits but reads fine one cell tall.
     if (a.what.cell == Cell::Value && w < 2) return "face gives `value` less than two cells across";
+    // A pattern is read across, so a text block is about width. Three cells is roughly a dozen
+    // characters, which is the point below which a face is showing a hint rather than the value.
+    if (a.what.cell == Cell::Text && w < 3) return "face gives `" + token + "` less than three cells across";
     if (a.what.cell == Cell::Meter && (h < 2 || w < 2)) return "face gives `meter` less than two cells by two";
+    // A piano roll is two axes at once: it needs height for the pitches and real width for the bars.
+    if (a.what.cell == Cell::PianoRoll && (h < 2 || w < 4))
+      return "face gives `pianoRoll` less than four cells by two";
   }
   for (uint32_t i = 0; i < d.numInputs; ++i)
     if (!seen.contains({Cell::Input, static_cast<int32_t>(i)})) return std::string("face leaves out input `") + d.inputs[i].id + "`";
@@ -196,6 +222,8 @@ std::optional<std::string> Registry::add(const ModuleDescriptor& d) {
   if (byId_.contains(id)) return id + ": duplicate module id";
   if (d.numInputs + d.numParams > kMaxPortsPerModule || d.numOutputs > kMaxPortsPerModule) return id + ": too many ports";
   if (d.numParams > kMaxParamsPerModule) return id + ": too many params";
+  if ((d.texts == nullptr) != (d.numTexts == 0)) return id + ": texts and numTexts disagree";
+  if (d.numTexts > kMaxTextsPerModule) return id + ": too many text properties";
   if (!d.create) return id + ": missing create()";
   // A scope is a kind of telemetry the module writes itself; a module claiming one without a slot to
   // write it into would get a panel that never shows anything.
@@ -205,6 +233,8 @@ std::optional<std::string> Registry::add(const ModuleDescriptor& d) {
     return id + ": publishes a value but does not write telemetry";
   if ((d.flags & kModulePublishesMeter) && !(d.flags & kModuleWritesTelemetry))
     return id + ": publishes a meter but does not write telemetry";
+  if ((d.flags & kModulePublishesNotes) && !(d.flags & kModuleWritesTelemetry))
+    return id + ": publishes notes but does not write telemetry";
 
   std::set<std::string> ids;
   for (uint32_t i = 0; i < d.numInputs; ++i)
@@ -227,6 +257,20 @@ std::optional<std::string> Registry::add(const ModuleDescriptor& d) {
       const std::string implicitId = "param:" + std::string(p.id);
       for (uint32_t k = 0; k < d.numInputs; ++k) if (implicitId == d.inputs[k].id) return id + ": input collides with implicit port " + implicitId;
     }
+  }
+
+  ids.clear();
+  for (uint32_t i = 0; i < d.numTexts; ++i) {
+    const TextDesc& t = d.texts[i];
+    if (t.id == nullptr || *t.id == '\0') return id + ": text property has no id";
+    if (!ids.insert(t.id).second) return id + ": duplicate text id " + t.id;
+    // A text property is reached by name in the node's data and on the face, so it may not share
+    // a name with anything else that is reached by name.
+    if (paramIndexOf(d, t.id) >= 0) return id + ": text " + t.id + " collides with a param";
+    if (indexOf(d.inputs, d.numInputs, t.id) >= 0 || indexOf(d.outputs, d.numOutputs, t.id) >= 0)
+      return id + ": text " + t.id + " collides with a port";
+    if (t.def == nullptr) return id + ": text " + t.id + " has no default";
+    if (std::strlen(t.def) > kMaxTextLength) return id + ": text " + t.id + " default is too long";
   }
 
   auto rm = std::make_unique<RegisteredModule>();

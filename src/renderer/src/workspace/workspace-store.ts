@@ -1,9 +1,14 @@
 import { useConfigStore } from "@renderer/config/config-store";
-import { useProjectStore } from "@renderer/project/project-store";
+import {
+  type ModuleExample,
+  projectFromExample,
+} from "@renderer/examples/registry";
+import { projectId, useProjectStore } from "@renderer/project/project-store";
 import { type ProjectDoc, ProjectDocSchema } from "@shared/protocol/project";
 import {
   type ProjectSummary,
   slugify,
+  uniqueName,
   uniqueSlug,
   type WorkspaceInfo,
 } from "@shared/protocol/workspace";
@@ -38,6 +43,14 @@ export interface WorkspaceActions {
   openAt: (root: string) => Promise<void>;
   refresh: () => Promise<void>;
   openProject: (slug: string) => Promise<boolean>;
+  /**
+   * Copies an example into the workspace and opens it. False when it could not be written.
+   *
+   * An example is a starting point, not a document: what lands in the tab is an ordinary project with
+   * its own name, its own folder and no restrictions at all. The tab opens either way — a workspace
+   * that will not take the copy is a reason to say so, not a reason to throw the copy away.
+   */
+  copyExample: (example: ModuleExample) => Promise<boolean>;
   /** Saves where it already lives, or in a folder named after it. False when it could not be written. */
   saveProject: (id: string) => Promise<boolean>;
   saveProjectAs: (id: string, name: string) => Promise<boolean>;
@@ -113,6 +126,26 @@ export const useWorkspaceStore = create<WorkspaceState & WorkspaceActions>(
       // Opening is not a change. Without this the project would be unsaved from the moment it appeared.
       useProjectStore.getState().markClean(doc.id);
       return true;
+    },
+
+    copyExample: async (example) => {
+      const taken = [
+        ...get().projects.map((p) => p.name),
+        ...useProjectStore.getState().projects.map((p) => p.name),
+      ];
+      const doc = projectFromExample(
+        example,
+        uniqueName(example.name, taken),
+        projectId(),
+      );
+      // Opened before it is written, so the canvas shows it whether or not the workspace will take it,
+      // and so the save picks the patch up from the same place every other save does.
+      useProjectStore.getState().open(doc);
+      const saved = await get().saveProject(doc.id);
+      // Unsaved work is dirty work. A copy that could not be filed is exactly that, and the tab has to
+      // say so rather than looking like something already on disk.
+      if (!saved) useProjectStore.getState().markDirty(doc.id);
+      return saved;
     },
 
     saveProject: async (id) => {
@@ -214,9 +247,8 @@ function parseProject(text: string, slug: string): ProjectDoc | null {
   try {
     const parsed = ProjectDocSchema.safeParse(JSON.parse(text));
     if (!parsed.success) return null;
-    // The folder is where the project is, whatever the file may claim, and a project read out of a
-    // workspace is by definition not a demonstration.
-    return { ...parsed.data, slug, kind: "user" };
+    // The folder is where the project is, whatever the file may claim.
+    return { ...parsed.data, slug };
   } catch {
     return null;
   }
@@ -232,7 +264,7 @@ async function write(
 ): Promise<boolean> {
   // `slug` is where the project lives and the folder already says so; writing it into the file as well
   // would create a second answer that a rename could make wrong.
-  const { slug: _slug, ...payload } = { ...doc, name, kind: "user" as const };
+  const { slug: _slug, ...payload } = { ...doc, name };
   const validated = ProjectDocSchema.safeParse(payload);
   if (!validated.success) {
     set({ error: `“${name}” cannot be saved: ${validated.error.message}` });

@@ -1,8 +1,8 @@
 import { useCatalogStore } from "@renderer/catalog/catalog-store";
+import { commandRegistry } from "@renderer/commands/registry";
 import { uniqueEdgeId } from "@renderer/patch/add-module";
 import { paramValue } from "@renderer/patch/params";
 import { usePatchStore } from "@renderer/patch/patch-store";
-import { useProjectStore } from "@renderer/project/project-store";
 import { useThemeStore } from "@renderer/theming/theme-store";
 import type { PatchOp } from "@shared/protocol/patch";
 import { Application } from "pixi.js";
@@ -95,6 +95,7 @@ export const GridView = () => {
           setTrace: (id, index, channels) => view.setTrace(id, index, channels),
           setValue: (id, index, values) => view.setValue(id, index, values),
           setLevel: (id, index, level) => view.setLevel(id, index, level),
+          setNotes: (id, index, reading) => view.setNotes(id, index, reading),
         },
         (tick) => {
           created.ticker.add(tick);
@@ -147,106 +148,98 @@ export const GridView = () => {
         sync.dispose();
       });
 
-      const interaction = new GridInteraction(
-        view,
-        created.canvas,
-        {
-          // The selection is made here and acted on elsewhere: a keybinding cannot ask a Pixi class
-          // what is selected, and neither can a command.
-          onSelectionChanged: (ids) => useSelectionStore.getState().set(ids),
-          onNodesMoved: (moves) => {
-            usePatchStore.getState().apply(
-              moves.map(
-                (m): PatchOp => ({
-                  op: "moduleMove",
-                  id: m.id,
-                  x: m.x,
-                  y: m.y,
-                }),
-              ),
+      const interaction = new GridInteraction(view, created.canvas, {
+        // The selection is made here and acted on elsewhere: a keybinding cannot ask a Pixi class
+        // what is selected, and neither can a command.
+        onSelectionChanged: (ids) => useSelectionStore.getState().set(ids),
+        onNodesMoved: (moves) => {
+          usePatchStore.getState().apply(
+            moves.map(
+              (m): PatchOp => ({
+                op: "moduleMove",
+                id: m.id,
+                x: m.x,
+                y: m.y,
+              }),
+            ),
+            {
+              label:
+                moves.length > 1
+                  ? `Move ${moves.length} modules`
+                  : "Move module",
+            },
+          );
+        },
+        // Cables, like values, are read from the document and nowhere else.
+        readEdgesInto: (module, port) =>
+          usePatchStore
+            .getState()
+            .doc.edges.filter(
+              (e) => e.to.module === module && e.to.port === port,
+            )
+            .map((e) => ({ id: e.id, from: e.from })),
+        // A cable made or moved is one edit: the removal of what it was and the addition of what
+        // it is, so undo takes the whole gesture back. Engine sync sends both in one batch.
+        onConnect: (from, to, { replaces }) => {
+          const store = usePatchStore.getState();
+          const ops: PatchOp[] = [];
+          if (replaces !== undefined)
+            ops.push({ op: "edgeRemove", id: replaces });
+          ops.push({ op: "edgeAdd", id: uniqueEdgeId(store.doc), from, to });
+          store.apply(ops, {
+            label: replaces === undefined ? "Connect" : "Move cable",
+          });
+        },
+        onDisconnect: (id) => {
+          usePatchStore
+            .getState()
+            .apply([{ op: "edgeRemove", id }], { label: "Disconnect" });
+        },
+        // Through the command rather than straight to the editor, so the canvas, the inspector's
+        // expand button and a script all take the same path to it.
+        onEditText: ({ module, text }) => {
+          void commandRegistry.dispatch("patch.editText", { module, text });
+        },
+        // The one place a parameter value is read from: the document, through the accessor everything
+        // else uses. Nothing on the canvas keeps a copy to answer with.
+        readParam: (module, param) => {
+          const doc = usePatchStore.getState().doc;
+          const found = doc.modules.find((m) => m.id === module);
+          const descriptor = useCatalogStore
+            .getState()
+            .byId.get(found?.type ?? "");
+          return descriptor === undefined
+            ? 0
+            : paramValue(found, descriptor, param);
+        },
+        onParamChange: ({ module, param, value, done, previous }) => {
+          // Every value goes to the document, including the ones passing under a moving hand: it is
+          // the only place a parameter value lives, and everything that draws one reads it from
+          // there. Engine sync and the wave panels are watching the same stream, so neither is told
+          // anything here.
+          //
+          // Only the release is labelled, so the gesture is one step back rather than a hundred, and
+          // it carries its own inverse because the document no longer remembers where the knob was
+          // when the hand went down.
+          usePatchStore.getState().apply(
+            [
               {
-                label:
-                  moves.length > 1
-                    ? `Move ${moves.length} modules`
-                    : "Move module",
+                op: "paramSet",
+                module,
+                param,
+                value,
+                ...(done ? {} : { transient: true }),
               },
-            );
-          },
-          // Cables, like values, are read from the document and nowhere else.
-          readEdgesInto: (module, port) =>
-            usePatchStore
-              .getState()
-              .doc.edges.filter(
-                (e) => e.to.module === module && e.to.port === port,
-              )
-              .map((e) => ({ id: e.id, from: e.from })),
-          // A cable made or moved is one edit: the removal of what it was and the addition of what
-          // it is, so undo takes the whole gesture back. Engine sync sends both in one batch.
-          onConnect: (from, to, { replaces }) => {
-            const store = usePatchStore.getState();
-            const ops: PatchOp[] = [];
-            if (replaces !== undefined)
-              ops.push({ op: "edgeRemove", id: replaces });
-            ops.push({ op: "edgeAdd", id: uniqueEdgeId(store.doc), from, to });
-            store.apply(ops, {
-              label: replaces === undefined ? "Connect" : "Move cable",
-            });
-          },
-          onDisconnect: (id) => {
-            usePatchStore
-              .getState()
-              .apply([{ op: "edgeRemove", id }], { label: "Disconnect" });
-          },
-          // The one place a parameter value is read from: the document, through the accessor everything
-          // else uses. Nothing on the canvas keeps a copy to answer with.
-          readParam: (module, param) => {
-            const doc = usePatchStore.getState().doc;
-            const found = doc.modules.find((m) => m.id === module);
-            const descriptor = useCatalogStore
-              .getState()
-              .byId.get(found?.type ?? "");
-            return descriptor === undefined
-              ? 0
-              : paramValue(found, descriptor, param);
-          },
-          onParamChange: ({ module, param, value, done, previous }) => {
-            // Every value goes to the document, including the ones passing under a moving hand: it is
-            // the only place a parameter value lives, and everything that draws one reads it from
-            // there. Engine sync and the wave panels are watching the same stream, so neither is told
-            // anything here.
-            //
-            // Only the release is labelled, so the gesture is one step back rather than a hundred, and
-            // it carries its own inverse because the document no longer remembers where the knob was
-            // when the hand went down.
-            usePatchStore.getState().apply(
-              [
-                {
-                  op: "paramSet",
-                  module,
-                  param,
-                  value,
-                  ...(done ? {} : { transient: true }),
-                },
-              ],
-              done
-                ? {
-                    label: "Set parameter",
-                    inverse: [
-                      { op: "paramSet", module, param, value: previous },
-                    ],
-                  }
-                : {},
-            );
-          },
+            ],
+            done
+              ? {
+                  label: "Set parameter",
+                  inverse: [{ op: "paramSet", module, param, value: previous }],
+                }
+              : {},
+          );
         },
-        // An example demonstrates a module: its wiring is fixed and its knobs are live. Asked each
-        // time rather than read once, because saving an example makes it a project of the user's own
-        // and the canvas is not rebuilt for that — the tab is the same tab.
-        {
-          parametersOnly: () =>
-            useProjectStore.getState().active()?.kind === "example",
-        },
-      );
+      });
       stop.push(interaction.attach());
     };
 

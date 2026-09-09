@@ -1,5 +1,5 @@
 import { CELL } from "@renderer/grid/layout";
-import type { PatchDoc } from "@shared/protocol/patch";
+import type { PatchDoc, PatchModule } from "@shared/protocol/patch";
 import {
   DEFAULT_SCALE,
   DEFAULT_TIME_SIGNATURE,
@@ -7,12 +7,12 @@ import {
 } from "@shared/protocol/project";
 
 /**
- * One example project per module: the smallest patch that shows what that module does, and proves it
- * does it.
+ * One example per module: the smallest patch that shows what that module does, and proves it does it.
  *
- * These are demonstrations rather than documents. Their wiring is fixed and every knob is live, so a
- * person can hear what a control does without first having to build a context for it, and so a broken
- * module is obvious rather than something you find out about three patches later.
+ * These are starting points rather than documents. Opening one copies it into the workspace as a
+ * project of the user's own, so a person can hear what a control does without first having to build a
+ * context for it, and can then keep going — move things, add things, save it — in the patch they were
+ * already looking at. Nothing here is read-only; the copy is the point.
  *
  * They are written out by hand, one at a time, and each is checked by rendering it and measuring the
  * result. An example that does not make the sound it claims to is worse than no example.
@@ -45,18 +45,28 @@ export function allExamples(): ModuleExample[] {
   );
 }
 
-/** Turns an example into the project that gets opened. */
-export function projectForExample(example: ModuleExample): ProjectDoc {
+/**
+ * A fresh project copied from an example.
+ *
+ * A copy, not a reference: the patch is cloned so that editing the new project cannot reach back into
+ * the registry, and the id is new so that opening the same example twice gives two projects rather
+ * than one tab that quietly replaces its own contents. The name is the caller's, because only the
+ * caller knows which names the workspace already holds.
+ */
+export function projectFromExample(
+  example: ModuleExample,
+  name: string,
+  id: string,
+): ProjectDoc {
   return {
     schemaVersion: 1,
-    id: `example:${example.moduleId}`,
-    name: example.name,
+    id,
+    name,
     description: example.description,
     tempo: example.tempo ?? 120,
     timeSignature: DEFAULT_TIME_SIGNATURE,
     scale: DEFAULT_SCALE,
-    patch: example.patch,
-    kind: "example",
+    patch: structuredClone(example.patch),
   };
 }
 
@@ -549,11 +559,20 @@ const ARPEGGIO = {
  * one in which any of them does anything: a clip with nothing to convert its notes is silent, and a
  * converter with no clip has nothing to convert.
  */
+/** The clip every note example is built around, unless one asks for a different source. */
+const CLIP_SOURCE: Omit<PatchModule, "id" | "x" | "y"> = {
+  type: "notes.clip",
+  params: { length: 4, loop: 1 },
+  data: ARPEGGIO,
+};
+
 function noteExample(args: {
   moduleId: string;
   name: string;
   description: string;
   converter: "note.toPoly" | "note.toCv";
+  /** What plays the notes. The clip, unless the example is about something else that does. */
+  source?: Omit<PatchModule, "id" | "x" | "y">;
 }): ModuleExample {
   return {
     moduleId: args.moduleId,
@@ -566,13 +585,11 @@ function noteExample(args: {
       modules: [
         {
           id: "clip",
-          type: "notes.clip",
+          ...(args.source ?? CLIP_SOURCE),
           x: col(2),
           y: col(2),
-          params: { length: 4, loop: 1 },
-          data: ARPEGGIO,
         },
-        { id: "voices", type: args.converter, x: col(9), y: col(2) },
+        { id: "voices", type: args.converter, x: col(11), y: col(2) },
         {
           id: "osc",
           type: "osc.wavetable",
@@ -616,6 +633,26 @@ register(
       "Four notes played against the transport, looping. Turn Transpose to move them, and Length to " +
       "change how far the playhead runs before it wraps.",
     converter: "note.toPoly",
+  }),
+);
+
+register(
+  noteExample({
+    moduleId: "notes.pattern",
+    name: "Pattern",
+    description:
+      "A whole musical idea in one string, in the mini-notation TidalCycles invented: `<c4 eb4>` " +
+      "takes one note per cycle, `g3*2` plays twice as fast, `[~ bb3]` rests then plays, and " +
+      "`[c4,g4]` is a chord. Edit it in the inspector and it changes as it plays.",
+    converter: "note.toPoly",
+    source: {
+      type: "notes.pattern",
+      params: { cycle: 4, legato: 0.9 },
+      data: {
+        pattern: "<c4 eb4> g3*2 [~ bb3] [c4,g4]",
+        velocity: "1 0.4 0.8",
+      },
+    },
   }),
 );
 

@@ -3,7 +3,11 @@ import {
   type ObjectShape,
   schema,
 } from "@renderer/schemas/core/schema";
-import type { ModuleDescriptor, ParamDesc } from "@shared/protocol/catalog";
+import type {
+  ModuleDescriptor,
+  ParamDesc,
+  TextDesc,
+} from "@shared/protocol/catalog";
 import type { PatchModule } from "@shared/protocol/patch";
 import { paramValue } from "./params";
 
@@ -58,6 +62,8 @@ export function inspectableParams(descriptor: ModuleDescriptor): ParamDesc[] {
  * wrong value in one of the two places.
  */
 export const PARAM_PREFIX = "param:";
+/** The same, for a module's text properties, which live in the node's `data` rather than in params. */
+export const TEXT_PREFIX = "text:";
 
 export function flattenModule(
   module: PatchModule,
@@ -74,11 +80,20 @@ export function flattenModule(
       ? (param.enumLabels?.[Math.round(value)] ?? String(value))
       : value;
   }
+  // A text property's value is in the node's `data` under its own id, falling back to the default
+  // the module declared -- the same rule `configure` follows in the engine.
+  for (const text of descriptor.texts) {
+    const value = module.data?.[text.id];
+    view[`${TEXT_PREFIX}${text.id}`] =
+      typeof value === "string" ? value : text.default;
+  }
   return view;
 }
 
 export function buildModuleSchema(
   descriptor: ModuleDescriptor,
+  /** What the expand button on a text field does. Absent leaves the field a plain one-liner. */
+  onExpandText?: (text: TextDesc) => void,
 ): ObjectSchema<ObjectShape> {
   const shape: ObjectShape = {
     id: schema.string().withMetadata({ label: "ID", editable: false }),
@@ -119,12 +134,35 @@ export function buildModuleSchema(
     });
   }
 
+  for (const text of descriptor.texts) {
+    // `renderer: "code"` rather than `"pattern"`: the field is a string a module owns, and which
+    // language it is written in is the module's business, not the form's. A renderer that does not
+    // know the language falls back to a plain field, so a new language costs colouring, not typing.
+    shape[`${TEXT_PREFIX}${text.id}`] = schema.string().withMetadata({
+      label: text.name,
+      description: text.doc,
+      renderer: "code",
+      language: text.language,
+      placeholder: text.placeholder,
+      multiline: text.flags.multiline,
+      defaultValue: text.default,
+      ...(onExpandText === undefined
+        ? {}
+        : { onExpand: () => onExpandText(text) }),
+    });
+  }
+
   return schema.object(shape);
 }
 
 /** Turns an edited form key back into the parameter it names, or null for an identity field. */
 export function paramIdFor(key: string): string | null {
   return key.startsWith(PARAM_PREFIX) ? key.slice(PARAM_PREFIX.length) : null;
+}
+
+/** Turns an edited form key back into the text property it names, or null. */
+export function textIdFor(key: string): string | null {
+  return key.startsWith(TEXT_PREFIX) ? key.slice(TEXT_PREFIX.length) : null;
 }
 
 /**

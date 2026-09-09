@@ -1,8 +1,9 @@
 import { useModalStore } from "@renderer/components/floating/modal/modal-store";
-import { allExamples, projectForExample } from "@renderer/examples/registry";
+import { allExamples } from "@renderer/examples/registry";
 import { useHistoryStore } from "@renderer/history/history-store";
 import { useLayoutStore } from "@renderer/layout/layout-store";
 import { deleteSelection } from "@renderer/patch/delete-selection";
+import { editModuleText } from "@renderer/patch/editor/edit-text";
 import { emptyProject, useProjectStore } from "@renderer/project/project-store";
 import { useTransportStore } from "@renderer/transport/transport-store";
 import { SAVE_AS_MODAL } from "@renderer/workspace/SaveAsDialog";
@@ -69,6 +70,10 @@ export const SHELL_COMMANDS: CommandDefinition<never>[] = [
  *
  * Searching for a module by name finds its example, which makes the palette the answer to "what does
  * this module do" as well as to "what can this application do".
+ *
+ * Running one copies the example into the workspace and opens the copy: a project of the user's own,
+ * with a folder of its own and nothing withheld. What you find out about the module you find out in
+ * something you can then keep building in.
  */
 export function exampleCommands(): CommandDefinition<never>[] {
   return allExamples().map((example) => ({
@@ -76,7 +81,9 @@ export function exampleCommands(): CommandDefinition<never>[] {
     name: `Example: ${example.name}`,
     category: "Examples",
     description: `${example.description} (${example.moduleId})`,
-    execute: () => useProjectStore.getState().open(projectForExample(example)),
+    execute: async () => {
+      await useWorkspaceStore.getState().copyExample(example);
+    },
   }));
 }
 
@@ -100,9 +107,8 @@ const PROJECT_COMMANDS: CommandDefinition<never>[] = [
     /**
      * Saves where it already lives, or asks where to put it.
      *
-     * A project that has been saved before, and is not a demonstration, has one right answer and is
-     * given it. Anything else gets the name dialog, because filing an example under the example's own
-     * name would be filing your work under somebody else's title.
+     * A project that has been saved before has one right answer and is given it; one that has never
+     * been saved gets the name dialog, because it has no name on disk yet to be right about.
      */
     id: "project.save",
     name: "Save Project",
@@ -110,7 +116,7 @@ const PROJECT_COMMANDS: CommandDefinition<never>[] = [
     execute: async () => {
       const project = useProjectStore.getState().active();
       if (project === null) return;
-      if (project.kind === "example" || project.slug === undefined) {
+      if (project.slug === undefined) {
         useModalStore.getState().show(SAVE_AS_MODAL);
         return;
       }
@@ -136,6 +142,24 @@ const PATCH_COMMANDS: CommandDefinition<never>[] = [
     description:
       "Removes the selected modules, and the cables attached to them",
     execute: () => deleteSelection(),
+  },
+];
+
+/**
+ * Opening a module's text editor by name.
+ *
+ * Hidden, because the payload is a module id and a property id and nobody types that into a
+ * palette. It exists so the gesture has a name a script can call before it has a button: the
+ * inspector's expand button, a double-click on the face and a scenario all reach the same editor.
+ */
+const TEXT_COMMANDS: CommandDefinition<{ module: string; text: string }>[] = [
+  {
+    id: "patch.editText",
+    name: "Edit Text Property",
+    category: "Patch",
+    hidden: true,
+    execute: (_context, payload) =>
+      editModuleText(payload.module, payload.text),
   },
 ];
 
@@ -180,6 +204,7 @@ export function registerShellCommands(): void {
   commandRegistry.registerAll(SHELL_COMMANDS);
   commandRegistry.registerAll(PROJECT_COMMANDS);
   commandRegistry.registerAll(PATCH_COMMANDS);
+  commandRegistry.registerAll(TEXT_COMMANDS as CommandDefinition<never>[]);
   commandRegistry.registerAll(TRANSPORT_COMMANDS);
   commandRegistry.registerAll(WORKSPACE_COMMANDS);
   commandRegistry.registerAll(exampleCommands());

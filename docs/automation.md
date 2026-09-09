@@ -51,7 +51,8 @@ is. `pg.help()` lists them.
   same count and the value per channel, both null before the first) — where things
   are, in window CSS pixels, ready for a real pointer event. Null when there is no such thing.
 - **`workspace.openAt(root)`**, **`openProject(slug)`**, **`save()`**, **`saveAs(name)`**,
-  **`closeProject(id?)`**, **`openExample(moduleId)`**.
+  **`closeProject(id?)`**, **`copyExample(moduleId)`** (copies a module's example into the workspace
+  and opens the copy; resolves to whether it reached disk).
 - **`dialogs.answer(kind, answer)`** — the next native dialog of that kind returns this instead of
   showing: `confirmUnsaved` takes `"save" | "discard" | "cancel"`, `confirmDelete` a boolean,
   `chooseWorkspace` a path (which must exist) or null. Consumed once.

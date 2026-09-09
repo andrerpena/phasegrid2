@@ -2,7 +2,11 @@ import { useCatalogStore } from "@renderer/catalog/catalog-store";
 import { useEngineStore } from "@renderer/engine/engine-store";
 import { usePatchStore } from "@renderer/patch/patch-store";
 import { EMPTY_PATCH, type PatchDoc } from "@shared/protocol/patch";
-import { type SlotReading, TelemetryKind } from "@shared/protocol/telemetry";
+import {
+  type NotesReading,
+  type SlotReading,
+  TelemetryKind,
+} from "@shared/protocol/telemetry";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DESCRIPTORS, moduleNode } from "./fixtures";
 import {
@@ -109,6 +113,8 @@ beforeEach(() => {
   usePatchStore.setState({ doc: MODULATED, version: 0 });
 });
 
+const noteReadings: [string, string, number][] = [];
+
 const target = {
   setLive: (module: string, param: string, fraction: number | null) =>
     live.push([module, param, fraction]),
@@ -123,6 +129,8 @@ const target = {
     index: bigint,
     level: { peak: number[]; rms: number[]; clipped: number[] },
   ) => levels.push([module, index.toString(), level.peak, level.clipped]),
+  setNotes: (module: string, index: bigint, reading: NotesReading) =>
+    noteReadings.push([module, index.toString(), reading.notes.length]),
 };
 
 /** A meter on the sine, watched for the same reason a scope and a readout are. */

@@ -61,6 +61,31 @@ TEST_CASE("InstanceTable rebuilds only when a structural param changes", "[insta
   REQUIRE(d->appliedValues[1] == 0.f);
 }
 
+TEST_CASE("a rebuilt instance keeps the telemetry slot the node was watching on", "[instance_table]") {
+  // A subscription is about the NODE. `telemetry.subscribe` only reassigns slots when the SET of
+  // watched modules changes, and editing a module's data does not change that set -- so if the
+  // rebuild dropped the slot, nothing would ever hand the new instance one and the module would go
+  // quiet with no error anywhere. That is what this catches.
+  pg::Registry reg;
+  REQUIRE_FALSE(reg.add(kStructuralDesc).has_value());
+  pg::InstanceTable table;
+  pg::PrepareInfo info{48000.0, pg::kMaxBlockSize, 1};
+  auto a = table.acquire("n", *reg.find("test.structural"), info, {{"gain", 0.5f}, {"shape", 0.f}});
+  a->telemetrySlot.store(3, std::memory_order_relaxed);
+  a->previewSlot.store(4, std::memory_order_relaxed);
+
+  auto b = table.acquire("n", *reg.find("test.structural"), info, {{"gain", 0.5f}, {"shape", 1.f}});
+  REQUIRE(b.get() != a.get());
+  CHECK(b->telemetrySlot.load(std::memory_order_relaxed) == 3);
+  CHECK(b->previewSlot.load(std::memory_order_relaxed) == 4);
+
+  // The same for a change of node data, which is the case a pattern module actually hits.
+  auto c = table.acquire("n", *reg.find("test.structural"), info, {{"gain", 0.5f}, {"shape", 1.f}},
+                         nlohmann::json{{"pattern", "c e g"}});
+  REQUIRE(c.get() != b.get());
+  CHECK(c->telemetrySlot.load(std::memory_order_relaxed) == 3);
+}
+
 TEST_CASE("InstanceTable configures a new instance with the model params before preparing it", "[instance_table]") {
   pg::Registry reg;
   REQUIRE_FALSE(reg.add(kStructuralDesc).has_value());

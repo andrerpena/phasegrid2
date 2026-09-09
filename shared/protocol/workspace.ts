@@ -104,6 +104,20 @@ export function uniqueSlug(slug: string, taken: readonly string[]): string {
   }
 }
 
+/**
+ * `Pattern`, then `Pattern 2`: the visible counterpart of `uniqueSlug`.
+ *
+ * Used where the name is chosen for the person rather than typed by them — copying an example — so that
+ * two copies of one example are told apart in the tab bar and not only in the folder listing.
+ */
+export function uniqueName(name: string, taken: readonly string[]): string {
+  if (!taken.includes(name)) return name;
+  for (let n = 2; ; n++) {
+    const candidate = `${name} ${n}`;
+    if (!taken.includes(candidate)) return candidate;
+  }
+}
+
 /** The entries in the workspace, as they sit on disk. */
 export const WORKSPACE_FILE = "workspace.json";
 export const PROJECTS_DIR = "projects";

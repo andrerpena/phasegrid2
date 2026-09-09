@@ -42,6 +42,23 @@ export const ModuleRemoveOpSchema = z.object({
   id: z.string().min(1),
 });
 
+/**
+ * A module's structured state, replaced whole.
+ *
+ * Whole rather than merged: `data` is one value the module owns and `configure` reads all of it at
+ * once, so a merge would leave a caller with no way to remove a key. The inverse op carries the
+ * previous blob, which is what makes an edit to a pattern undo like any other edit.
+ *
+ * The engine treats `data` as structural, so this rebuilds the node. That is only affordable for
+ * something edited as often as a pattern because such a module derives its position from the
+ * transport and lands where the old one was -- see the node data section of docs/engine.md.
+ */
+export const ModuleSetDataOpSchema = z.object({
+  op: z.literal("moduleSetData"),
+  id: z.string().min(1),
+  data: NodeDataSchema,
+});
+
 export const EdgeAddOpSchema = z.object({
   op: z.literal("edgeAdd"),
   id: z.string().min(1),
@@ -85,6 +102,7 @@ export const SetVoiceCountOpSchema = z.object({
 export const PatchOpSchema = z.discriminatedUnion("op", [
   ModuleAddOpSchema,
   ModuleRemoveOpSchema,
+  ModuleSetDataOpSchema,
   EdgeAddOpSchema,
   EdgeRemoveOpSchema,
   ParamSetOpSchema,

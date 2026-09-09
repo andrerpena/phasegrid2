@@ -3,6 +3,7 @@ import {
   type ParamDesc,
   type PortDesc,
   resolveFaceToken,
+  type TextDesc,
 } from "@shared/protocol/catalog";
 import {
   CELL,
@@ -140,6 +141,29 @@ export interface MeterBlock extends BlockBase {
   kind: "meter";
 }
 
+/**
+ * A text property, shown on the face.
+ *
+ * Read-only here: the value is typed into the inspector or the editor modal, and the face shows
+ * what it currently is. Without it a module whose whole content is a string would be a blank
+ * rectangle, and two of them would be indistinguishable on the canvas.
+ */
+/**
+ * A piano roll: the notes the module is playing, drawn as a clip.
+ *
+ * A screen like the scope's -- it is a picture, so it has a panel -- but showing musical time
+ * rather than samples. What goes on it comes from the engine; see `TelemetryKind.Notes`.
+ */
+export interface PianoRollBlock extends BlockBase {
+  kind: "pianoRoll";
+  panel: Panel;
+}
+
+export interface TextBlock extends BlockBase {
+  kind: "text";
+  text: TextDesc;
+}
+
 export type Block =
   | TitleBlock
   | JackBlock
@@ -147,7 +171,9 @@ export type Block =
   | WaveBlock
   | ScopeBlock
   | ValueBlock
-  | MeterBlock;
+  | MeterBlock
+  | TextBlock
+  | PianoRollBlock;
 
 export interface Face {
   /** Size in grid cells, the title's row included. The pixel size is these times `CELL` and nothing else. */
@@ -165,6 +191,8 @@ export interface Face {
   /** Named for what it does rather than for its token: `face.value` would read as a number. */
   readout: ValueBlock | null;
   meter: MeterBlock | null;
+  texts: TextBlock[];
+  pianoRoll: PianoRollBlock | null;
   /** Every place a cable can plug in: the jacks, and the sockets at the knobs' feet. */
   sockets: Socket[];
 }
@@ -178,6 +206,11 @@ export const SCOPE_MIN_CELLS = 2;
 export const VALUE_MIN_COLS = 2;
 /** A meter needs two cells each way: a bar per channel, and width enough to read a level along. */
 export const METER_MIN_CELLS = 2;
+/** A pattern is read across, so a text block is about width: below this it shows a hint, not a value. */
+export const TEXT_MIN_COLS = 3;
+/** A piano roll is two axes at once: height for the pitches, and real width for the bars. */
+export const PIANO_ROLL_MIN_COLS = 4;
+export const PIANO_ROLL_MIN_ROWS = 2;
 /** The wave block a composed face gives a module: wider than tall, the shape of a scope screen. */
 export const WAVE_COLS = 3;
 export const WAVE_ROWS = 2;
@@ -230,7 +263,9 @@ type Cell =
   | { kind: "meter" }
   | { kind: "input"; port: PortDesc }
   | { kind: "output"; port: PortDesc }
-  | { kind: "param"; param: ParamDesc };
+  | { kind: "param"; param: ParamDesc }
+  | { kind: "text"; text: TextDesc }
+  | { kind: "pianoRoll" };
 
 /** The token that would have placed a cell: what a block is called, and what a script asks for. */
 function nameOf(cell: Exclude<Cell, { kind: "empty" }>): string {
@@ -248,6 +283,10 @@ function nameOf(cell: Exclude<Cell, { kind: "empty" }>): string {
       return cell.port.id;
     case "param":
       return cell.param.id;
+    case "text":
+      return cell.text.id;
+    case "pianoRoll":
+      return "pianoRoll";
   }
 }
 
@@ -295,6 +334,19 @@ function cellOf(token: string, descriptor: ModuleDescriptor): Cell {
         `${descriptor.id}: face names \`meter\` but the module publishes none`,
       );
     return { kind: "meter" };
+  }
+  if (resolved.kind === "pianoRoll") {
+    if (!descriptor.flags.publishesNotes)
+      throw new Error(
+        `${descriptor.id}: face names \`pianoRoll\` but the module publishes no notes`,
+      );
+    return { kind: "pianoRoll" };
+  }
+  if (resolved.kind === "text") {
+    const text = descriptor.texts.find((t) => t.id === resolved.id);
+    if (text === undefined)
+      throw new Error(`${descriptor.id}: no text ${resolved.id}`);
+    return { kind: "text", text };
   }
   if (resolved.kind === "param") {
     const param = descriptor.params.find((p) => p.id === resolved.id);
@@ -533,6 +585,20 @@ function placeBlocks(cells: Cell[][], descriptor: ModuleDescriptor): Face {
           );
         blocks.push({ ...base, kind: "meter" });
         break;
+      case "pianoRoll":
+        if (blockRows < PIANO_ROLL_MIN_ROWS || blockCols < PIANO_ROLL_MIN_COLS)
+          throw new Error(
+            `${descriptor.id}: face gives \`pianoRoll\` less than four cells by two`,
+          );
+        blocks.push({ ...base, kind: "pianoRoll", panel: panelOf(base) });
+        break;
+      case "text":
+        if (blockCols < TEXT_MIN_COLS)
+          throw new Error(
+            `${descriptor.id}: face gives \`${name}\` less than three cells across`,
+          );
+        blocks.push({ ...base, kind: "text", text: area.cell.text });
+        break;
     }
   }
 
@@ -546,6 +612,10 @@ function placeBlocks(cells: Cell[][], descriptor: ModuleDescriptor): Face {
   const scopes = blocks.filter((b): b is ScopeBlock => b.kind === "scope");
   const readouts = blocks.filter((b): b is ValueBlock => b.kind === "value");
   const meters = blocks.filter((b): b is MeterBlock => b.kind === "meter");
+  const texts = blocks.filter((b): b is TextBlock => b.kind === "text");
+  const rolls = blocks.filter(
+    (b): b is PianoRollBlock => b.kind === "pianoRoll",
+  );
   const declared = descriptor.inputs.filter((p) => !p.implicit);
   for (const port of [...declared, ...descriptor.outputs])
     if (!jacks.some((j) => j.socket.port === port))
@@ -564,6 +634,8 @@ function placeBlocks(cells: Cell[][], descriptor: ModuleDescriptor): Face {
     scope: scopes[0] ?? null,
     readout: readouts[0] ?? null,
     meter: meters[0] ?? null,
+    texts,
+    pianoRoll: rolls[0] ?? null,
     sockets: [
       ...jacks.map((j) => j.socket),
       ...knobs.flatMap((k) => (k.socket === null ? [] : [k.socket])),

@@ -196,21 +196,7 @@ export const ProjectHeader = () => {
       </label>
 
       <span className="flex-1" />
-      <span
-        className="flex items-center gap-1 text-muted-foreground"
-        title={
-          project.kind === "example"
-            ? "An example. Saving it makes it a project of your own."
-            : undefined
-        }
-      >
-        {project.name}
-        {project.kind === "example" && (
-          <span className="rounded-sm border border-border px-1 text-2xs uppercase tracking-wide text-signal-note">
-            example
-          </span>
-        )}
-      </span>
+      <span className="text-muted-foreground">{project.name}</span>
 
       {/*
         One button, whose label says which of the two things it will do.
@@ -233,9 +219,7 @@ export const ProjectHeader = () => {
         }
         onClick={() => void commandRegistry.dispatch("project.save")}
       >
-        {project.kind === "example" || project.slug === undefined
-          ? "Save As…"
-          : "Save"}
+        {project.slug === undefined ? "Save As…" : "Save"}
       </button>
     </div>
   );

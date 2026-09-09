@@ -37,7 +37,6 @@ export interface Snapshot {
       id: string;
       name: string;
       slug: string | null;
-      kind: string;
       dirty: boolean;
       tempo: number;
     }[];
@@ -89,7 +88,6 @@ export function buildSnapshot(logTail = 20): Snapshot {
         id: p.id,
         name: p.name,
         slug: p.slug ?? null,
-        kind: p.kind,
         dirty: project.isDirty(p.id),
         tempo: p.tempo,
       })),

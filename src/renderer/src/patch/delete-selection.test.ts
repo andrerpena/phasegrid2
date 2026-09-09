@@ -27,8 +27,8 @@ const PATCH: PatchDoc = {
   ],
 };
 
-function open(kind: "user" | "example" = "user"): void {
-  useProjectStore.getState().open({ ...emptyProject(), kind });
+function open(): void {
+  useProjectStore.getState().open(emptyProject());
   usePatchStore.getState().replace(PATCH);
 }
 
@@ -89,15 +89,6 @@ describe("deleting the selection", () => {
     useSelectionStore.getState().set(["amp"]);
     deleteSelection();
     expect(useSelectionStore.getState().isEmpty()).toBe(true);
-  });
-
-  it("does nothing in an example", () => {
-    // An example's wiring is fixed. Deleting from one would be the most confusing possible way to
-    // discover it was never yours to edit.
-    open("example");
-    useSelectionStore.getState().set(["amp"]);
-    deleteSelection();
-    expect(ids()).toEqual(["osc", "amp", "out"]);
   });
 
   it("does nothing with an empty selection", () => {

@@ -12,6 +12,7 @@ import * as monaco from "monaco-editor/editor/editor.api";
 import editorWorker from "monaco-editor/editor/editor.worker?worker";
 import jsonWorker from "monaco-editor/language/json/json.worker?worker";
 import { jsonDefaults } from "monaco-editor/languages/features/json/register";
+import { registerMiniLanguage } from "./monaco-mini";
 import { installMonacoTheme } from "./monaco-theme";
 
 /**
@@ -74,6 +75,9 @@ function configureJson(): void {
   });
 
   registerHexColourProvider();
+  // Mini-notation, for the pattern editor. Registered alongside JSON rather than lazily, because
+  // both go through this one setup and a second entry point is how the two configurations drift.
+  registerMiniLanguage(monaco);
 }
 
 /**

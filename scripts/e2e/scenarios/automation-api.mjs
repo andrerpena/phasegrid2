@@ -193,19 +193,32 @@ export default {
       snap.history.future.length === 1 && snap.projects.open[0].dirty === true,
     );
 
-    // ── An example opens ──
-    await pg('workspace.openExample("mod.lfo")');
+    // ── An example is copied into the workspace ──
+    check(
+      "copying an example writes it into the workspace",
+      (await pg('workspace.copyExample("mod.lfo")')) === true,
+    );
     await idle();
     snap = await pg("snapshot()");
     check(
-      "an example opens as a second tab",
+      "and it opens as a second tab, filed under its own name",
       snap.projects.open.length === 2 &&
-        snap.projects.open[1].kind === "example",
+        snap.projects.open[1].slug === "lfo" &&
+        snap.projects.open[1].dirty === false,
       JSON.stringify(snap.projects.open),
     );
     check(
       "with its patch on the canvas",
       (await pg("grid.nodes()")).length === 3,
+    );
+    // The copy is a project like any other: the wiring is not fixed, so a module can be deleted from
+    // it. That is the whole difference between a copy and the read-only demonstration it replaced.
+    await pg('patch.select(["lfo"])');
+    await pg('commands.run("patch.deleteSelection")');
+    await idle();
+    check(
+      "and it can be edited, because it is nobody's demonstration",
+      (await pg("snapshot()")).patch.modules.length === 2,
     );
   },
 };

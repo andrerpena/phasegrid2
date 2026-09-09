@@ -4,7 +4,7 @@ import { afterSync } from "@renderer/patch/engine-sync";
 import { usePatchStore } from "@renderer/patch/patch-store";
 import type { ModuleDescriptor, ParamDesc } from "@shared/protocol/catalog";
 import type { PatchDoc } from "@shared/protocol/patch";
-import { TelemetryKind } from "@shared/protocol/telemetry";
+import { type NotesReading, TelemetryKind } from "@shared/protocol/telemetry";
 import { paramFraction } from "./layout";
 
 /**
@@ -48,6 +48,8 @@ export interface TelemetryTarget {
     index: bigint,
     level: { peak: number[]; rms: number[]; clipped: number[] },
   ): void;
+  /** The notes a note source is playing: what its piano roll draws, and which steps light up. */
+  setNotes(moduleId: string, index: bigint, reading: NotesReading): void;
 }
 
 export interface TelemetrySync {
@@ -106,7 +108,8 @@ export function displayModules(
       return (
         flags?.publishesScope === true ||
         flags?.publishesValue === true ||
-        flags?.publishesMeter === true
+        flags?.publishesMeter === true ||
+        flags?.publishesNotes === true
       );
     })
     .map((m) => m.id)
@@ -252,7 +255,8 @@ export function startTelemetrySync(
       if (
         reading.kind !== TelemetryKind.Scope &&
         reading.kind !== TelemetryKind.Value &&
-        reading.kind !== TelemetryKind.Meter
+        reading.kind !== TelemetryKind.Meter &&
+        reading.kind !== TelemetryKind.Notes
       )
         continue;
       if (shown.get(moduleId) === reading.blockIndex) continue;
@@ -261,6 +265,8 @@ export function startTelemetrySync(
         target.setTrace(moduleId, reading.blockIndex, reading.channels);
       else if (reading.kind === TelemetryKind.Value)
         target.setValue(moduleId, reading.blockIndex, reading.values);
+      else if (reading.kind === TelemetryKind.Notes)
+        target.setNotes(moduleId, reading.blockIndex, reading);
       else
         target.setLevel(moduleId, reading.blockIndex, {
           peak: reading.peak,

@@ -20,6 +20,14 @@ using ParamValues = std::map<std::string, float>;
 /// rest of it. Always an object, empty when the node has none. Message thread only.
 using NodeData = nlohmann::json;
 
+/// A text property's value out of the node's data, or its declared default.
+///
+/// Anything but a string of a sensible length reads as the default rather than throwing: this runs
+/// on the message thread inside a compile, and `data` is whatever was in the patch file. A module
+/// that wants to be strict about the CONTENT is free to be -- that is its own business, and it is
+/// what `notes.pattern` does with a pattern it cannot parse.
+std::string textProperty(const NodeData& data, const char* key, const char* fallback);
+
 struct PrepareInfo {
   double sampleRate = 48000.0;
   uint32_t maxBlock = kMaxBlockSize;

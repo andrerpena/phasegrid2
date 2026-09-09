@@ -140,11 +140,26 @@ button in its header; `⌘S` saves, `⌘⇧S` saves under a new name. Closing a 
 quitting asks first, and Cancel genuinely cancels.
 
 A project that has never been saved is filed under the name it already has, so saving never stops to ask
-where things go. An **example** is the exception: it has nowhere to save to, and saving one asks for a
-name, writes it into the workspace, and the tab stops being an example.
+where things go.
 
 Deleting a project from the Projects panel removes its folder. A tab open on it stays open, as a project
 that has never been saved — deleting the file is not a reason to throw away what is on screen.
+
+## Examples
+
+Every module has an example: the smallest patch that shows what it does, reachable from the command
+palette by the module's own name. Running one **copies it into the workspace** as a project of your own
+— its own name, its own folder, nothing withheld — and opens the copy. Move things, rewire it, delete
+half of it, save it: it is a project like any other, and the second copy of one example is `Sine 2` in
+`projects/sine-2/`.
+
+The copy is what makes an example useful rather than a museum piece: finding out what a module does and
+starting to build with it are the same gesture. If the workspace refuses the write, the copy stays open
+as unsaved work with the dot in its tab, rather than being thrown away.
+
+The examples themselves live in `src/renderer/src/examples/registry.ts`, and each is rendered by the
+real engine and measured in `examples.render.test.ts`. An example that does not make the sound it
+claims to is worse than no example.
 
 ## Editing
 
@@ -152,10 +167,6 @@ Select modules on the grid — click one, shift-click to add, or drag a marquee 
 press Delete or Backspace to remove them. The cables attached to them go with them, as one undo entry:
 removing a module already takes its edges in `applyOps`, in `invert`, and in the engine's own
 `GraphModel::removeNode`, so nothing describes that twice.
-
-Deleting does nothing in an example, whose wiring is fixed. Saving an example under a name makes it a
-project of your own, and it unlocks in the same moment — the canvas is asked each gesture rather than
-told once when it was built.
 
 ## Boundaries
 

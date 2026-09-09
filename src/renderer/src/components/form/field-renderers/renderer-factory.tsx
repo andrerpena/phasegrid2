@@ -2,6 +2,7 @@ import type { AnyFieldApi } from "@tanstack/react-form";
 import type { BaseSchema, SchemaMetadata } from "../../../schemas/core/schema";
 import { FormControl } from "../../form-controls";
 import { BooleanFieldRenderer } from "./BooleanFieldRenderer";
+import { CodeFieldRenderer } from "./CodeFieldRenderer";
 import { ColorFieldRenderer } from "./ColorFieldRenderer";
 import { EnumFieldRenderer } from "./EnumFieldRenderer";
 import { NumberFieldRenderer } from "./NumberFieldRenderer";
@@ -44,6 +45,10 @@ const resolveEditRenderer = (
   // gets the color swatch regardless of its underlying (string) type.
   if (metadata.renderer === "color") {
     return ColorFieldRenderer;
+  }
+  // A string a module owns: one line, plus a button to open it in a real editor.
+  if (metadata.renderer === "code") {
+    return CodeFieldRenderer;
   }
   if (metadata.enumValues && metadata.enumValues.length > 0) {
     return EnumFieldRenderer;

@@ -26,6 +26,21 @@ export interface SchemaMetadata<Output = unknown> {
   unit?: string;
   /** Whether the field is editable (for inspector) */
   editable?: boolean;
+  /**
+   * Which language a `code` field is written in -- "mini" for Tidal/Strudel mini-notation, absent
+   * for plain text. A renderer that does not know the name falls back to plain text, so an
+   * unrecognised language costs syntax colouring rather than the ability to type.
+   */
+  language?: string;
+  /** What to show in an empty field. */
+  placeholder?: string;
+  /** A `code` field the editor should open as a block of lines rather than as one. */
+  multiline?: boolean;
+  /**
+   * What the expand button on a `code` field does. Supplied by whoever built the schema, so the
+   * form stays free of what a module's language is and of the editor that understands it.
+   */
+  onExpand?: () => void;
 
   // Validation functions (use unknown for parameter to allow covariant usage in ObjectShape)
   /** Sync validation on form submit */

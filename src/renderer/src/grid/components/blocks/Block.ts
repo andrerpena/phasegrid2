@@ -43,6 +43,8 @@ export interface BlockStyle {
   wave: WaveStyle;
   /** A socket's colour is its signal's. */
   signal: Record<SignalRole, number>;
+  /** The transport's own colour, for anything that marks where time has got to. */
+  playhead: number;
 }
 
 /** The blocks' colours from the theme and the module's accent, the one way every caller builds them. */
@@ -72,6 +74,7 @@ export function blockStyle(colors: GridColors, accent: number): BlockStyle {
       background: hexToNumber(colors.background),
     },
     signal,
+    playhead: hexToNumber(colors.playhead),
   };
 }
 
