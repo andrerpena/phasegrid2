@@ -76,6 +76,9 @@ const vca: ModuleDescriptor = {
     needsTransport: false,
     writesTelemetry: false,
     previewsWave: false,
+    publishesScope: false,
+    publishesValue: false,
+    publishesMeter: false,
   },
   inputs: [port("in"), port("gain"), port("param:gain", true)],
   outputs: [port("out")],
@@ -409,6 +412,90 @@ describe("a composed face", () => {
     expect(face.wave?.panel.width).toBe(
       (face.wave?.width ?? 0) - 2 * TILE_GUTTER,
     );
+  });
+
+  it("gives a scope block to the module that publishes one, ahead of its knobs, and refuses the token elsewhere", () => {
+    const scoped: ModuleDescriptor = {
+      ...vca,
+      flags: { ...vca.flags, writesTelemetry: true, publishesScope: true },
+      inputs: [port("in")],
+      params: [param("time")],
+    };
+    const face = defaultFace(scoped);
+    expect(face.scope).not.toBeNull();
+    expect(face.wave).toBeNull();
+    expect(face.scope?.col).toBeLessThan(face.knobs[0].col);
+    expect(face.scope?.panel.width).toBe(
+      (face.scope?.width ?? 0) - 2 * TILE_GUTTER,
+    );
+    // A face may say `scope` only on a module that has one to show.
+    expect(() =>
+      parseFace(
+        [
+          ["in", "scope", "scope"],
+          [".", "scope", "scope"],
+        ],
+        vca,
+      ),
+    ).toThrow(/publishes none/);
+    expect(() => parseFace([["in", "scope"]], scoped)).toThrow(
+      /less than two cells by two/,
+    );
+  });
+
+  it("draws the scope module the engine declares: a jack, the screen, the time knob", () => {
+    const face = composeFace(descriptor("display.scope"));
+    expect(face.blocks.map((b) => `${b.kind}:${b.name}`)).toEqual([
+      "title:title",
+      "jack:in",
+      "scope:scope",
+      "knob:time",
+    ]);
+    expect(face.scope).toMatchObject({ col: 1, row: 1, cols: 4, rows: 3 });
+  });
+
+  it("gives a readout to the module that publishes a value, and refuses the token elsewhere", () => {
+    const readout: ModuleDescriptor = {
+      ...vca,
+      flags: { ...vca.flags, writesTelemetry: true, publishesValue: true },
+      inputs: [port("in")],
+      // A display module has no outputs: tapping a wire cannot change what it sounds like.
+      outputs: [],
+      params: [],
+    };
+    const face = defaultFace(readout);
+    expect(face.readout).not.toBeNull();
+    expect(face.knobs).toHaveLength(0);
+    expect(() => parseFace([["in", "value", "value"]], vca)).toThrow(
+      /publishes none/,
+    );
+    // A readout is a line of text: one cell tall is fine, one cell wide is not.
+    expect(() => parseFace([["in", "value", "value"]], readout)).not.toThrow();
+    expect(() => parseFace([["in", "value"]], readout)).toThrow(
+      /less than two cells across/,
+    );
+  });
+
+  it("draws the readout module the engine declares: a jack and the number", () => {
+    const face = composeFace(descriptor("display.value"));
+    expect(face.blocks.map((b) => `${b.kind}:${b.name}`)).toEqual([
+      "title:title",
+      "jack:in",
+      "value:value",
+    ]);
+    expect(face.readout).toMatchObject({ col: 1, row: 1, cols: 3, rows: 2 });
+    // A readout has no screen of its own: the number sits on an ordinary tile.
+    expect(face.readout).not.toHaveProperty("panel");
+  });
+
+  it("draws the meter module the engine declares: a jack and the bars", () => {
+    const face = composeFace(descriptor("display.meter"));
+    expect(face.blocks.map((b) => `${b.kind}:${b.name}`)).toEqual([
+      "title:title",
+      "jack:in",
+      "meter:meter",
+    ]);
+    expect(face.meter).toMatchObject({ col: 1, row: 1, cols: 3, rows: 2 });
   });
 
   it("stands a module up on its wave alone", () => {

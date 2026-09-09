@@ -723,7 +723,17 @@ register(
   displayExample(
     "display.meter",
     "Meter",
-    "A meter tapping the signal on its way to the output. It changes nothing: a tap is a tap.",
+    "A meter tapping the signal on its way to the output, showing its level on its face. It " +
+      "changes nothing: a tap is a tap. Turn the oscillator's Fold to push it into the clip light.",
+  ),
+);
+
+register(
+  displayExample(
+    "display.value",
+    "Value",
+    "A readout showing what is on the wire as a number. Turn the oscillator's Fold and watch it " +
+      "move; it reads the signal itself, sign and all, rather than how loud it is.",
   ),
 );
 
@@ -731,7 +741,7 @@ register(
   displayExample(
     "display.scope",
     "Scope",
-    "A scope tapping the signal on its way to the output. Turn the oscillator's Tune and watch the " +
-      "waveform stretch.",
+    "A scope tapping the signal on its way to the output, drawing it on its face as it plays. Turn " +
+      "the oscillator's Fold and watch the trace bend; turn Time to see more or less of it.",
   ),
 );

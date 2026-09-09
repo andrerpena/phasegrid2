@@ -21,15 +21,33 @@ import { paramFraction } from "./layout";
  * under modulation exactly as a knob does. The request-per-edit path (`preview-sync.ts`) is only for
  * an engine with no segment.
  *
+ * And the display modules: one that publishes a scope or a readout writes that itself, into the slot
+ * the engine gives any watched module, so it is asked for by name in the same list as the modulated
+ * ones and its slot is read by the kind it carries rather than as knob values.
+ *
  * This is the one owner of the engine's subscription set. `telemetry.subscribe` replaces the whole
  * set on every call, so a second subscriber elsewhere would silently cancel this one; when meters
- * and scopes arrive they add their modules here.
+ * arrive they add their modules here.
  */
 
 export interface TelemetryTarget {
   setLive(moduleId: string, paramId: string, fraction: number | null): void;
   /** A module's picture, one cycle -1..1, as the engine drew it for the values it is running with. */
   setWave(moduleId: string, samples: ArrayLike<number>): void;
+  /** The window on the wire into a scope module, one array per channel, and the engine's count of it. */
+  setTrace(
+    moduleId: string,
+    index: bigint,
+    channels: ArrayLike<number>[],
+  ): void;
+  /** The last value on the wire into a readout module, per channel, and the engine's count of it. */
+  setValue(moduleId: string, index: bigint, values: number[]): void;
+  /** The level on the wire into a meter module, and the engine's count of it. */
+  setLevel(
+    moduleId: string,
+    index: bigint,
+    level: { peak: number[]; rms: number[]; clipped: number[] },
+  ): void;
 }
 
 export interface TelemetrySync {
@@ -71,6 +89,30 @@ export function modulatedModules(
   return out;
 }
 
+/**
+ * The modules that publish something of their own onto their face -- a scope's window, a readout's
+ * value, a meter's level. Every one of them is watched, cabled or not: what it shows is what it is for.
+ *
+ * One list rather than one per kind, because the slot says which kind it carries and the reader
+ * dispatches on that. A new display module is a flag here and a case in the tick.
+ */
+export function displayModules(
+  doc: PatchDoc,
+  catalog: Map<string, ModuleDescriptor>,
+): string[] {
+  return doc.modules
+    .filter((m) => {
+      const flags = catalog.get(m.type)?.flags;
+      return (
+        flags?.publishesScope === true ||
+        flags?.publishesValue === true ||
+        flags?.publishesMeter === true
+      );
+    })
+    .map((m) => m.id)
+    .sort();
+}
+
 /** The modules whose face has a wave panel: every one of them is asked for its picture. */
 export function previewedModules(
   doc: PatchDoc,
@@ -98,8 +140,12 @@ export function startTelemetrySync(
   let slots = new Map<string, number>();
   let previewSlots = new Map<string, number>();
   let live = new Map<string, LiveParam[]>();
+  /** The display modules among the watched: their slots carry a picture of their own, not knob values. */
+  let displays: string[] = [];
   /** The last picture drawn per module, by the engine's own count, so an unchanged one is not redrawn. */
   const drawn = new Map<string, bigint>();
+  /** The same for what a display module publishes, kept apart so the two counts cannot cross. */
+  const shown = new Map<string, bigint>();
   let lastRequest = "";
 
   const openSegment = (): void => {
@@ -132,7 +178,11 @@ export function startTelemetrySync(
         if (!wanted.get(moduleId)?.some((l) => l.param.id === param.id))
           target.setLive(moduleId, param.id, null);
     live = wanted;
-    const modules = [...wanted.keys()].sort();
+    displays = displayModules(
+      usePatchStore.getState().doc,
+      useCatalogStore.getState().byId,
+    );
+    const modules = [...new Set([...wanted.keys(), ...displays])].sort();
     const previews = previewedModules(
       usePatchStore.getState().doc,
       useCatalogStore.getState().byId,
@@ -145,6 +195,7 @@ export function startTelemetrySync(
     slots = new Map();
     previewSlots = new Map();
     drawn.clear();
+    shown.clear();
     afterSync(async () => {
       if (stopped) return;
       try {
@@ -191,6 +242,31 @@ export function startTelemetrySync(
       if (drawn.get(moduleId) === reading.blockIndex) continue;
       drawn.set(moduleId, reading.blockIndex);
       target.setWave(moduleId, reading.samples);
+    }
+    // Held or running alike: a held patch publishes nothing new, so the last picture simply stays.
+    for (const moduleId of displays) {
+      const slot = slots.get(moduleId);
+      if (slot === undefined) continue;
+      const reading = window.telemetry.read(slot);
+      if (reading === null) continue;
+      if (
+        reading.kind !== TelemetryKind.Scope &&
+        reading.kind !== TelemetryKind.Value &&
+        reading.kind !== TelemetryKind.Meter
+      )
+        continue;
+      if (shown.get(moduleId) === reading.blockIndex) continue;
+      shown.set(moduleId, reading.blockIndex);
+      if (reading.kind === TelemetryKind.Scope)
+        target.setTrace(moduleId, reading.blockIndex, reading.channels);
+      else if (reading.kind === TelemetryKind.Value)
+        target.setValue(moduleId, reading.blockIndex, reading.values);
+      else
+        target.setLevel(moduleId, reading.blockIndex, {
+          peak: reading.peak,
+          rms: reading.rms,
+          clipped: reading.clipped,
+        });
     }
   };
 

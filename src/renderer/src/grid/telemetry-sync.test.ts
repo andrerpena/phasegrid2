@@ -6,6 +6,7 @@ import { type SlotReading, TelemetryKind } from "@shared/protocol/telemetry";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DESCRIPTORS, moduleNode } from "./fixtures";
 import {
+  displayModules,
   modulatedModules,
   previewedModules,
   startTelemetrySync,
@@ -49,6 +50,9 @@ const subscriptions: string[][] = [];
 const previewRequests: string[][] = [];
 const live: [string, string, number | null][] = [];
 const waves: [string, number[]][] = [];
+const traces: [string, string, number[][]][] = [];
+const shownValues: [string, string, number[]][] = [];
+const levels: [string, string, number[], number[]][] = [];
 let readings = new Map<number, SlotReading | null>();
 let tick: (() => void) | null = null;
 const opened: string[] = [];
@@ -58,6 +62,9 @@ beforeEach(() => {
   previewRequests.length = 0;
   live.length = 0;
   waves.length = 0;
+  traces.length = 0;
+  shownValues.length = 0;
+  levels.length = 0;
   opened.length = 0;
   readings = new Map();
   tick = null;
@@ -107,6 +114,57 @@ const target = {
     live.push([module, param, fraction]),
   setWave: (module: string, samples: ArrayLike<number>) =>
     waves.push([module, Array.from(samples)]),
+  setTrace: (module: string, index: bigint, channels: ArrayLike<number>[]) =>
+    traces.push([module, index.toString(), channels.map((c) => Array.from(c))]),
+  setValue: (module: string, index: bigint, values: number[]) =>
+    shownValues.push([module, index.toString(), values]),
+  setLevel: (
+    module: string,
+    index: bigint,
+    level: { peak: number[]; rms: number[]; clipped: number[] },
+  ) => levels.push([module, index.toString(), level.peak, level.clipped]),
+};
+
+/** A meter on the sine, watched for the same reason a scope and a readout are. */
+const METERED: PatchDoc = {
+  ...MODULATED,
+  modules: [...MODULATED.modules, moduleNode("level", "display.meter")],
+  edges: [
+    ...MODULATED.edges,
+    {
+      id: "e3",
+      from: { module: "osc", port: "out" },
+      to: { module: "level", port: "in" },
+    },
+  ],
+};
+
+/** A readout on the sine, watched for the same reason a scope is. */
+const READOUT: PatchDoc = {
+  ...MODULATED,
+  modules: [...MODULATED.modules, moduleNode("readout", "display.value")],
+  edges: [
+    ...MODULATED.edges,
+    {
+      id: "e3",
+      from: { module: "osc", port: "out" },
+      to: { module: "readout", port: "in" },
+    },
+  ],
+};
+
+/** A scope on the sine, beside the modulated patch: it is watched with nothing plugged into it. */
+const SCOPED: PatchDoc = {
+  ...MODULATED,
+  modules: [...MODULATED.modules, moduleNode("scope", "display.scope")],
+  edges: [
+    ...MODULATED.edges,
+    {
+      id: "e3",
+      from: { module: "osc", port: "out" },
+      to: { module: "scope", port: "in" },
+    },
+  ],
 };
 const schedule = (fn: () => void) => {
   tick = fn;
@@ -126,6 +184,16 @@ describe("which modules are watched", () => {
   it("is empty when every cable carries audio or control into an ordinary port", () => {
     const plain: PatchDoc = { ...MODULATED, edges: [MODULATED.edges[1]] };
     expect(modulatedModules(plain, DESCRIPTORS).size).toBe(0);
+  });
+
+  it("watches every module that shows something the engine publishes, cabled or not", () => {
+    expect(displayModules(MODULATED, DESCRIPTORS)).toEqual([]);
+    expect(displayModules(SCOPED, DESCRIPTORS)).toEqual(["scope"]);
+    // A readout and a meter are watched by the same rule, and the three are one list.
+    expect(displayModules(READOUT, DESCRIPTORS)).toEqual(["readout"]);
+    expect(displayModules(METERED, DESCRIPTORS)).toEqual(["level"]);
+    // Nothing modulates it, so the modulated set does not know it; the subscription has to merge.
+    expect(modulatedModules(SCOPED, DESCRIPTORS).has("scope")).toBe(false);
   });
 
   it("asks for a picture from every module that has a panel, cabled or not", () => {
@@ -165,6 +233,100 @@ describe("telemetry sync", () => {
     tick?.();
     expect(waves).toHaveLength(2);
     expect(waves[1]).toEqual(["osc", [0, 1, 0]]);
+    sync.stop();
+  });
+
+  it("asks for a scope module by name with the modulated ones, and reads its slot as a trace", async () => {
+    usePatchStore.setState({ doc: SCOPED, version: 0 });
+    const sync = startTelemetrySync(target, schedule);
+    await flush();
+    expect(subscriptions.at(-1)).toEqual(["osc", "scope"]);
+    // Slot 1 is the scope's: a window, not knob values.
+    readings.set(1, {
+      kind: TelemetryKind.Scope,
+      blockIndex: 3n,
+      channels: [
+        Float32Array.from([0, 0.5, 0]),
+        Float32Array.from([0, -0.5, 0]),
+      ],
+    });
+    tick?.();
+    tick?.();
+    // Drawn once for one publish, however many frames look at it.
+    expect(traces).toEqual([
+      [
+        "scope",
+        "3",
+        [
+          [0, 0.5, 0],
+          [0, -0.5, 0],
+        ],
+      ],
+    ]);
+    readings.set(1, {
+      kind: TelemetryKind.Scope,
+      blockIndex: 4n,
+      channels: [Float32Array.from([1, 1, 1]), Float32Array.from([1, 1, 1])],
+    });
+    tick?.();
+    expect(traces).toHaveLength(2);
+    // Its slot never feeds a knob: the scope's parameter is not modulated and its slot is not Params.
+    expect(live.filter(([module]) => module === "scope")).toEqual([]);
+    sync.stop();
+  });
+
+  it("reads a readout's slot as a value, from the same list as the scopes", async () => {
+    usePatchStore.setState({ doc: READOUT, version: 0 });
+    const sync = startTelemetrySync(target, schedule);
+    await flush();
+    expect(subscriptions.at(-1)).toEqual(["osc", "readout"]);
+    // Slot 1 is the readout's, and it carries a Value rather than a window.
+    readings.set(1, {
+      kind: TelemetryKind.Value,
+      blockIndex: 5n,
+      values: [-0.25, 0.5],
+    });
+    tick?.();
+    tick?.();
+    expect(shownValues).toEqual([["readout", "5", [-0.25, 0.5]]]);
+    expect(traces).toEqual([]);
+    sync.stop();
+  });
+
+  it("reads a meter's slot as a level, from the same list again", async () => {
+    usePatchStore.setState({ doc: METERED, version: 0 });
+    const sync = startTelemetrySync(target, schedule);
+    await flush();
+    expect(subscriptions.at(-1)).toEqual(["level", "osc"]);
+    // Slot 0 is the meter's: the modules are sorted, and `level` comes before `osc`.
+    readings.set(0, {
+      kind: TelemetryKind.Meter,
+      blockIndex: 11n,
+      peak: [0.8, 0.4],
+      rms: [0.5, 0.25],
+      clipped: [1, 0],
+    });
+    tick?.();
+    tick?.();
+    expect(levels).toEqual([["level", "11", [0.8, 0.4], [1, 0]]]);
+    // Its slot is not knob values: a watched display module publishes its own kind.
+    expect(live.filter(([module]) => module === "level")).toEqual([]);
+    sync.stop();
+  });
+
+  it("keeps showing a scope's last window while the patch is held", async () => {
+    usePatchStore.setState({ doc: SCOPED, version: 0 });
+    const sync = startTelemetrySync(target, schedule);
+    await flush();
+    useEngineStore.setState({ running: false });
+    readings.set(1, {
+      kind: TelemetryKind.Scope,
+      blockIndex: 9n,
+      channels: [Float32Array.from([0.25])],
+    });
+    tick?.();
+    // A held patch has no live knob values, but a window that arrives is still a window worth showing.
+    expect(traces).toHaveLength(1);
     sync.stop();
   });
 

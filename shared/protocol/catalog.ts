@@ -124,13 +124,30 @@ export const ModuleFlagsSchema = z
      * same parameters the sound is, by the module that makes the sound.
      */
     previewsWave: z.boolean(),
+    /**
+     * Its telemetry slot carries a rolling window of the signal it is fed (`TelemetryKind.Scope`).
+     * The editor gives such a module a scope panel on its face and draws the window there, read from
+     * the engine's segment at frame rate.
+     */
+    publishesScope: z.boolean(),
+    /**
+     * Its telemetry slot carries the last value on its input, per channel (`TelemetryKind.Value`).
+     * The editor gives such a module a readout on its face and writes the number there.
+     */
+    publishesValue: z.boolean(),
+    /**
+     * Its telemetry slot carries the level on its input: held peak, RMS and a clip flag per channel
+     * (`TelemetryKind.Meter`). The editor gives such a module a level meter on its face.
+     */
+    publishesMeter: z.boolean(),
   })
   .strict();
 
 /**
  * A module's face: rows of tokens, one per grid cell, as the engine padded them (every row the same
  * length). Equal neighbouring tokens form one rectangular block, as CSS `grid-template-areas`. `.` is
- * an empty cell, `wave` the wave panel, anything else names a port (`in:`/`out:` when the two sides
+ * an empty cell, `wave` the wave panel, `scope` the scope panel, `value` the readout, `meter` the
+ * level meter, anything else names a port (`in:`/`out:` when the two sides
  * share an id) or a param (`param:` when it collides with a port). The engine's registry has already
  * checked the geometry; the check here is only that every token still names something on the
  * module, which is what `composeFace` needs to be true.
@@ -148,10 +165,16 @@ export function resolveFaceToken(
 ):
   | { kind: "empty" }
   | { kind: "wave" }
+  | { kind: "scope" }
+  | { kind: "value" }
+  | { kind: "meter" }
   | { kind: "input" | "output" | "param"; id: string }
   | null {
   if (token === ".") return { kind: "empty" };
   if (token === "wave") return { kind: "wave" };
+  if (token === "scope") return { kind: "scope" };
+  if (token === "value") return { kind: "value" };
+  if (token === "meter") return { kind: "meter" };
   // Implicit modulation ports never sit on a face; they ride on their param's control, so only a
   // declared input is a jack.
   const declared = module.inputs.filter(

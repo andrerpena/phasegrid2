@@ -23,7 +23,7 @@ import {
  * A module's face, as blocks on a grid of cells.
  *
  * A module is a rectangle of uniform cells, and what it wears is a composition of blocks -- a jack,
- * a knob, a wave panel -- each covering a whole number of them, the way a hardware panel is a grid
+ * a knob, a wave panel, a scope, a readout, a meter -- each covering a whole number of them, the way a hardware panel is a grid
  * of tiles. There is no table here of how any particular module looks. The engine says which blocks
  * and where (`descriptor.face`, rows of tokens in the manner of CSS `grid-template-areas`), and a
  * module that says nothing gets a face composed by rule from its ports and its primary params. The
@@ -56,7 +56,7 @@ export interface Socket {
 
 /** What every block has: its cells, and the rectangle those cells cover. */
 export interface BlockBase {
-  /** The face token that placed it: a port id, a param id or `wave`; `title` for the title. Unique on a face. */
+  /** The face token that placed it: a port id, a param id, `wave`, `scope`, `value` or `meter`; `title` for the title. Unique on a face. */
   name: string;
   /** Cells on the module's grid, whose row 0 is the title's; the face the engine declared starts at `TITLE_ROWS`. */
   col: number;
@@ -101,13 +101,53 @@ export interface KnobBlock extends BlockBase {
   labelY: number;
 }
 
-export interface WaveBlock extends BlockBase {
-  kind: "wave";
-  /** The screen: the tile itself, which is drawn in the screen's colour rather than a key's. */
-  panel: { x: number; y: number; width: number; height: number };
+/** A screen: the tile itself, drawn in the screen's colour rather than a key's, with the picture on it. */
+export interface Panel {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
-export type Block = TitleBlock | JackBlock | KnobBlock | WaveBlock;
+export interface WaveBlock extends BlockBase {
+  kind: "wave";
+  panel: Panel;
+}
+
+/**
+ * The scope: a screen like the wave's, showing not what the module would play but what is on the
+ * wire into it, as the engine publishes it. Same geometry, different source, so the two stay two
+ * kinds: a node routes a picture to one and a trace to the other.
+ */
+export interface ScopeBlock extends BlockBase {
+  kind: "scope";
+  panel: Panel;
+}
+
+/**
+ * The readout: the last value on the wire, as a number. Not a screen -- it is text on an ordinary
+ * tile -- so it has no panel; the block's own rectangle is where the number goes.
+ */
+export interface ValueBlock extends BlockBase {
+  kind: "value";
+}
+
+/**
+ * The level meter: a bar per channel with the held peak over it. A screen in shape but not in kind --
+ * it draws bars on an ordinary tile rather than a picture of the signal.
+ */
+export interface MeterBlock extends BlockBase {
+  kind: "meter";
+}
+
+export type Block =
+  | TitleBlock
+  | JackBlock
+  | KnobBlock
+  | WaveBlock
+  | ScopeBlock
+  | ValueBlock
+  | MeterBlock;
 
 export interface Face {
   /** Size in grid cells, the title's row included. The pixel size is these times `CELL` and nothing else. */
@@ -121,6 +161,10 @@ export interface Face {
   jacks: JackBlock[];
   knobs: KnobBlock[];
   wave: WaveBlock | null;
+  scope: ScopeBlock | null;
+  /** Named for what it does rather than for its token: `face.value` would read as a number. */
+  readout: ValueBlock | null;
+  meter: MeterBlock | null;
   /** Every place a cable can plug in: the jacks, and the sockets at the knobs' feet. */
   sockets: Socket[];
 }
@@ -129,14 +173,38 @@ export interface Face {
 export const JACK_CELLS = 1;
 export const KNOB_MIN_CELLS = 2;
 export const WAVE_MIN_CELLS = 2;
+export const SCOPE_MIN_CELLS = 2;
+/** A readout needs width for its digits, but one cell of height is a line of text. */
+export const VALUE_MIN_COLS = 2;
+/** A meter needs two cells each way: a bar per channel, and width enough to read a level along. */
+export const METER_MIN_CELLS = 2;
 /** The wave block a composed face gives a module: wider than tall, the shape of a scope screen. */
 export const WAVE_COLS = 3;
 export const WAVE_ROWS = 2;
+/** The scope a composed face gives a module: the same screen, wider still, since it is the whole point of the module. */
+export const SCOPE_COLS = 4;
+export const SCOPE_ROWS = 2;
+/** The readout a composed face gives a module: as tall as the row it shares with the knobs. */
+export const VALUE_COLS = 3;
+export const VALUE_ROWS = 2;
+/** The meter a composed face gives a module: as tall as the row it shares, wide enough to read. */
+export const METER_COLS = 3;
+export const METER_ROWS = 2;
 /** The face token the title block answers to, so a script can ask for it like any other. */
 export const TITLE_NAME = "title";
 
-/** The wave's screen is its tile: the picture goes right to the tile's edge. */
-const WAVE_INSET = TILE_GUTTER;
+/** A screen is its tile: the picture goes right to the tile's edge. */
+const PANEL_INSET = TILE_GUTTER;
+
+/** The screen a wave or a scope draws on: its block, less the gutter. */
+function panelOf(base: BlockBase): Panel {
+  return {
+    x: base.x + PANEL_INSET,
+    y: base.y + PANEL_INSET,
+    width: base.width - 2 * PANEL_INSET,
+    height: base.height - 2 * PANEL_INSET,
+  };
+}
 
 /**
  * Where a jack's socket sits in its tile: below the middle, leaving the top of the tile for the
@@ -157,6 +225,9 @@ export const KNOB_SOCKET_INSET = 8;
 type Cell =
   | { kind: "empty" }
   | { kind: "wave" }
+  | { kind: "scope" }
+  | { kind: "value" }
+  | { kind: "meter" }
   | { kind: "input"; port: PortDesc }
   | { kind: "output"; port: PortDesc }
   | { kind: "param"; param: ParamDesc };
@@ -166,6 +237,12 @@ function nameOf(cell: Exclude<Cell, { kind: "empty" }>): string {
   switch (cell.kind) {
     case "wave":
       return "wave";
+    case "scope":
+      return "scope";
+    case "value":
+      return "value";
+    case "meter":
+      return "meter";
     case "input":
     case "output":
       return cell.port.id;
@@ -198,6 +275,27 @@ function cellOf(token: string, descriptor: ModuleDescriptor): Cell {
       );
     return { kind: "wave" };
   }
+  if (resolved.kind === "scope") {
+    if (!descriptor.flags.publishesScope)
+      throw new Error(
+        `${descriptor.id}: face names \`scope\` but the module publishes none`,
+      );
+    return { kind: "scope" };
+  }
+  if (resolved.kind === "value") {
+    if (!descriptor.flags.publishesValue)
+      throw new Error(
+        `${descriptor.id}: face names \`value\` but the module publishes none`,
+      );
+    return { kind: "value" };
+  }
+  if (resolved.kind === "meter") {
+    if (!descriptor.flags.publishesMeter)
+      throw new Error(
+        `${descriptor.id}: face names \`meter\` but the module publishes none`,
+      );
+    return { kind: "meter" };
+  }
   if (resolved.kind === "param") {
     const param = descriptor.params.find((p) => p.id === resolved.id);
     if (param === undefined)
@@ -223,22 +321,30 @@ function cellsOf(
  * The cells a module with no declared face gets: the template every module used to wear.
  *
  * Inputs down the left column, outputs down the right, and between them the primary knobs in a row
- * of two-by-two blocks, with the wave panel first when the module can draw one. A module with six
- * ports and one knob is six rows tall; one with two ports and four knobs is a knob tall.
+ * of two-by-two blocks, with the screens first when the module has any -- the scope, the wave, the
+ * readout. A module with six ports and one knob is six rows tall; one with two ports and four knobs
+ * is a knob tall.
  */
 function defaultCells(descriptor: ModuleDescriptor): Cell[][] {
   const inputs = descriptor.inputs.filter((p) => !p.implicit);
   const outputs = descriptor.outputs;
   const wave = descriptor.flags.previewsWave;
-  const knobs = faceParams(
-    descriptor,
-    wave ? MAX_FACE_CONTROLS - 1 : MAX_FACE_CONTROLS,
-  );
+  const scope = descriptor.flags.publishesScope;
+  const readout = descriptor.flags.publishesValue;
+  const meter = descriptor.flags.publishesMeter;
+  const screens =
+    Number(wave) + Number(scope) + Number(readout) + Number(meter);
+  const knobs = faceParams(descriptor, MAX_FACE_CONTROLS - screens);
 
-  const middleCols = knobs.length * KNOB_COLS + (wave ? WAVE_COLS : 0);
+  const middleCols =
+    knobs.length * KNOB_COLS +
+    (wave ? WAVE_COLS : 0) +
+    (scope ? SCOPE_COLS : 0) +
+    (readout ? VALUE_COLS : 0) +
+    (meter ? METER_COLS : 0);
   const cols = Math.max(MIN_COLS, middleCols + 2);
   const portRows = Math.max(inputs.length, outputs.length);
-  const middleRows = knobs.length > 0 || wave ? KNOB_ROWS : 0;
+  const middleRows = knobs.length > 0 || screens > 0 ? KNOB_ROWS : 0;
   const rows = Math.max(portRows, middleRows, 1);
 
   const grid: Cell[][] = Array.from({ length: rows }, () =>
@@ -259,7 +365,10 @@ function defaultCells(descriptor: ModuleDescriptor): Cell[][] {
       for (let c = 0; c < w; c++) grid[top + r][col + c] = cell;
     col += w;
   };
+  if (scope) fill({ kind: "scope" }, SCOPE_COLS, SCOPE_ROWS);
   if (wave) fill({ kind: "wave" }, WAVE_COLS, WAVE_ROWS);
+  if (readout) fill({ kind: "value" }, VALUE_COLS, VALUE_ROWS);
+  if (meter) fill({ kind: "meter" }, METER_COLS, METER_ROWS);
   for (const param of knobs)
     fill({ kind: "param", param }, KNOB_COLS, KNOB_ROWS);
   return grid;
@@ -401,16 +510,28 @@ function placeBlocks(cells: Cell[][], descriptor: ModuleDescriptor): Face {
           throw new Error(
             `${descriptor.id}: face gives \`wave\` less than two cells by two`,
           );
-        blocks.push({
-          ...base,
-          kind: "wave",
-          panel: {
-            x: base.x + WAVE_INSET,
-            y: base.y + WAVE_INSET,
-            width: base.width - 2 * WAVE_INSET,
-            height: base.height - 2 * WAVE_INSET,
-          },
-        });
+        blocks.push({ ...base, kind: "wave", panel: panelOf(base) });
+        break;
+      case "scope":
+        if (blockRows < SCOPE_MIN_CELLS || blockCols < SCOPE_MIN_CELLS)
+          throw new Error(
+            `${descriptor.id}: face gives \`scope\` less than two cells by two`,
+          );
+        blocks.push({ ...base, kind: "scope", panel: panelOf(base) });
+        break;
+      case "value":
+        if (blockCols < VALUE_MIN_COLS)
+          throw new Error(
+            `${descriptor.id}: face gives \`value\` less than two cells across`,
+          );
+        blocks.push({ ...base, kind: "value" });
+        break;
+      case "meter":
+        if (blockRows < METER_MIN_CELLS || blockCols < METER_MIN_CELLS)
+          throw new Error(
+            `${descriptor.id}: face gives \`meter\` less than two cells by two`,
+          );
+        blocks.push({ ...base, kind: "meter" });
         break;
     }
   }
@@ -422,6 +543,9 @@ function placeBlocks(cells: Cell[][], descriptor: ModuleDescriptor): Face {
   const jacks = blocks.filter((b): b is JackBlock => b.kind === "jack");
   const knobs = blocks.filter((b): b is KnobBlock => b.kind === "knob");
   const waves = blocks.filter((b): b is WaveBlock => b.kind === "wave");
+  const scopes = blocks.filter((b): b is ScopeBlock => b.kind === "scope");
+  const readouts = blocks.filter((b): b is ValueBlock => b.kind === "value");
+  const meters = blocks.filter((b): b is MeterBlock => b.kind === "meter");
   const declared = descriptor.inputs.filter((p) => !p.implicit);
   for (const port of [...declared, ...descriptor.outputs])
     if (!jacks.some((j) => j.socket.port === port))
@@ -437,6 +561,9 @@ function placeBlocks(cells: Cell[][], descriptor: ModuleDescriptor): Face {
     jacks,
     knobs,
     wave: waves[0] ?? null,
+    scope: scopes[0] ?? null,
+    readout: readouts[0] ?? null,
+    meter: meters[0] ?? null,
     sockets: [
       ...jacks.map((j) => j.socket),
       ...knobs.flatMap((k) => (k.socket === null ? [] : [k.socket])),

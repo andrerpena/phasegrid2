@@ -42,14 +42,15 @@ bool tryRead(const TelemetrySlotHeader* slot, std::vector<float>& out, uint32_t 
 
 }  // namespace
 
-TEST_CASE("a meter slot carries peak, RMS and clip count per channel", "[telemetry]") {
+TEST_CASE("a meter slot carries three values per channel, in order", "[telemetry]") {
   TelemetryWriter w;
   std::string error;
   REQUIRE(w.create(uniqueName("meter"), 4, 48000.0, 64, error));
 
-  // Two channels, four frames. Left peaks at 0.5; right clips twice.
-  const float frames[] = {0.5f, 2.0f, -0.5f, -2.0f, 0.25f, 0.0f, -0.25f, 0.0f};
-  w.writeMeter(1, frames, 2, 4, 7);
+  // Held peak, RMS and clip flag, per channel. The module works these out; the writer only copies
+  // them, the way it copies a scope's window or a readout's value.
+  const float values[] = {0.5f, 0.35f, 0.f, 2.0f, 1.4f, 1.f};
+  w.writeMeter(1, values, 2, 7);
 
   const TelemetrySlotHeader* slot = w.slot(1);
   REQUIRE(slot->kind == static_cast<uint32_t>(TelemetryKind::Meter));
@@ -60,9 +61,10 @@ TEST_CASE("a meter slot carries peak, RMS and clip count per channel", "[telemet
 
   const float* p = w.payload(1);
   REQUIRE(p[0] == 0.5f);   // left peak
-  REQUIRE(p[2] == 0.f);    // left never exceeded 1
+  REQUIRE(p[1] == 0.35f);  // left RMS
+  REQUIRE(p[2] == 0.f);    // left has not clipped
   REQUIRE(p[3] == 2.0f);   // right peak
-  REQUIRE(p[5] == 2.0f);   // right clipped on two frames
+  REQUIRE(p[5] == 1.f);    // right is clipping
 }
 
 TEST_CASE("a scope slot carries each channel's samples de-interleaved", "[telemetry]") {
@@ -82,6 +84,40 @@ TEST_CASE("a scope slot carries each channel's samples de-interleaved", "[teleme
   // reader's stride does not depend on how many frames a particular block happened to carry.
   REQUIRE(p[kTelemetryScopeFrames + 0] == -1.f);
   REQUIRE(p[kTelemetryScopeFrames + 2] == -3.f);
+}
+
+TEST_CASE("a scope slot reads a ring from its oldest frame", "[telemetry]") {
+  TelemetryWriter w;
+  std::string error;
+  REQUIRE(w.create(uniqueName("ring"), 1, 48000.0, 64, error));
+
+  // Four stereo frames in a ring whose oldest frame is the third: the window in order is 3, 4, 1, 2.
+  const float ring[] = {1.f, -1.f, 2.f, -2.f, 3.f, -3.f, 4.f, -4.f};
+  w.writeScope(0, ring, 2, 4, 7, 2);
+
+  const float* p = w.payload(0);
+  REQUIRE(p[0] == 3.f);
+  REQUIRE(p[1] == 4.f);
+  REQUIRE(p[2] == 1.f);
+  REQUIRE(p[3] == 2.f);
+  REQUIRE(p[kTelemetryScopeFrames + 0] == -3.f);
+  REQUIRE(p[kTelemetryScopeFrames + 3] == -2.f);
+}
+
+TEST_CASE("a value slot carries one signed float per channel", "[telemetry]") {
+  TelemetryWriter w;
+  std::string error;
+  REQUIRE(w.create(uniqueName("value"), 1, 48000.0, 64, error));
+
+  const float values[] = {-0.25f, 0.5f};
+  w.writeValue(0, values, 2, 42);
+
+  REQUIRE(w.slot(0)->kind == static_cast<uint32_t>(pg::TelemetryKind::Value));
+  REQUIRE(w.slot(0)->channels == 2);
+  REQUIRE(w.slot(0)->frames == 1);
+  REQUIRE(w.slot(0)->blockIndex == 42);
+  REQUIRE(w.payload(0)[0] == -0.25f);
+  REQUIRE(w.payload(0)[1] == 0.5f);
 }
 
 TEST_CASE("a reader never observes a half-written slot", "[telemetry]") {
@@ -150,8 +186,8 @@ TEST_CASE("creating a segment replaces one a previous engine left behind", "[tel
 
   TelemetryWriter first;
   REQUIRE(first.create(name, 2, 48000.0, 64, error));
-  const float frames[] = {0.9f, 0.9f};
-  first.writeMeter(0, frames, 1, 2, 1);
+  const float values[] = {0.9f, 0.9f, 0.f};
+  first.writeMeter(0, values, 1, 1);
   REQUIRE(first.payload(0)[0] == 0.9f);
 
   // Simulate a crash: the mapping goes away without `destroy()` unlinking the name, which is what a
@@ -181,9 +217,9 @@ TEST_CASE("an out-of-range slot is ignored rather than written past the segment"
   TelemetryWriter w;
   std::string error;
   REQUIRE(w.create(uniqueName("range"), 2, 48000.0, 64, error));
-  const float frames[] = {1.f, 1.f};
+  const float values[] = {1.f, 1.f, 0.f};
   // The slot index comes from a subscription the client chose, so it is not to be trusted blindly.
-  w.writeMeter(99, frames, 1, 2, 1);
+  w.writeMeter(99, values, 1, 1);
   REQUIRE(w.slot(99) == nullptr);
   REQUIRE(w.payload(99) == nullptr);
 }
@@ -195,13 +231,13 @@ TEST_CASE("writing telemetry allocates nothing", "[telemetry][rt]") {
 
   std::vector<float> block(256, 0.25f);
   // Prove there is something to measure before measuring that it costs no allocations.
-  w.writeMeter(0, block.data(), 2, 128, 1);
+  w.writeMeter(0, block.data(), 2, 1);
   REQUIRE(w.payload(0)[0] == 0.25f);
 
   {
     pg::test::RtScope rt;
     for (uint64_t i = 0; i < 1000; ++i) {
-      w.writeMeter(0, block.data(), 2, 128, i);
+      w.writeMeter(0, block.data(), 2, i);
       w.writeScope(1, block.data(), 2, 128, i);
       w.beat();
     }

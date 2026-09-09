@@ -1,7 +1,7 @@
 import { projectDoc, seedProject } from "../harness.mjs";
 
 /**
- * The five modules with a declared face, drawn as the engine laid them out, beside one that left
+ * The eight modules with a declared face, drawn as the engine laid them out, beside one that left
  * its face to the interface; and a cable dropped on a knob landing in the socket at its foot.
  */
 const PATCH = {
@@ -15,6 +15,9 @@ const PATCH = {
     { id: "lfo", type: "mod.lfo", x: 312, y: 336 },
     { id: "out", type: "io.audioOut", x: 312, y: 48 },
     { id: "filter", type: "filter.multi", x: 312, y: 168 },
+    { id: "scope", type: "display.scope", x: 600, y: 336 },
+    { id: "readout", type: "display.value", x: 600, y: 192 },
+    { id: "level", type: "display.meter", x: 600, y: 48 },
   ],
   edges: [
     {
@@ -66,6 +69,9 @@ export default {
       ["pulse", "osc.pulse"],
       ["lfo", "mod.lfo"],
       ["out", "io.audioOut"],
+      ["scope", "display.scope"],
+      ["readout", "display.value"],
+      ["level", "display.meter"],
     ]) {
       const rows = declared(catalog, type);
       check(

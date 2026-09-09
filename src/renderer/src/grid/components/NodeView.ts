@@ -9,7 +9,10 @@ import { paramFraction } from "../layout";
 import { type Block, type BlockStyle, blockStyle } from "./blocks/Block";
 import { JackBlock } from "./blocks/JackBlock";
 import { KnobBlock } from "./blocks/KnobBlock";
+import { type Level, MeterBlock } from "./blocks/MeterBlock";
+import { ScopeBlock } from "./blocks/ScopeBlock";
 import { TitleBlock } from "./blocks/TitleBlock";
+import { ValueBlock } from "./blocks/ValueBlock";
 import { WaveBlock } from "./blocks/WaveBlock";
 
 /**
@@ -19,12 +22,34 @@ import { WaveBlock } from "./blocks/WaveBlock";
  * Everything about how it looks comes from the engine's descriptor and the theme. There is no table
  * here mapping module ids to appearances, and no branch on what kind of module this is: the face
  * says which blocks, each block draws itself, and the node routes what it is told -- a value, a live
- * value, a picture, a cable plugged in -- to the blocks that answer for it. That is what makes adding
+ * value, a picture, a trace, a reading, a level, a cable plugged in -- to the blocks that answer for it. That is what makes adding
  * a module to the engine enough to see it drawn correctly, and adding a kind of block one file.
  *
  * Built once and updated in place. A patch redraws whenever a parameter moves, and rebuilding a node's
  * graphics on every frame is how a canvas starts dropping them.
  */
+
+/** The last trace a scope drew, as a script sees it: which publish, how long, and how loud. */
+export interface TraceSummary {
+  /** The engine's count of the publish, as a string: a bigint does not survive JSON. */
+  index: string;
+  frames: number;
+  peak: number;
+}
+
+/** The last reading a readout showed, as a script sees it: which publish, and the value per channel. */
+export interface Reading {
+  index: string;
+  channels: number[];
+}
+
+/** The last level a meter showed, as a script sees it. */
+export interface LevelSummary {
+  index: string;
+  peak: number[];
+  rms: number[];
+  clipped: boolean[];
+}
 
 export interface NodeStyle {
   colors: GridColors;
@@ -47,6 +72,12 @@ function buildBlock(
       return new KnobBlock(geometry, style);
     case "wave":
       return new WaveBlock(geometry, style);
+    case "scope":
+      return new ScopeBlock(geometry, style);
+    case "value":
+      return new ValueBlock(geometry, style);
+    case "meter":
+      return new MeterBlock(geometry, style);
   }
 }
 
@@ -59,6 +90,15 @@ export class NodeView {
   private readonly jacks = new Map<string, JackBlock>();
   private readonly knobs = new Map<string, KnobBlock>();
   private readonly wave: WaveBlock | null = null;
+  private readonly scope: ScopeBlock | null = null;
+  private readonly readout: ValueBlock | null = null;
+  private readonly meter: MeterBlock | null = null;
+  /** The last trace put on the scope, by the engine's count, and its size: what a script asks about. */
+  private trace: TraceSummary | null = null;
+  /** The last reading put on the readout, the same way. */
+  private reading: Reading | null = null;
+  /** The last level put on the meter, the same way. */
+  private level: LevelSummary | null = null;
 
   constructor(
     /**
@@ -91,6 +131,9 @@ export class NodeView {
         );
       else if (block instanceof KnobBlock) this.knobs.set(geometry.name, block);
       else if (block instanceof WaveBlock) this.wave = block;
+      else if (block instanceof ScopeBlock) this.scope = block;
+      else if (block instanceof ValueBlock) this.readout = block;
+      else if (block instanceof MeterBlock) this.meter = block;
     }
     this.applyValues(module);
     this.view.position.set(module.x ?? 0, module.y ?? 0);
@@ -105,6 +148,61 @@ export class NodeView {
    */
   setWave(samples: ArrayLike<number>): void {
     this.wave?.setWave(samples);
+  }
+
+  /**
+   * The window on the wire into this module, one array per channel, as the engine published it.
+   * Read from the segment by whoever watches it and handed in here; a node with no scope ignores it.
+   */
+  setTrace(index: bigint, channels: ArrayLike<number>[]): void {
+    if (this.scope === null) return;
+    this.scope.setTrace(channels);
+    let peak = 0;
+    for (const samples of channels)
+      for (let i = 0; i < samples.length; i++)
+        peak = Math.max(peak, Math.abs(samples[i]));
+    this.trace = {
+      index: index.toString(),
+      frames: channels[0]?.length ?? 0,
+      peak,
+    };
+  }
+
+  /** What the scope last drew, or null for a module without one or one nothing has published to. */
+  traceOf(): TraceSummary | null {
+    return this.trace;
+  }
+
+  /**
+   * The last value on the wire into this module, per channel, as the engine published it. A node
+   * with no readout ignores it.
+   */
+  setValue(index: bigint, values: number[]): void {
+    if (this.readout === null) return;
+    this.readout.setValue(values);
+    this.reading = { index: index.toString(), channels: values };
+  }
+
+  /** What the readout last showed, or null for a module without one or one nothing has published to. */
+  readingOf(): Reading | null {
+    return this.reading;
+  }
+
+  /** The level on the wire into this module, as the engine published it. Ignored without a meter. */
+  setLevel(index: bigint, level: Level): void {
+    if (this.meter === null) return;
+    this.meter.setLevel(level);
+    this.level = {
+      index: index.toString(),
+      peak: level.peak,
+      rms: level.rms,
+      clipped: level.clipped.map((c) => c > 0),
+    };
+  }
+
+  /** What the meter last showed, or null for a module without one or one nothing has published to. */
+  levelOf(): LevelSummary | null {
+    return this.level;
   }
 
   /**

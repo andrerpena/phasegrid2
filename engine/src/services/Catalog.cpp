@@ -106,6 +106,9 @@ nlohmann::json moduleJson(const RegisteredModule& m) {
     {"needsTransport", (d.flags & kModuleNeedsTransport) != 0},
     {"writesTelemetry", (d.flags & kModuleWritesTelemetry) != 0},
     {"previewsWave", (d.flags & kModulePreviewsWave) != 0},
+    {"publishesScope", (d.flags & kModulePublishesScope) != 0},
+    {"publishesValue", (d.flags & kModulePublishesValue) != 0},
+    {"publishesMeter", (d.flags & kModulePublishesMeter) != 0},
   };
   // The registry's input list is the declared ports followed by one implicit port per modulatable param,
   // in exactly the order the compiler assigns buffers, so the UI's port indices match the engine's.

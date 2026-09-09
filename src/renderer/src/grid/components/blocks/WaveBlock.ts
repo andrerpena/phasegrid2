@@ -1,6 +1,11 @@
 import { Container, Graphics } from "pixi.js";
 import type { WaveBlock as WaveGeometry } from "../../face";
-import { type Block, type BlockStyle, drawTile, type WaveStyle } from "./Block";
+import {
+  type Block,
+  type BlockStyle,
+  drawScreen,
+  type WaveStyle,
+} from "./Block";
 
 /**
  * A panel that draws one cycle of a wave.
@@ -42,8 +47,6 @@ export function resampleWave(
 /** Roughly one point per pixel: finer buys nothing on screen and costs geometry on every redraw. */
 const COLUMNS_PER_PIXEL = 1;
 const LINE_WIDTH = 1.5;
-/** Cells of ruling behind the curve. */
-const DIVISIONS = { x: 4, y: 2 };
 
 export class WaveBlock implements Block {
   readonly view = new Container();
@@ -74,26 +77,13 @@ export class WaveBlock implements Block {
 
   /** The screen and its ruling, which only change with the style. */
   private drawStatic(): void {
-    // The tile is the screen: drawn like every other key, in the screen's colour, so it has one
-    // border like its neighbours and not a bezel around a second frame.
-    drawTile(this.tile, this.geometry, {
-      fill: this.waveStyle.background,
-      stroke: this.style.tile.stroke,
-    });
-    const { width: w, height: h } = this.geometry.panel;
-
-    this.rules.clear();
-    for (let i = 1; i < DIVISIONS.x; i++) {
-      const x = Math.round((i * w) / DIVISIONS.x) + 0.5;
-      this.rules.moveTo(x, 1).lineTo(x, h - 1);
-    }
-    for (let i = 1; i < DIVISIONS.y; i++) {
-      const y = Math.round((i * h) / DIVISIONS.y) + 0.5;
-      this.rules.moveTo(1, y).lineTo(w - 1, y);
-    }
-    // One stroke for every rule: each `stroke()` is its own draw instruction, and a panel ruled into
-    // sixteen cells would otherwise cost sixteen of them per redraw.
-    this.rules.stroke({ width: 1, color: this.waveStyle.grid, alpha: 0.5 });
+    drawScreen(
+      this.tile,
+      this.rules,
+      this.geometry,
+      this.geometry.panel,
+      this.style,
+    );
   }
 
   /**

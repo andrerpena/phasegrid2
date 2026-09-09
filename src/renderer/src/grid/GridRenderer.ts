@@ -3,6 +3,7 @@ import type { PhasegridTheme } from "@renderer/theming/theme";
 import type { ModuleDescriptor } from "@shared/protocol/catalog";
 import type { PatchDoc } from "@shared/protocol/patch";
 import { type Application, Container, Graphics } from "pixi.js";
+import type { Level } from "./components/blocks/MeterBlock";
 import { Cable, cableShape, drawCableShape } from "./components/Cable";
 import { NodeView } from "./components/NodeView";
 import { type Facing, hitKnob, hitSocket, type Socket, socketOf } from "./face";
@@ -430,6 +431,25 @@ export class GridRenderer {
   /** Puts a cycle the engine drew onto a module's panel. Ignored for a module not drawn. */
   setPreview(moduleId: string, samples: ArrayLike<number>): void {
     this.nodes.get(moduleId)?.setWave(samples);
+  }
+
+  /** Puts the window the engine published onto a module's scope. Ignored for a module not drawn. */
+  setTrace(
+    moduleId: string,
+    index: bigint,
+    channels: ArrayLike<number>[],
+  ): void {
+    this.nodes.get(moduleId)?.setTrace(index, channels);
+  }
+
+  /** Puts the value the engine published onto a module's readout. Ignored for a module not drawn. */
+  setValue(moduleId: string, index: bigint, values: number[]): void {
+    this.nodes.get(moduleId)?.setValue(index, values);
+  }
+
+  /** Puts the level the engine published onto a module's meter. Ignored for a module not drawn. */
+  setLevel(moduleId: string, index: bigint, level: Level): void {
+    this.nodes.get(moduleId)?.setLevel(index, level);
   }
 
   /** Where modulation has put a knob this frame, 0..1, or null. Ignored for a module not drawn. */

@@ -117,38 +117,32 @@ void TelemetryWriter::publish(uint32_t index, TelemetryKind kind, uint32_t chann
   s->seq.store(start + 2, std::memory_order_release);
 }
 
-void TelemetryWriter::writeMeter(uint32_t slot, const float* interleaved, uint32_t channels,
-                                 uint32_t frames, uint64_t blockIndex) noexcept PG_RT_NONBLOCKING {
+void TelemetryWriter::writeMeter(uint32_t slot, const float* values, uint32_t channels,
+                                 uint64_t blockIndex) noexcept PG_RT_NONBLOCKING {
   const uint32_t ch = std::min(channels, kTelemetryMaxChannels);
-  publish(slot, TelemetryKind::Meter, ch, frames, blockIndex, [&](float* out) noexcept {
-    for (uint32_t c = 0; c < ch; ++c) {
-      float peak = 0.f, sum = 0.f;
-      uint32_t clipped = 0;
-      for (uint32_t i = 0; i < frames; ++i) {
-        const float v = interleaved[i * channels + c];
-        const float a = std::fabs(v);
-        if (a > peak) peak = a;
-        sum += v * v;
-        if (a > 1.f) ++clipped;
-      }
-      out[c * kMeterFloatsPerChannel + 0] = peak;
-      out[c * kMeterFloatsPerChannel + 1] = frames > 0 ? std::sqrt(sum / static_cast<float>(frames)) : 0.f;
-      out[c * kMeterFloatsPerChannel + 2] = static_cast<float>(clipped);
-    }
+  publish(slot, TelemetryKind::Meter, ch, 1, blockIndex, [&](float* out) noexcept {
+    for (uint32_t i = 0; i < ch * kMeterFloatsPerChannel; ++i) out[i] = values[i];
   });
 }
 
 void TelemetryWriter::writeScope(uint32_t slot, const float* interleaved, uint32_t channels,
-                                 uint32_t frames, uint64_t blockIndex) noexcept PG_RT_NONBLOCKING {
+                                 uint32_t frames, uint64_t blockIndex, uint32_t first) noexcept
+    PG_RT_NONBLOCKING {
   const uint32_t ch = std::min(channels, kTelemetryMaxChannels);
-  // A block is far shorter than the scope window, so this writes what it has and reports how many.
-  // Stitching successive blocks into a rolling window is the reader's job, where a slow reader that
-  // misses blocks degrades into a coarser picture instead of stalling the audio thread.
+  // The window is the writer's to keep, not the reader's to stitch: a block is a few milliseconds and
+  // a reader at frame rate would see one block in six, so a picture assembled on that side would be
+  // mostly holes. A module keeps a rolling window and publishes the whole of it every block; a slow
+  // reader then merely sees fewer of the windows, each of them complete.
   const uint32_t n = std::min(frames, kTelemetryScopeFrames);
+  const uint32_t start = n == 0 ? 0 : first % n;
   publish(slot, TelemetryKind::Scope, ch, n, blockIndex, [&](float* out) noexcept {
-    for (uint32_t c = 0; c < ch; ++c)
-      for (uint32_t i = 0; i < n; ++i)
-        out[c * kTelemetryScopeFrames + i] = interleaved[i * channels + c];
+    for (uint32_t c = 0; c < ch; ++c) {
+      float* dst = out + c * kTelemetryScopeFrames;
+      // Two straight runs rather than a modulo per sample: the ring's tail from `first`, then its head.
+      const uint32_t tail = n - start;
+      for (uint32_t i = 0; i < tail; ++i) dst[i] = interleaved[(start + i) * channels + c];
+      for (uint32_t i = 0; i < start; ++i) dst[tail + i] = interleaved[i * channels + c];
+    }
   });
 }
 
@@ -157,6 +151,14 @@ void TelemetryWriter::writeParams(uint32_t slot, const float* values, uint32_t c
   const uint32_t n = std::min(count, kTelemetryMaxParams);
   publish(slot, TelemetryKind::Params, n, 1, blockIndex, [&](float* out) noexcept {
     for (uint32_t i = 0; i < n; ++i) out[i] = values[i];
+  });
+}
+
+void TelemetryWriter::writeValue(uint32_t slot, const float* values, uint32_t channels,
+                                 uint64_t blockIndex) noexcept PG_RT_NONBLOCKING {
+  const uint32_t ch = std::min(channels, kTelemetryMaxChannels);
+  publish(slot, TelemetryKind::Value, ch, 1, blockIndex, [&](float* out) noexcept {
+    for (uint32_t c = 0; c < ch; ++c) out[c] = values[c];
   });
 }
 

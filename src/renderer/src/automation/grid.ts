@@ -57,7 +57,7 @@ function rectOf(
 /** One block of a face, as a script sees it: what it is, what it is for, and where. */
 export interface FaceBlock {
   kind: Block["kind"];
-  /** The face token: the port id, the param id, `wave`, or `title`. */
+  /** The face token: the port id, the param id, `wave`, `scope`, `value`, `meter`, or `title`. */
   name: string;
   rect: Rect;
   /** A jack's socket, or a knob's modulation socket; absent on the title, a wave and an unmodulatable knob. */
@@ -66,6 +66,26 @@ export interface FaceBlock {
   centre?: Point;
   /** Where modulation has a knob this frame, 0..1, or null with nothing in its socket. */
   live?: number | null;
+  /**
+   * What a scope last drew: the engine's count of the publish, how many frames, and the loudest
+   * sample. Null until the engine has published one. The way a script sees a scope draw.
+   */
+  trace?: { index: string; frames: number; peak: number } | null;
+  /**
+   * What a readout last showed: the engine's count of the publish, and the value per channel. Null
+   * until the engine has published one.
+   */
+  reading?: { index: string; channels: number[] } | null;
+  /**
+   * What a meter last showed: the engine's count of the publish, the held peak and RMS per channel,
+   * and whether each has clipped. Null until the engine has published one.
+   */
+  level?: {
+    index: string;
+    peak: number[];
+    rms: number[];
+    clipped: boolean[];
+  } | null;
 }
 
 export function createGridApi(source: GridSource = fromRegistry) {
@@ -211,6 +231,9 @@ export function createGridApi(source: GridSource = fromRegistry) {
           });
           out.live = node.liveOf(block.name);
         }
+        if (block.kind === "scope") out.trace = node.traceOf();
+        if (block.kind === "value") out.reading = node.readingOf();
+        if (block.kind === "meter") out.level = node.levelOf();
         return out;
       });
     },

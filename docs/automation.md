@@ -46,7 +46,9 @@ is. `pg.help()` lists them.
   **`grid.knob(module, param)`** (its centre, and `live`: where modulation has it this frame, 0..1,
   or null with nothing in its socket — the way a script sees a knob turn), **`grid.face(module)`**
   (every block on the module, the title first and then the face's in reading order: kind, the name
-  the engine gave it, its rect, its socket, a knob's centre and `live`) — where things
+  the engine gave it, its rect, its socket, a knob's centre and `live`, and a scope's `trace`: the
+  engine's count of the last window drawn, its frames and its peak, and a readout's `reading`: the
+  same count and the value per channel, both null before the first) — where things
   are, in window CSS pixels, ready for a real pointer event. Null when there is no such thing.
 - **`workspace.openAt(root)`**, **`openProject(slug)`**, **`save()`**, **`saveAs(name)`**,
   **`closeProject(id?)`**, **`openExample(moduleId)`**.

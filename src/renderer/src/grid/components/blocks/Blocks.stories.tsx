@@ -11,6 +11,9 @@ import { PixiStage } from "../../stories/PixiStage";
 import { blockStyle } from "./Block";
 import { JackBlock } from "./JackBlock";
 import { KnobBlock } from "./KnobBlock";
+import { MeterBlock } from "./MeterBlock";
+import { ScopeBlock } from "./ScopeBlock";
+import { ValueBlock } from "./ValueBlock";
 import { WaveBlock } from "./WaveBlock";
 
 /**
@@ -181,4 +184,119 @@ export const Wave: StoryObj<WaveArgs> = {
   args: { wave: "sine" },
   argTypes: { wave: { control: "select", options: ["sine", "saw", "square"] } },
   render: (args) => <WaveStage {...args} />,
+};
+
+interface ScopeArgs {
+  signal: "tone" | "noise" | "silence";
+}
+
+/** A window as the engine would publish it: 1024 frames, the oldest first, stereo. */
+const WINDOW = 1024;
+const frames = (f: (i: number) => number, right = 0.5) => {
+  const left = Float32Array.from({ length: WINDOW }, (_, i) => f(i));
+  return [left, left.map((v) => v * right)];
+};
+const SIGNALS = {
+  tone: frames((i) => Math.sin((2 * Math.PI * i * 5.5) / WINDOW + 1)),
+  noise: frames((i) => (((i * 9301 + 49297) % 233280) / 233280) * 2 - 1),
+  silence: frames(() => 0),
+};
+
+const ScopeStage = ({ signal }: ScopeArgs) => {
+  const theme = useThemeStore((s) => s.theme);
+  const build = useCallback(() => {
+    const geometry = composeFace(descriptor("display.scope")).scope;
+    if (geometry === null) throw new Error("the scope has a scope");
+    const block = new ScopeBlock(
+      geometry,
+      blockStyle(theme.grid, hexToNumber(theme.grid.signal.audio)),
+    );
+    block.setTrace(SIGNALS[signal]);
+    block.view.position.set(12 - geometry.x, 12 - geometry.y);
+    const view = new Container();
+    view.addChild(block.view);
+    return { view, destroy: () => block.destroy() };
+  }, [signal, theme]);
+  return <PixiStage build={build} width={120} height={96} />;
+};
+
+/** The scope, drawing a window handed to it: a tone held still by the trigger, noise as a band. */
+export const Scope: StoryObj<ScopeArgs> = {
+  args: { signal: "tone" },
+  argTypes: {
+    signal: { control: "select", options: ["tone", "noise", "silence"] },
+  },
+  render: (args) => <ScopeStage {...args} />,
+};
+
+interface ValueArgs {
+  left: number;
+  right: number;
+}
+
+const ValueStage = ({ left, right }: ValueArgs) => {
+  const theme = useThemeStore((s) => s.theme);
+  const build = useCallback(() => {
+    const geometry = composeFace(descriptor("display.value")).readout;
+    if (geometry === null) throw new Error("the readout has one");
+    const block = new ValueBlock(
+      geometry,
+      blockStyle(theme.grid, hexToNumber(theme.grid.signal.cv)),
+    );
+    block.setValue([left, right]);
+    block.view.position.set(12 - geometry.x, 12 - geometry.y);
+    const view = new Container();
+    view.addChild(block.view);
+    return { view, destroy: () => block.destroy() };
+  }, [left, right, theme]);
+  return <PixiStage build={build} width={96} height={72} />;
+};
+
+/** The readout: one number for a mono signal, one per channel when they differ. */
+export const Value: StoryObj<ValueArgs> = {
+  args: { left: -0.25, right: -0.25 },
+  argTypes: {
+    left: { control: { type: "range", min: -2, max: 2, step: 0.01 } },
+    right: { control: { type: "range", min: -2, max: 2, step: 0.01 } },
+  },
+  render: (args) => <ValueStage {...args} />,
+};
+
+interface MeterArgs {
+  left: number;
+  right: number;
+  clipped: boolean;
+}
+
+const MeterStage = ({ left, right, clipped }: MeterArgs) => {
+  const theme = useThemeStore((s) => s.theme);
+  const build = useCallback(() => {
+    const geometry = composeFace(descriptor("display.meter")).meter;
+    if (geometry === null) throw new Error("the meter has one");
+    const block = new MeterBlock(
+      geometry,
+      blockStyle(theme.grid, hexToNumber(theme.grid.signal.audio)),
+    );
+    block.setLevel({
+      // A held peak sits a little above the level itself, which is what the notch shows.
+      peak: [Math.min(1.5, left * 1.2), Math.min(1.5, right * 1.2)],
+      rms: [left, right],
+      clipped: [clipped ? 1 : 0, clipped ? 1 : 0],
+    });
+    block.view.position.set(12 - geometry.x, 12 - geometry.y);
+    const view = new Container();
+    view.addChild(block.view);
+    return { view, destroy: () => block.destroy() };
+  }, [left, right, clipped, theme]);
+  return <PixiStage build={build} width={96} height={72} />;
+};
+
+/** The level meter: a bar per channel, the held peak over it, and the clip light. */
+export const Meter: StoryObj<MeterArgs> = {
+  args: { left: 0.5, right: 0.25, clipped: false },
+  argTypes: {
+    left: { control: { type: "range", min: 0, max: 1.5, step: 0.01 } },
+    right: { control: { type: "range", min: 0, max: 1.5, step: 0.01 } },
+  },
+  render: (args) => <MeterStage {...args} />,
 };

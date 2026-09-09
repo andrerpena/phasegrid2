@@ -20,7 +20,7 @@ bool hasImplicitPort(const ParamDesc& p) {
 }
 
 /// What one face token names, once resolved against the descriptor.
-enum class Cell : uint8_t { Empty, Input, Output, Param, Wave };
+enum class Cell : uint8_t { Empty, Input, Output, Param, Wave, Scope, Value, Meter };
 
 struct Resolved {
   Cell cell = Cell::Empty;
@@ -44,6 +44,21 @@ std::optional<std::string> resolveToken(const ModuleDescriptor& d, const std::st
   if (token == "wave") {
     if (!(d.flags & kModulePreviewsWave)) return "face names `wave` but the module cannot preview one";
     out = {Cell::Wave, -1};
+    return std::nullopt;
+  }
+  if (token == "scope") {
+    if (!(d.flags & kModulePublishesScope)) return "face names `scope` but the module does not publish one";
+    out = {Cell::Scope, -1};
+    return std::nullopt;
+  }
+  if (token == "value") {
+    if (!(d.flags & kModulePublishesValue)) return "face names `value` but the module does not publish one";
+    out = {Cell::Value, -1};
+    return std::nullopt;
+  }
+  if (token == "meter") {
+    if (!(d.flags & kModulePublishesMeter)) return "face names `meter` but the module does not publish one";
+    out = {Cell::Meter, -1};
     return std::nullopt;
   }
   auto prefixed = [&](const char* prefix) -> std::optional<std::string> {
@@ -148,6 +163,10 @@ std::optional<std::string> validateFace(const ModuleDescriptor& d, std::vector<s
       if (h < 2 || w < 2) return "face gives `" + token + "` less than two cells by two";
     }
     if (a.what.cell == Cell::Wave && (h < 2 || w < 2)) return "face gives `wave` less than two cells by two";
+    if (a.what.cell == Cell::Scope && (h < 2 || w < 2)) return "face gives `scope` less than two cells by two";
+    // A readout is a line of text: it needs width for the digits but reads fine one cell tall.
+    if (a.what.cell == Cell::Value && w < 2) return "face gives `value` less than two cells across";
+    if (a.what.cell == Cell::Meter && (h < 2 || w < 2)) return "face gives `meter` less than two cells by two";
   }
   for (uint32_t i = 0; i < d.numInputs; ++i)
     if (!seen.contains({Cell::Input, static_cast<int32_t>(i)})) return std::string("face leaves out input `") + d.inputs[i].id + "`";
@@ -178,6 +197,14 @@ std::optional<std::string> Registry::add(const ModuleDescriptor& d) {
   if (d.numInputs + d.numParams > kMaxPortsPerModule || d.numOutputs > kMaxPortsPerModule) return id + ": too many ports";
   if (d.numParams > kMaxParamsPerModule) return id + ": too many params";
   if (!d.create) return id + ": missing create()";
+  // A scope is a kind of telemetry the module writes itself; a module claiming one without a slot to
+  // write it into would get a panel that never shows anything.
+  if ((d.flags & kModulePublishesScope) && !(d.flags & kModuleWritesTelemetry))
+    return id + ": publishes a scope but does not write telemetry";
+  if ((d.flags & kModulePublishesValue) && !(d.flags & kModuleWritesTelemetry))
+    return id + ": publishes a value but does not write telemetry";
+  if ((d.flags & kModulePublishesMeter) && !(d.flags & kModuleWritesTelemetry))
+    return id + ": publishes a meter but does not write telemetry";
 
   std::set<std::string> ids;
   for (uint32_t i = 0; i < d.numInputs; ++i)

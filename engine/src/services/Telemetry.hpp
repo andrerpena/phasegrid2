@@ -42,7 +42,9 @@ inline constexpr uint32_t kTelemetryMaxSlots = 128;
 /// on the interface turns when something is plugged into it.
 /// `Preview` is one cycle of what a module would draw for the values it is running with, written by
 /// `PreviewPublisher` on the message thread: `channels` is 1 and `frames` is the cycle's length.
-enum class TelemetryKind : uint32_t { None = 0, Meter = 1, Scope = 2, Params = 3, Preview = 4 };
+/// `Value` is the last frame of the signal a `display.value` was fed, one float per channel: a signed
+/// reading, which no other kind carries (a meter's peak is a magnitude, and 0.5 and -0.5 read alike).
+enum class TelemetryKind : uint32_t { None = 0, Meter = 1, Scope = 2, Params = 3, Preview = 4, Value = 5 };
 
 /// "nobody is watching this module". Not a valid slot index, and the default for every instance.
 inline constexpr uint32_t kNoTelemetrySlot = 0xFFFFFFFFu;
@@ -65,7 +67,8 @@ static_assert(sizeof(TelemetrySlotHeader) == 32, "the TypeScript reader assumes 
 static_assert(std::atomic<uint32_t>::is_always_lock_free,
               "a seqlock the audio thread writes must not be able to take a lock");
 
-/// Meter payload: peak, RMS and clip count per channel, in that order.
+/// Meter payload: held peak, RMS and a clip flag per channel, in that order. The module works these
+/// out and holds them; the writer only serialises them, as it does for every other kind.
 inline constexpr uint32_t kMeterFloatsPerChannel = 3;
 /// Params payload: one float per parameter. Matches `kMaxParamsPerModule`, and a slot holds far more.
 inline constexpr uint32_t kTelemetryMaxParams = 64;
@@ -121,13 +124,19 @@ public:
   size_t byteLength() const { return bytes_; }
 
   /// Audio thread. No allocation, no locks, no syscalls.
-  void writeMeter(uint32_t slot, const float* interleaved, uint32_t channels, uint32_t frames,
-                  uint64_t blockIndex) noexcept PG_RT_NONBLOCKING;
+  /// Audio thread. `kMeterFloatsPerChannel` floats per channel: held peak, RMS, clip flag.
+  void writeMeter(uint32_t slot, const float* values, uint32_t channels, uint64_t blockIndex) noexcept
+      PG_RT_NONBLOCKING;
+  /// Audio thread. `interleaved` holds `frames` frames, read as a ring whose oldest frame is `first`:
+  /// a module keeping a rolling window publishes it in order without copying it straight first.
   void writeScope(uint32_t slot, const float* interleaved, uint32_t channels, uint32_t frames,
-                  uint64_t blockIndex) noexcept PG_RT_NONBLOCKING;
+                  uint64_t blockIndex, uint32_t first = 0) noexcept PG_RT_NONBLOCKING;
   /// Audio thread. `count` parameter values, one float each, in descriptor order; `channels` carries
   /// the count and `frames` is 1. Capped at `kTelemetryMaxParams`.
   void writeParams(uint32_t slot, const float* values, uint32_t count, uint64_t blockIndex) noexcept
+      PG_RT_NONBLOCKING;
+  /// Audio thread. One float per channel: the last frame of the block, signed, as it was on the wire.
+  void writeValue(uint32_t slot, const float* values, uint32_t channels, uint64_t blockIndex) noexcept
       PG_RT_NONBLOCKING;
   /// Message thread (it is the preview publisher's), but built the same way so a reader cannot tell.
   /// One channel of `count` samples, capped at `kTelemetryScopeFrames`; `index` counts publishes.

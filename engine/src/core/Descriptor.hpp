@@ -42,6 +42,18 @@ inline constexpr uint32_t kModuleWritesTelemetry = 1u << 2;
 /// The module can draw one cycle of what it would sound like at given param values: `Module::preview`.
 /// An interface gives such a module a wave panel on its face and asks the engine what to put in it.
 inline constexpr uint32_t kModulePreviewsWave   = 1u << 3;
+/// The module's telemetry slot carries a `Scope` window of the signal it is fed. An interface gives such
+/// a module a scope panel on its face (`scope` in the face rows) and draws the window there. Implies
+/// `kModuleWritesTelemetry`; the registry refuses one without the other.
+inline constexpr uint32_t kModulePublishesScope = 1u << 4;
+/// The module's telemetry slot carries a `Value` reading: the last frame of the signal it is fed, per
+/// channel. An interface gives such a module a readout on its face (`value` in the face rows). Implies
+/// `kModuleWritesTelemetry`, like the scope.
+inline constexpr uint32_t kModulePublishesValue = 1u << 5;
+/// The module's telemetry slot carries a `Meter` reading: held peak, RMS and a clip flag per channel.
+/// An interface gives such a module a level meter on its face (`meter` in the face rows). Implies
+/// `kModuleWritesTelemetry`, like the scope and the readout.
+inline constexpr uint32_t kModulePublishesMeter = 1u << 6;
 
 // C-layout so descriptors can cross a dlopen boundary unchanged.
 struct PortDesc {
@@ -105,7 +117,10 @@ struct ModuleDescriptor {
    * Tokens: `.` is an empty cell; a port id is a jack for that input or output (`in:<id>` or
    * `out:<id>` when the two sides share a name); a param id is a control for that param (`param:<id>`
    * when it collides with a port id), at least two cells by two; `wave` is the wave panel, at least
-   * two by two, on a module that `kModulePreviewsWave`. Every declared port appears exactly once.
+   * two by two, on a module that `kModulePreviewsWave`; `scope` is the scope panel, at least two by
+   * two, on a module that `kModulePublishesScope`; `value` is the readout, at least two cells by one,
+   * on a module that `kModulePublishesValue`; `meter` is the level meter, at least two by two, on a
+   * module that `kModulePublishesMeter`. Every declared port appears exactly once.
    * Implicit modulation ports never appear: they ride on their param's control. A short row is
    * padded with `.`. `Registry::add` rejects anything else, so a face that is wrong is a module
    * that does not register rather than a node drawn wrong.

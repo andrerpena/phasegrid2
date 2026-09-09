@@ -17,7 +17,17 @@ trips per second per meter.
   copies rather than exposing a view, because the engine keeps writing and a view would change under a
   caller mid-decode.
 - `display.meter` and `display.scope` are the modules that publish. They have no outputs, so tapping a
-  wire cannot change what it sounds like.
+  wire cannot change what it sounds like. The scope keeps the window itself: a block is a few
+  milliseconds, a fraction of one cycle of anything worth looking at, and a reader at frame rate
+  would see one block in six, so a window stitched on the reading side would be mostly holes. The
+  module keeps a ring of `kTelemetryScopeFrames`, decimated so that its `time` knob fills it, and
+  publishes the whole ring every block; `writeScope` takes the ring's oldest frame so it is written in
+  order without a copy. The face (`scope` in its rows, `kModulePublishesScope`) reads it as a trace,
+  triggered on a rising zero crossing so a tone holds still.
+- `display.value` publishes a `Value` slot: the last frame of the block, one float per channel, signed.
+  Its own kind rather than a meter, because a meter's peak is a magnitude and +0.5 and -0.5 read the
+  same through one, while the sign is most of what a control voltage is read for. Its face
+  (`value`, `kModulePublishesValue`) prints it.
 - Any other subscribed module publishes a `Params` slot: the effective value of every one of its
   parameters, in display units and descriptor order, after whatever is plugged into its `param:` inputs
   has been added. The scheduler writes it after the module's `process`, from voice pair 0's lane 0 and
@@ -35,7 +45,12 @@ trips per second per meter.
   module, so nothing publishes `Params` and the knobs rest where the document has them; the pictures keep
   coming, drawn from the model's values, so a face still follows a knob turned while the patch is stopped.
 - The renderer owns the subscription set in one place (`src/renderer/src/grid/telemetry-sync.ts`):
-  `telemetry.subscribe` replaces the whole set, so two subscribers would cancel each other.
+  `telemetry.subscribe` replaces the whole set, so two subscribers would cancel each other. A scope
+  module is named in the same `modules` list as the modulated ones (the engine gives any watched
+  module a slot; a `kModuleWritesTelemetry` module writes its own kind into it) and its slot is read
+  by the kind it carries rather than as knob values. Scopes and readouts share that one list:
+  `displayModules` collects both, and the tick dispatches on the slot's kind, so another display
+  module is a flag and a case rather than a second path.
 - `telemetry.subscribe` decides which module writes into which slot and returns the map.
 
 ## Why a seqlock

@@ -61,16 +61,19 @@ const char* const kFace[] = {
 | a port id (`in:<id>` / `out:<id>` when the two sides share a name) | a jack, one cell; every declared port must appear once |
 | a param id (`param:<id>` when it collides with a port id) | a knob, at least two cells by two; a larger block scales it up |
 | `wave` | the wave panel, at least two by two, on a module that `kModulePreviewsWave` |
+| `scope` | the scope screen, at least two by two, on a module that `kModulePublishesScope`; it draws the window the module writes into its telemetry slot |
+| `value` | the readout, at least two cells across, on a module that `kModulePublishesValue`; it prints the value the module writes into its telemetry slot |
+| `meter` | the level meter, at least two by two, on a module that `kModulePublishesMeter`; it draws the level the module writes into its telemetry slot |
 
 Implicit modulation ports (`param:<id>`) never appear: the socket for one sits at its knob's foot, and a cable dropped
 on the knob connects to it. A jack in the leftmost or rightmost column sits its socket on the module's border; one on
 the bottom row sits it on the bottom border; anywhere else the socket is the cell's centre. Short rows are padded
 with `.`. Hidden and enum params have no block yet.
 
-`Registry::add` rejects a face that names nothing, leaves a port out, names something twice, gives a knob or the wave
-too little room, or has a non-rectangular block -- so a wrong face is a module that does not register rather than a
+`Registry::add` rejects a face that names nothing, leaves a port out, names something twice, gives a knob, the wave,
+the scope, the readout or the meter too little room, or has a non-rectangular block -- so a wrong face is a module that does not register rather than a
 node drawn wrong. `face = nullptr, faceRows = 0` is a module with no declared face: the interface composes one from
-its ports (down the sides) and its `kParamPrimary` params (knobs between them, the wave first). A vendored module
+its ports (down the sides) and its `kParamPrimary` params (knobs between them, the scope, the wave, the readout and the meter first). A vendored module
 declares its rows in `ModuleSpec::faceRows`, naming controls by suffix.
 
 ## Wrapping a vendored module

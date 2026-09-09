@@ -127,6 +127,23 @@ describe("decoding a slot", () => {
     expect(Array.from(reading.channels[1])).toEqual([-1, -2, -3]);
   });
 
+  it("reads a readout's value per channel, sign and all", () => {
+    const slot = buildSlot({
+      seq: 2,
+      kind: TelemetryKind.Value,
+      channels: 2,
+      frames: 1,
+      fill: (view, at) => {
+        view.setFloat32(at, -0.25, true);
+        view.setFloat32(at + 4, 0.5, true);
+      },
+    });
+    const reading = decodeSlot(slot);
+    if (reading?.kind !== TelemetryKind.Value)
+      throw new Error("expected a value");
+    expect(reading.values).toEqual([-0.25, 0.5]);
+  });
+
   it("reads a params slot as one value per parameter, in order", () => {
     const bytes = buildSlot({
       seq: 2,

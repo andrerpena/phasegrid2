@@ -228,7 +228,7 @@ wide enough for the values is a sidebar that has taken the room the grid wanted.
 ## The canvas
 
 **A module is a face made of blocks.** On the canvas a module is a rectangle of 24 px cells, and
-what it wears is a composition of blocks — the title, a jack, a knob, a wave panel — each covering a
+what it wears is a composition of blocks — the title, a jack, a knob, a wave panel, a scope, a readout — each covering a
 whole number of cells, the way a hardware panel is a grid of tiles. The title is a block like the
 others, one row across the module's whole width at row 0; the rows the engine declares sit under it. Which blocks and where
 is the engine's to say: the descriptor carries `face`, rows of tokens in the manner of CSS
@@ -245,7 +245,19 @@ Every block sits on a **tile**: a filled key in `tileFill` with a `tileStroke` h
 its cells edge to edge (the gutter and corner radius are constants, both zero for now, in
 `grid/layout.ts` and `blocks/Block.ts`), so a face reads as a panel of keys and the module's own
 frame, a square `nodeFill` rectangle with a `nodeStroke` border, shows only through empty cells. The wave's tile is its screen: the
-picture fills it and the tile's edge is the bezel.
+picture fills it and the tile's edge is the bezel. The scope is the same screen showing a different
+thing: not what the module would play but what is on the wire into it, the window the engine
+publishes for a `publishesScope` module (docs/telemetry.md), read at frame rate by
+`telemetry-sync.ts` and drawn by `blocks/ScopeBlock.ts` from a rising zero crossing so a tone holds
+still, each column the least and greatest sample that fell in it so noise reads as a band rather
+than a slower wave that is not there. Two kinds of block rather than one with a mode, because a node
+routes a picture to one and a trace to the other and never has to ask.
+
+The readout (`blocks/ValueBlock.ts`) is the third of that family and the only one that is not a
+screen: it is a number on an ordinary tile, monospaced, because a value that changes sixty times a
+second in a proportional font shifts its digits sideways as they change. It shows one number for a
+signal whose channels agree and one per channel when they do not, so a mono control voltage is one
+reading rather than two identical ones.
 
 Every place a cable can plug in is a `Socket` with a `facing`: a jack's, inside its tile under the
 port's name, and the one in the bottom right corner of every knob tile whose parameter can be

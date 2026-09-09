@@ -1,5 +1,5 @@
 {
-  "catalogHash": "33ea7367f4ea4f4d",
+  "catalogHash": "120dd508bdaeb2c1",
   "conventions": {
     "blockSize": 128,
     "gateThreshold": 0,
@@ -20,6 +20,9 @@
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesMeter": false,
+        "publishesScope": false,
+        "publishesValue": false,
         "terminal": false,
         "writesTelemetry": false
       },
@@ -111,11 +114,27 @@
     },
     {
       "category": "display",
-      "doc": "Publishes peak, RMS and clip count for the interface to draw. Produces no audio and changes nothing.",
-      "face": null,
+      "doc": "Shows the level on its face: a bar per channel, the held peak above it, and a clip light. Produces no audio and changes nothing.",
+      "face": [
+        [
+          "in",
+          "meter",
+          "meter",
+          "meter"
+        ],
+        [
+          ".",
+          "meter",
+          "meter",
+          "meter"
+        ]
+      ],
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesMeter": true,
+        "publishesScope": false,
+        "publishesValue": false,
         "terminal": false,
         "writesTelemetry": true
       },
@@ -136,11 +155,42 @@
     },
     {
       "category": "display",
-      "doc": "Publishes the waveform for the interface to draw. Produces no audio and changes nothing.",
-      "face": null,
+      "doc": "Shows the waveform on its face: a rolling window of the signal, as long as Time says. Produces no audio and changes nothing.",
+      "face": [
+        [
+          "in",
+          "scope",
+          "scope",
+          "scope",
+          "scope",
+          "time",
+          "time"
+        ],
+        [
+          ".",
+          "scope",
+          "scope",
+          "scope",
+          "scope",
+          "time",
+          "time"
+        ],
+        [
+          ".",
+          "scope",
+          "scope",
+          "scope",
+          "scope",
+          ".",
+          "."
+        ]
+      ],
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesMeter": false,
+        "publishesScope": true,
+        "publishesValue": false,
         "terminal": false,
         "writesTelemetry": true
       },
@@ -157,6 +207,68 @@
       ],
       "name": "Scope",
       "outputs": [],
+      "params": [
+        {
+          "curve": "log",
+          "default": 20.0,
+          "doc": "How much of the signal the screen shows, in milliseconds",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": false,
+            "noSmooth": true,
+            "primary": true,
+            "structural": false
+          },
+          "id": "time",
+          "max": 500.0,
+          "min": 2.0,
+          "name": "Time",
+          "uiWidget": "knob",
+          "unit": "none"
+        }
+      ]
+    },
+    {
+      "category": "display",
+      "doc": "Shows the value on its input as a number, per channel, as it changes. Produces no audio and changes nothing.",
+      "face": [
+        [
+          "in",
+          "value",
+          "value",
+          "value"
+        ],
+        [
+          ".",
+          "value",
+          "value",
+          "value"
+        ]
+      ],
+      "flags": {
+        "needsTransport": false,
+        "previewsWave": false,
+        "publishesMeter": false,
+        "publishesScope": false,
+        "publishesValue": true,
+        "terminal": false,
+        "writesTelemetry": true
+      },
+      "id": "display.value",
+      "inputs": [
+        {
+          "doc": "Signal to display; voices are summed as at the output",
+          "id": "in",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "In",
+          "role": "any"
+        }
+      ],
+      "name": "Value",
+      "outputs": [],
       "params": []
     },
     {
@@ -166,6 +278,9 @@
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesMeter": false,
+        "publishesScope": false,
+        "publishesValue": false,
         "terminal": false,
         "writesTelemetry": false
       },
@@ -443,6 +558,9 @@
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesMeter": false,
+        "publishesScope": false,
+        "publishesValue": false,
         "terminal": false,
         "writesTelemetry": false
       },
@@ -900,6 +1018,9 @@
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesMeter": false,
+        "publishesScope": false,
+        "publishesValue": false,
         "terminal": false,
         "writesTelemetry": false
       },
@@ -1246,6 +1367,9 @@
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesMeter": false,
+        "publishesScope": false,
+        "publishesValue": false,
         "terminal": false,
         "writesTelemetry": false
       },
@@ -1769,6 +1893,9 @@
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesMeter": false,
+        "publishesScope": false,
+        "publishesValue": false,
         "terminal": false,
         "writesTelemetry": false
       },
@@ -2118,6 +2245,9 @@
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesMeter": false,
+        "publishesScope": false,
+        "publishesValue": false,
         "terminal": false,
         "writesTelemetry": false
       },
@@ -2351,6 +2481,9 @@
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesMeter": false,
+        "publishesScope": false,
+        "publishesValue": false,
         "terminal": false,
         "writesTelemetry": false
       },
@@ -2719,6 +2852,9 @@
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesMeter": false,
+        "publishesScope": false,
+        "publishesValue": false,
         "terminal": false,
         "writesTelemetry": false
       },
@@ -2995,6 +3131,9 @@
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesMeter": false,
+        "publishesScope": false,
+        "publishesValue": false,
         "terminal": false,
         "writesTelemetry": false
       },
@@ -3300,6 +3439,9 @@
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesMeter": false,
+        "publishesScope": false,
+        "publishesValue": false,
         "terminal": false,
         "writesTelemetry": false
       },
@@ -3694,6 +3836,9 @@
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesMeter": false,
+        "publishesScope": false,
+        "publishesValue": false,
         "terminal": true,
         "writesTelemetry": false
       },
@@ -3757,6 +3902,9 @@
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesMeter": false,
+        "publishesScope": false,
+        "publishesValue": false,
         "terminal": false,
         "writesTelemetry": false
       },
@@ -3850,6 +3998,9 @@
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesMeter": false,
+        "publishesScope": false,
+        "publishesValue": false,
         "terminal": false,
         "writesTelemetry": false
       },
@@ -4052,6 +4203,9 @@
       "flags": {
         "needsTransport": false,
         "previewsWave": true,
+        "publishesMeter": false,
+        "publishesScope": false,
+        "publishesValue": false,
         "terminal": false,
         "writesTelemetry": false
       },
@@ -4174,6 +4328,9 @@
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesMeter": false,
+        "publishesScope": false,
+        "publishesValue": false,
         "terminal": false,
         "writesTelemetry": false
       },
@@ -4431,6 +4588,9 @@
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesMeter": false,
+        "publishesScope": false,
+        "publishesValue": false,
         "terminal": false,
         "writesTelemetry": false
       },
@@ -4536,6 +4696,9 @@
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesMeter": false,
+        "publishesScope": false,
+        "publishesValue": false,
         "terminal": false,
         "writesTelemetry": false
       },
@@ -4586,6 +4749,9 @@
       "flags": {
         "needsTransport": true,
         "previewsWave": false,
+        "publishesMeter": false,
+        "publishesScope": false,
+        "publishesValue": false,
         "terminal": false,
         "writesTelemetry": false
       },
@@ -4717,6 +4883,9 @@
       "flags": {
         "needsTransport": false,
         "previewsWave": true,
+        "publishesMeter": false,
+        "publishesScope": false,
+        "publishesValue": false,
         "terminal": false,
         "writesTelemetry": false
       },
@@ -4825,6 +4994,9 @@
       "flags": {
         "needsTransport": false,
         "previewsWave": true,
+        "publishesMeter": false,
+        "publishesScope": false,
+        "publishesValue": false,
         "terminal": false,
         "writesTelemetry": false
       },
@@ -4933,6 +5105,9 @@
       "flags": {
         "needsTransport": false,
         "previewsWave": true,
+        "publishesMeter": false,
+        "publishesScope": false,
+        "publishesValue": false,
         "terminal": false,
         "writesTelemetry": false
       },
@@ -5013,6 +5188,9 @@
       "flags": {
         "needsTransport": false,
         "previewsWave": true,
+        "publishesMeter": false,
+        "publishesScope": false,
+        "publishesValue": false,
         "terminal": false,
         "writesTelemetry": false
       },
@@ -5836,6 +6014,9 @@
       "flags": {
         "needsTransport": true,
         "previewsWave": false,
+        "publishesMeter": false,
+        "publishesScope": false,
+        "publishesValue": false,
         "terminal": false,
         "writesTelemetry": false
       },
@@ -5929,6 +6110,9 @@
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesMeter": false,
+        "publishesScope": false,
+        "publishesValue": false,
         "terminal": false,
         "writesTelemetry": false
       },

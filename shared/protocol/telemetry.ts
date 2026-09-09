@@ -40,6 +40,11 @@ export enum TelemetryKind {
    * published by the engine's message thread whenever those values move. One channel, `frames` long.
    */
   Preview = 4,
+  /**
+   * The last frame of the signal a readout module is fed, one float per channel. Signed, which is why
+   * it is not a meter: a meter's peak is a magnitude, and +0.5 and -0.5 read the same through one.
+   */
+  Value = 5,
 }
 
 export interface TelemetryHeader {
@@ -55,7 +60,11 @@ export interface TelemetryHeader {
 export interface MeterReading {
   kind: TelemetryKind.Meter;
   blockIndex: bigint;
-  /** Per channel. */
+  /**
+   * Per channel. `peak` is the held peak, falling towards the signal between transients, and
+   * `clipped` is a held flag rather than a count: both are held by the module, because a reader at
+   * frame rate sees one block in six and would otherwise miss exactly the moments a meter is for.
+   */
   peak: number[];
   rms: number[];
   clipped: number[];
@@ -83,11 +92,19 @@ export interface PreviewReading {
   samples: Float32Array;
 }
 
+export interface ValueReading {
+  kind: TelemetryKind.Value;
+  blockIndex: bigint;
+  /** The last value on the wire, per channel, as it was: signed, unscaled. */
+  values: number[];
+}
+
 export type SlotReading =
   | MeterReading
   | ScopeReading
   | ParamsReading
-  | PreviewReading;
+  | PreviewReading
+  | ValueReading;
 
 /** Where a slot begins, given its index. */
 export function slotOffset(index: number): number {
@@ -184,6 +201,14 @@ export function decodeSlot(bytes: Uint8Array): SlotReading | null {
     for (let i = 0; i < frames; i++)
       samples[i] = view.getFloat32(payload + i * 4, true);
     return { kind, blockIndex, samples };
+  }
+
+  if (kind === TelemetryKind.Value) {
+    if (payload + channels * 4 > bytes.byteLength) return null;
+    const values: number[] = [];
+    for (let c = 0; c < channels; c++)
+      values.push(view.getFloat32(payload + c * 4, true));
+    return { kind, blockIndex, values };
   }
 
   if (kind === TelemetryKind.Params) {

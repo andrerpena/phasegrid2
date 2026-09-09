@@ -2,7 +2,7 @@ import { hexToNumber } from "@renderer/lib/color";
 import type { GridColors } from "@renderer/theming/theme";
 import type { SignalRole } from "@shared/protocol/catalog";
 import type { Container, Graphics, Text } from "pixi.js";
-import type { BlockBase } from "../../face";
+import type { BlockBase, Panel } from "../../face";
 import { TILE_GUTTER } from "../../layout";
 
 /**
@@ -25,6 +25,7 @@ export interface KnobStyle {
   label: number;
 }
 
+/** A screen's colours: the wave panel's and the scope's, which are the same screen showing different things. */
 export interface WaveStyle {
   /** The curve. The module's accent, so a node reads as one thing. */
   curve: number;
@@ -152,4 +153,39 @@ export function drawSocket(
   if (state.connected) g.fill({ color });
   else g.fill({ color: 0x000000, alpha: 0.55 });
   g.stroke({ width: state.hovered ? 2 : 1.5, color });
+}
+
+/** Cells of ruling behind a screen's picture. */
+export const SCREEN_DIVISIONS = { x: 4, y: 2 };
+
+/**
+ * A screen: the tile drawn in the screen's colour, and the ruling behind whatever it shows.
+ *
+ * The tile is drawn like every other key, so it has one border like its neighbours and not a bezel
+ * around a second frame. The ruling is one stroke for every rule: each `stroke()` is its own draw
+ * instruction, and a panel ruled into sixteen cells would otherwise cost sixteen of them per redraw.
+ * `rules` is positioned at the panel by the caller; the lines are drawn in the panel's own space.
+ */
+export function drawScreen(
+  tile: Graphics,
+  rules: Graphics,
+  block: BlockBase,
+  panel: Panel,
+  style: BlockStyle,
+): void {
+  drawTile(tile, block, {
+    fill: style.wave.background,
+    stroke: style.tile.stroke,
+  });
+  const { width: w, height: h } = panel;
+  rules.clear();
+  for (let i = 1; i < SCREEN_DIVISIONS.x; i++) {
+    const x = Math.round((i * w) / SCREEN_DIVISIONS.x) + 0.5;
+    rules.moveTo(x, 1).lineTo(x, h - 1);
+  }
+  for (let i = 1; i < SCREEN_DIVISIONS.y; i++) {
+    const y = Math.round((i * h) / SCREEN_DIVISIONS.y) + 0.5;
+    rules.moveTo(1, y).lineTo(w - 1, y);
+  }
+  rules.stroke({ width: 1, color: style.wave.grid, alpha: 0.5 });
 }
