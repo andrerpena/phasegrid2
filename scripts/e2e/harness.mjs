@@ -117,6 +117,9 @@ const setValue = (el, value) => {
 const press = (key, mods = {}) => window.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ...mods }));
 const byText = (selector, text) => [...document.querySelectorAll(selector)].find((e) => e.textContent.trim() === text);
 const click = (selector, text) => { const el = byText(selector, text); if (!el) throw new Error("no element: " + text); el.click(); };
+// Scoped to the projects list: a project called "Modulation" or "Scope" shares its name with a
+// catalogue heading or module, and a click by text alone would land on whichever comes first.
+const openProject = (name) => click('[data-testid="projects"] button', name);
 `;
 
 let nextPort = 9400 + Math.floor(Math.random() * 400);

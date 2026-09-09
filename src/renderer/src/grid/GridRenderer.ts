@@ -461,6 +461,11 @@ export class GridRenderer {
     this.nodes.get(moduleId)?.setLevel(index, level);
   }
 
+  /** Lights the keys the engine published on a module's keyboard. Ignored for a module not drawn. */
+  setKeys(moduleId: string, index: bigint, held: number[]): void {
+    this.nodes.get(moduleId)?.setKeys(index, held);
+  }
+
   /** Where modulation has put a knob this frame, 0..1, or null. Ignored for a module not drawn. */
   setLive(moduleId: string, paramId: string, fraction: number | null): void {
     this.nodes.get(moduleId)?.setLive(paramId, fraction);

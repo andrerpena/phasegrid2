@@ -28,6 +28,12 @@ trips per second per meter.
   Its own kind rather than a meter, because a meter's peak is a magnitude and +0.5 and -0.5 read the
   same through one, while the sign is most of what a control voltage is read for. Its face
   (`value`, `kModulePublishesValue`) prints it.
+- `display.piano` publishes a `Keys` slot: one float per MIDI note number, 1 for a key that is down,
+  128 of them. Per note rather than per voice, so a reader never has to know how many voices the
+  program runs or which lane is which: the module reads each voice's pitch and gate at the block's
+  last frame, across every voice pair, and publishes once on the last. Its face (`piano`,
+  `kModulePublishesKeys`) lights the keys; the keyboard's range is the module's own parameters,
+  read from the document, and never crosses telemetry.
 - A subscribed module publishes a `Params` slot: the effective value of every one of its parameters, in
   display units and descriptor order, after whatever is plugged into its `param:` inputs has been added.
   The scheduler writes it after the module's `process`, from voice pair 0's lane 0 and the block's last

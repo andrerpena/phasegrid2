@@ -1,5 +1,5 @@
 {
-  "catalogHash": "395061bf00eb2588",
+  "catalogHash": "2888cfda7bfa947a",
   "conventions": {
     "blockSize": 128,
     "gateThreshold": 0,
@@ -14,12 +14,13 @@
   },
   "modules": [
     {
-      "category": "amp",
+      "category": "Amplifiers",
       "doc": "Voltage-controlled amplifier: multiplies its input by the Gain knob plus the gain input, clamped at zero. Plug an envelope into gain and turn the knob down to shape a note.",
       "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesKeys": false,
         "publishesMeter": false,
         "publishesNotes": false,
         "publishesScope": false,
@@ -115,7 +116,7 @@
       "texts": []
     },
     {
-      "category": "display",
+      "category": "Display",
       "doc": "Shows the level on its face: a bar per channel, the held peak above it, and a clip light. Produces no audio and changes nothing.",
       "face": [
         [
@@ -134,6 +135,7 @@
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesKeys": false,
         "publishesMeter": true,
         "publishesNotes": false,
         "publishesScope": false,
@@ -158,7 +160,112 @@
       "texts": []
     },
     {
-      "category": "display",
+      "category": "Display",
+      "doc": "A keyboard that lights the keys being played. Feed it the pitch and gate a note converter puts out and each voice lights its own key; leave the gate unconnected and a pitch alone lights one. Octaves sets how much of the keyboard is shown and Low which octave it starts on. Produces no audio and changes nothing.",
+      "face": [
+        [
+          "pitch",
+          "piano",
+          "piano",
+          "piano",
+          "piano",
+          "piano",
+          "piano",
+          "piano",
+          "octaves",
+          "octaves"
+        ],
+        [
+          "gate",
+          "piano",
+          "piano",
+          "piano",
+          "piano",
+          "piano",
+          "piano",
+          "piano",
+          "octaves",
+          "octaves"
+        ]
+      ],
+      "flags": {
+        "needsTransport": false,
+        "previewsWave": false,
+        "publishesKeys": true,
+        "publishesMeter": false,
+        "publishesNotes": false,
+        "publishesScope": false,
+        "publishesValue": false,
+        "terminal": false,
+        "writesTelemetry": true
+      },
+      "id": "display.piano",
+      "inputs": [
+        {
+          "doc": "The pitch each voice is playing, 0.1 per octave from middle C, as a note converter puts out",
+          "id": "pitch",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Pitch",
+          "role": "pitch"
+        },
+        {
+          "doc": "High while the voice's key is down. Unconnected, every voice is held, so a bare pitch lights one key",
+          "id": "gate",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Gate",
+          "role": "gate"
+        }
+      ],
+      "name": "Piano",
+      "outputs": [],
+      "params": [
+        {
+          "curve": "linear",
+          "default": 2.0,
+          "doc": "How many octaves the keyboard shows. It fills its block whatever the number, so more octaves means narrower keys",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "primary": true,
+            "structural": false
+          },
+          "id": "octaves",
+          "max": 6.0,
+          "min": 1.0,
+          "name": "Octaves",
+          "uiWidget": "knob",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 3.0,
+          "doc": "The octave the keyboard starts on: 3 is C3, one octave below middle C (C4)",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "primary": false,
+            "structural": false
+          },
+          "id": "low",
+          "max": 8.0,
+          "min": -1.0,
+          "name": "Low",
+          "uiWidget": "slider",
+          "unit": "none"
+        }
+      ],
+      "texts": []
+    },
+    {
+      "category": "Display",
       "doc": "Shows the waveform on its face: a rolling window of the signal, as long as Time says. Produces no audio and changes nothing.",
       "face": [
         [
@@ -192,6 +299,7 @@
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesKeys": false,
         "publishesMeter": false,
         "publishesNotes": false,
         "publishesScope": true,
@@ -237,7 +345,7 @@
       "texts": []
     },
     {
-      "category": "display",
+      "category": "Display",
       "doc": "Shows the value on its input as a number, per channel, as it changes. Produces no audio and changes nothing.",
       "face": [
         [
@@ -256,6 +364,7 @@
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesKeys": false,
         "publishesMeter": false,
         "publishesNotes": false,
         "publishesScope": false,
@@ -280,12 +389,13 @@
       "texts": []
     },
     {
-      "category": "mod",
+      "category": "Modulation",
       "doc": "Delay/attack/hold/decay/sustain/release envelope. The gate holds it at the sustain level; a falling edge starts the release. Times are in seconds after the stage curve is applied.",
       "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesKeys": false,
         "publishesMeter": false,
         "publishesNotes": false,
         "publishesScope": false,
@@ -562,12 +672,13 @@
       "texts": []
     },
     {
-      "category": "filter",
+      "category": "Filters",
       "doc": "Multi-model filter: analog, dirty, ladder, digital, diode, formant, comb, phaser. Cutoff is a MIDI note number, so a semitone of modulation is a semitone of cutoff.",
       "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesKeys": false,
         "publishesMeter": false,
         "publishesNotes": false,
         "publishesScope": false,
@@ -1024,12 +1135,13 @@
       "texts": []
     },
     {
-      "category": "fx",
+      "category": "Audio FX",
       "doc": "Chorus built from up to four modulated delay pairs sharing one rate. Frequency is a power of two in hertz; Delay 1 and Delay 2 set the range the pairs are spread across.",
       "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesKeys": false,
         "publishesMeter": false,
         "publishesNotes": false,
         "publishesScope": false,
@@ -1375,12 +1487,13 @@
       "texts": []
     },
     {
-      "category": "fx",
+      "category": "Audio FX",
       "doc": "Multiband compressor. Each band has an upper threshold that compresses above it and a lower threshold that expands below it; Enabled Bands chooses how many bands run. Thresholds and gains are in decibels.",
       "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesKeys": false,
         "publishesMeter": false,
         "publishesNotes": false,
         "publishesScope": false,
@@ -1903,12 +2016,13 @@
       "texts": []
     },
     {
-      "category": "fx",
+      "category": "Audio FX",
       "doc": "Stereo / ping-pong delay with a filtered feedback path. Frequency is a power of two in hertz and is the inverse of the delay time (3 = 8 Hz = 125 ms); Sync switches it to tempo divisions instead.",
       "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesKeys": false,
         "publishesMeter": false,
         "publishesNotes": false,
         "publishesScope": false,
@@ -2257,12 +2371,13 @@
       "texts": []
     },
     {
-      "category": "fx",
+      "category": "Audio FX",
       "doc": "Waveshaper -- soft clip, hard clip, folding, bit crush or downsampling -- with a filter that can run before it, after it, or not at all. Drive is in decibels, Filter Cutoff a MIDI note number.",
       "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesKeys": false,
         "publishesMeter": false,
         "publishesNotes": false,
         "publishesScope": false,
@@ -2495,12 +2610,13 @@
       "texts": []
     },
     {
-      "category": "fx",
+      "category": "Audio FX",
       "doc": "Three-band equaliser. Each band's Mode picks between a shelf and a cut (low: shelf or high-pass, band: shelf or notch, high: shelf or low-pass). Cutoffs are MIDI note numbers, gains are decibels.",
       "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesKeys": false,
         "publishesMeter": false,
         "publishesNotes": false,
         "publishesScope": false,
@@ -2868,12 +2984,13 @@
       "texts": []
     },
     {
-      "category": "fx",
+      "category": "Audio FX",
       "doc": "Flanger: a short feedback delay swept by a triangle around Center. Center is a MIDI note number, Frequency a power of two in hertz.",
       "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesKeys": false,
         "publishesMeter": false,
         "publishesNotes": false,
         "publishesScope": false,
@@ -3149,12 +3266,13 @@
       "texts": []
     },
     {
-      "category": "fx",
+      "category": "Audio FX",
       "doc": "Phaser: all-pass stages swept around Center by their own oscillator. Center and Mod Depth are in semitones, Frequency is a power of two in hertz.",
       "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesKeys": false,
         "publishesMeter": false,
         "publishesNotes": false,
         "publishesScope": false,
@@ -3459,12 +3577,13 @@
       "texts": []
     },
     {
-      "category": "fx",
+      "category": "Audio FX",
       "doc": "Reverb with pre-filtering, low/high shelving and a chorused tail. Decay Time is a power of two in seconds; the cutoffs are MIDI note numbers.",
       "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesKeys": false,
         "publishesMeter": false,
         "publishesNotes": false,
         "publishesScope": false,
@@ -3847,7 +3966,7 @@
       "texts": []
     },
     {
-      "category": "io",
+      "category": "I/O",
       "doc": "Sends stereo audio to the engine output. Voices are summed.",
       "face": [
         [
@@ -3864,6 +3983,7 @@
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesKeys": false,
         "publishesMeter": false,
         "publishesNotes": false,
         "publishesScope": false,
@@ -3926,12 +4046,13 @@
       "texts": []
     },
     {
-      "category": "math",
+      "category": "Math",
       "doc": "Affine map of one signal: out = in * Scale + Offset, lane by lane. The usual way to turn a unipolar envelope or LFO into the bipolar range a pitch or pan input wants, and back.",
       "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesKeys": false,
         "publishesMeter": false,
         "publishesNotes": false,
         "publishesScope": false,
@@ -4024,12 +4145,13 @@
       "texts": []
     },
     {
-      "category": "mix",
+      "category": "Mixing",
       "doc": "Adds four signals, each through its own level. Unconnected channels are silent.",
       "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesKeys": false,
         "publishesMeter": false,
         "publishesNotes": false,
         "publishesScope": false,
@@ -4204,7 +4326,7 @@
       "texts": []
     },
     {
-      "category": "mod",
+      "category": "Modulation",
       "doc": "A low-frequency oscillator for driving knobs. Rate is in hertz; Shape morphs sine, triangle, saw and square; Depth sets the swing. The output is bipolar, so the knob it feeds stays the centre of the movement. A rising edge on Reset restarts the cycle. The face shows the wave.",
       "face": [
         [
@@ -4237,6 +4359,7 @@
       "flags": {
         "needsTransport": false,
         "previewsWave": true,
+        "publishesKeys": false,
         "publishesMeter": false,
         "publishesNotes": false,
         "publishesScope": false,
@@ -4358,12 +4481,13 @@
       "texts": []
     },
     {
-      "category": "mod",
+      "category": "Modulation",
       "doc": "Random modulator: perlin, sample & hold, sine interpolation or a Lorenz attractor. Output is 0..1. Frequency is a power of two in hertz (2 = 4 Hz) while Sync is Seconds.",
       "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesKeys": false,
         "publishesMeter": false,
         "publishesNotes": false,
         "publishesScope": false,
@@ -4620,12 +4744,13 @@
       "texts": []
     },
     {
-      "category": "note",
+      "category": "Notes",
       "doc": "Turns note events into pitch, gate and velocity signals. Monophonic: one note sounds at a time, chosen by the priority mode, and the gate stays high while any note is held.",
       "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesKeys": false,
         "publishesMeter": false,
         "publishesNotes": false,
         "publishesScope": false,
@@ -4730,12 +4855,13 @@
       "texts": []
     },
     {
-      "category": "note",
+      "category": "Notes",
       "doc": "Spreads note events across the program's voices: each output carries a different value per voice lane. A note takes a free voice, or steals the one that has been sounding longest, and releases its voice on the matching note off.",
       "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesKeys": false,
         "publishesMeter": false,
         "publishesNotes": false,
         "publishesScope": false,
@@ -4785,12 +4911,430 @@
       "texts": []
     },
     {
-      "category": "note",
+      "category": "Note FX",
+      "doc": "Plays whatever notes are held one at a time, on a grid locked to the transport: hold a chord and hear it climb. Rate sets the step, Mode the order (up, down, both ways, as played, at random), Octaves how far the run climbs before it repeats, and Gate how much of each step the note holds. Stopped, it runs at the project tempo; playing, it follows the playhead exactly.",
+      "face": [
+        [
+          "in:notes",
+          "octaves",
+          "octaves",
+          "gate",
+          "gate",
+          "out:notes"
+        ],
+        [
+          ".",
+          "octaves",
+          "octaves",
+          "gate",
+          "gate",
+          "."
+        ]
+      ],
+      "flags": {
+        "needsTransport": true,
+        "previewsWave": false,
+        "publishesKeys": false,
+        "publishesMeter": false,
+        "publishesNotes": false,
+        "publishesScope": false,
+        "publishesValue": false,
+        "terminal": false,
+        "writesTelemetry": false
+      },
+      "id": "notefx.arp",
+      "inputs": [
+        {
+          "doc": "The notes to arpeggiate: whatever is held is played one at a time",
+          "id": "notes",
+          "implicit": false,
+          "kind": "event",
+          "name": "Notes",
+          "role": "note"
+        },
+        {
+          "doc": "How much of its step each note holds. At 1 a note ends exactly where the next begins",
+          "id": "param:gate",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Gate",
+          "param": "gate",
+          "role": "cv"
+        }
+      ],
+      "name": "Arpeggiator",
+      "outputs": [
+        {
+          "doc": "One note per step, chosen from the held ones by the mode",
+          "id": "notes",
+          "implicit": false,
+          "kind": "event",
+          "name": "Notes",
+          "role": "note"
+        }
+      ],
+      "params": [
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "How long each step lasts, in musical time",
+          "enumLabels": [
+            "1/16",
+            "1/8",
+            "1/4",
+            "1/2",
+            "1 bar",
+            "2 bars",
+            "4 bars"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "primary": false,
+            "structural": false
+          },
+          "id": "rate",
+          "max": 6.0,
+          "min": 0.0,
+          "name": "Rate",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "The order the held notes are played in",
+          "enumLabels": [
+            "Up",
+            "Down",
+            "Up-Down",
+            "As played",
+            "Random"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "primary": false,
+            "structural": false
+          },
+          "id": "mode",
+          "max": 4.0,
+          "min": 0.0,
+          "name": "Mode",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "How many octaves the pattern climbs through before it repeats",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "primary": true,
+            "structural": false
+          },
+          "id": "octaves",
+          "max": 4.0,
+          "min": 1.0,
+          "name": "Octaves",
+          "uiWidget": "slider",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.5,
+          "doc": "How much of its step each note holds. At 1 a note ends exactly where the next begins",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "id": "gate",
+          "max": 1.0,
+          "min": 0.05000000074505806,
+          "name": "Gate",
+          "uiWidget": "knob",
+          "unit": "ratio"
+        }
+      ],
+      "texts": []
+    },
+    {
+      "category": "Note FX",
+      "doc": "Turns every note into a chord with that note as its root: a major triad, a minor one, a seventh. The chord is fixed when the note starts, so changing the type under a held note releases the tones that were sounding. Raise the project's voice count so the tones play as a chord rather than as one note after another.",
+      "face": null,
+      "flags": {
+        "needsTransport": false,
+        "previewsWave": false,
+        "publishesKeys": false,
+        "publishesMeter": false,
+        "publishesNotes": false,
+        "publishesScope": false,
+        "publishesValue": false,
+        "terminal": false,
+        "writesTelemetry": false
+      },
+      "id": "notefx.chord",
+      "inputs": [
+        {
+          "doc": "The notes to build chords on: each one becomes the root",
+          "id": "notes",
+          "implicit": false,
+          "kind": "event",
+          "name": "Notes",
+          "role": "note"
+        }
+      ],
+      "name": "Chord",
+      "outputs": [
+        {
+          "doc": "The chords: one note on per chord tone for every note that comes in",
+          "id": "notes",
+          "implicit": false,
+          "kind": "event",
+          "name": "Notes",
+          "role": "note"
+        }
+      ],
+      "params": [
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Which chord every incoming note becomes the root of",
+          "enumLabels": [
+            "Major",
+            "Minor",
+            "Diminished",
+            "Augmented",
+            "Sus2",
+            "Sus4",
+            "Major 7",
+            "Minor 7",
+            "Dominant 7"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "primary": false,
+            "structural": false
+          },
+          "id": "chord",
+          "max": 8.0,
+          "min": 0.0,
+          "name": "Chord",
+          "uiWidget": "select",
+          "unit": "none"
+        }
+      ],
+      "texts": []
+    },
+    {
+      "category": "Note FX",
+      "doc": "Loosens a note stream the way a person playing would: each note arrives a little late, by a random amount up to Timing, and a little louder or softer, by up to Velocity. A note is moved whole -- its off is delayed as much as its on -- so lengths are kept. The randomness is the same on every pass, so a part sounds the way it did last time.",
+      "face": [
+        [
+          "in:notes",
+          "timing",
+          "timing",
+          "velocity",
+          "velocity",
+          "out:notes"
+        ],
+        [
+          ".",
+          "timing",
+          "timing",
+          "velocity",
+          "velocity",
+          "."
+        ]
+      ],
+      "flags": {
+        "needsTransport": true,
+        "previewsWave": false,
+        "publishesKeys": false,
+        "publishesMeter": false,
+        "publishesNotes": false,
+        "publishesScope": false,
+        "publishesValue": false,
+        "terminal": false,
+        "writesTelemetry": false
+      },
+      "id": "notefx.humanize",
+      "inputs": [
+        {
+          "doc": "The notes to loosen up",
+          "id": "notes",
+          "implicit": false,
+          "kind": "event",
+          "name": "Notes",
+          "role": "note"
+        },
+        {
+          "doc": "The most a note may arrive late. Each note is delayed by a random amount up to this, and released the same amount late, so its length is kept",
+          "id": "param:timing",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Timing",
+          "param": "timing",
+          "role": "cv"
+        },
+        {
+          "doc": "How much each note's velocity may wander, either way, as a fraction of itself",
+          "id": "param:velocity",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Velocity",
+          "param": "velocity",
+          "role": "cv"
+        }
+      ],
+      "name": "Humanize",
+      "outputs": [
+        {
+          "doc": "The same notes, each a little late and a little louder or softer",
+          "id": "notes",
+          "implicit": false,
+          "kind": "event",
+          "name": "Notes",
+          "role": "note"
+        }
+      ],
+      "params": [
+        {
+          "curve": "linear",
+          "default": 0.009999999776482582,
+          "doc": "The most a note may arrive late. Each note is delayed by a random amount up to this, and released the same amount late, so its length is kept",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "id": "timing",
+          "max": 0.10000000149011612,
+          "min": 0.0,
+          "name": "Timing",
+          "uiWidget": "knob",
+          "unit": "seconds"
+        },
+        {
+          "curve": "linear",
+          "default": 0.20000000298023224,
+          "doc": "How much each note's velocity may wander, either way, as a fraction of itself",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "id": "velocity",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Velocity",
+          "uiWidget": "knob",
+          "unit": "ratio"
+        }
+      ],
+      "texts": []
+    },
+    {
+      "category": "Note FX",
+      "doc": "Moves every note onto the project's scale, set in the strip above the grid: a C# played in C major comes out as C. Nearest goes to the closest scale tone, Down and Up always go one way. In a chromatic project nothing moves. The snapped pitch is fixed when the note starts, so changing the key under a held note still releases the right one.",
+      "face": null,
+      "flags": {
+        "needsTransport": true,
+        "previewsWave": false,
+        "publishesKeys": false,
+        "publishesMeter": false,
+        "publishesNotes": false,
+        "publishesScope": false,
+        "publishesValue": false,
+        "terminal": false,
+        "writesTelemetry": false
+      },
+      "id": "notefx.quantize",
+      "inputs": [
+        {
+          "doc": "The notes to snap to the project's scale",
+          "id": "notes",
+          "implicit": false,
+          "kind": "event",
+          "name": "Notes",
+          "role": "note"
+        }
+      ],
+      "name": "Quantize",
+      "outputs": [
+        {
+          "doc": "The same notes, each moved to a pitch in the scale",
+          "id": "notes",
+          "implicit": false,
+          "kind": "event",
+          "name": "Notes",
+          "role": "note"
+        }
+      ],
+      "params": [
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Where a note outside the scale goes: to the nearest scale tone (downward on a tie), or always down, or always up",
+          "enumLabels": [
+            "Nearest",
+            "Down",
+            "Up"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "primary": false,
+            "structural": false
+          },
+          "id": "mode",
+          "max": 2.0,
+          "min": 0.0,
+          "name": "Mode",
+          "uiWidget": "select",
+          "unit": "none"
+        }
+      ],
+      "texts": []
+    },
+    {
+      "category": "Notes",
       "doc": "Plays a list of notes against the transport and emits them as a note stream. The notes live in the node's data as \"notes\": an array of {start, length, pitch, velocity} objects, start and length in beats from the clip's start, pitch a MIDI note number and velocity 0..1. Anything else in that array is rejected as a whole and the clip plays nothing. The playhead is derived from the transport, so it follows the host when it plays, free-runs at the transport tempo when it does not, and survives an edit to the notes.",
       "face": null,
       "flags": {
         "needsTransport": true,
         "previewsWave": false,
+        "publishesKeys": false,
         "publishesMeter": false,
         "publishesNotes": false,
         "publishesScope": false,
@@ -4893,7 +5437,7 @@
       "texts": []
     },
     {
-      "category": "note",
+      "category": "Notes",
       "doc": "A note source written as a string, in the mini-notation TidalCycles invented and Strudel carries: `<c4 eb4> g3*2 [~ bb3]` is a whole musical idea in a text field. The pattern is played against the transport, one cycle at a time, and comes out as a note stream. A second string patterns the velocity, aligned to the notes rather than to itself. A pattern that will not parse plays nothing rather than half of itself.",
       "face": [
         [
@@ -4960,6 +5504,7 @@
       "flags": {
         "needsTransport": true,
         "previewsWave": false,
+        "publishesKeys": false,
         "publishesMeter": false,
         "publishesNotes": true,
         "publishesScope": false,
@@ -5132,7 +5677,7 @@
       ]
     },
     {
-      "category": "osc",
+      "category": "Oscillators",
       "doc": "A band-limited pulse with hard sync. Sync, in semitones, runs the wave faster than the pitch and restarts it every cycle, which keeps the pitch and packs more pulses into it. The face shows the resulting shape.",
       "face": [
         [
@@ -5166,6 +5711,7 @@
       "flags": {
         "needsTransport": false,
         "previewsWave": true,
+        "publishesKeys": false,
         "publishesMeter": false,
         "publishesNotes": false,
         "publishesScope": false,
@@ -5245,7 +5791,7 @@
       "texts": []
     },
     {
-      "category": "osc",
+      "category": "Oscillators",
       "doc": "A band-limited sawtooth with hard sync. Sync, in semitones, runs a second ramp faster than the pitch and restarts it every cycle, which keeps the pitch and adds the classic sync harmonics. The face shows the resulting shape.",
       "face": [
         [
@@ -5279,6 +5825,7 @@
       "flags": {
         "needsTransport": false,
         "previewsWave": true,
+        "publishesKeys": false,
         "publishesMeter": false,
         "publishesNotes": false,
         "publishesScope": false,
@@ -5358,7 +5905,7 @@
       "texts": []
     },
     {
-      "category": "osc",
+      "category": "Oscillators",
       "doc": "A sine with a wavefolder. Turning Fold up drives the wave through a sine curve, which folds it back on itself in round lobes and fills the spectrum with odd harmonics. Fold is in semitones, so every twelve doubles the drive: at twelve, two lobes meet at the centre. The face shows the resulting shape.",
       "face": [
         [
@@ -5392,6 +5939,7 @@
       "flags": {
         "needsTransport": false,
         "previewsWave": true,
+        "publishesKeys": false,
         "publishesMeter": false,
         "publishesNotes": false,
         "publishesScope": false,
@@ -5471,12 +6019,13 @@
       "texts": []
     },
     {
-      "category": "osc",
+      "category": "Oscillators",
       "doc": "Wavetable oscillator with unison, phase distortion and spectral morphing. Pitch is 0.1 per octave from middle C; the oscillator tracks it while Midi Track is on.",
       "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": true,
+        "publishesKeys": false,
         "publishesMeter": false,
         "publishesNotes": false,
         "publishesScope": false,
@@ -6299,12 +6848,13 @@
       "texts": []
     },
     {
-      "category": "time",
+      "category": "Time",
       "doc": "A phase ramp locked to the transport, plus a one-frame trigger at the start of each cycle. Drives sequencers and ramp-fed oscillators. While the transport is stopped it free-runs at its tempo.",
       "face": null,
       "flags": {
         "needsTransport": true,
         "previewsWave": false,
+        "publishesKeys": false,
         "publishesMeter": false,
         "publishesNotes": false,
         "publishesScope": false,
@@ -6397,12 +6947,13 @@
       "texts": []
     },
     {
-      "category": "osc",
+      "category": "Oscillators",
       "doc": "Plays a sample. A rising gate restarts it; Loop and Bounce decide what happens at the end. Pitch only moves it while Keytrack is on. With no asset loaded it plays white noise.",
       "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
+        "publishesKeys": false,
         "publishesMeter": false,
         "publishesNotes": false,
         "publishesScope": false,

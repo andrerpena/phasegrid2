@@ -15,7 +15,7 @@ const ModuleDescriptor& samplerPlayer() {
     vendor::ModuleSpec spec;
     spec.id = "sampler.player";
     spec.name = "Sampler";
-    spec.category = "osc";
+    spec.category = "Oscillators";
     spec.doc = "Plays a sample. A rising gate restarts it; Loop and Bounce decide what happens at the end. "
                "Pitch only moves it while Keytrack is on. With no asset loaded it plays white noise.";
     spec.prefix = "sample";

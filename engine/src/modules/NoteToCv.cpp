@@ -108,7 +108,7 @@ class NoteToCv final : public VoicedModule<State> {
 }  // namespace
 
 // Explicit `extern` (see AudioOut.cpp): a namespace-scope `const` is internal linkage by default.
-extern const ModuleDescriptor kNoteToCv{kModuleAbiVersion, "note.toCv", "Note to CV", "note",
+extern const ModuleDescriptor kNoteToCv{kModuleAbiVersion, "note.toCv", "Note to CV", "Notes",
   "Turns note events into pitch, gate and velocity signals. Monophonic: one note sounds at a time, chosen by "
   "the priority mode, and the gate stays high while any note is held.",
   kIn, countOf(kIn), kOut, countOf(kOut), kParams, countOf(kParams), 0, 0,

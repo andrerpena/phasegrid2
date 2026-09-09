@@ -42,7 +42,8 @@ export const CatalogPanel = () => {
 
   // Categories are the tree's parents, so the list reads as headings with modules under them and a
   // category can be folded away. Sorted, because the engine returns them in registration order and a
-  // catalogue that reorders itself between builds is one you cannot learn the shape of.
+  // catalogue that reorders itself between builds is one you cannot learn the shape of. A category is
+  // a title the engine wrote ("Audio FX", "Oscillators"), shown as written.
   const items = useMemo<MenuItem[]>(() => {
     const byCategory = new Map<string, MenuItem[]>();
     for (const m of modules) {
@@ -64,7 +65,7 @@ export const CatalogPanel = () => {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([category, children]) => ({
         id: `category:${category}`,
-        label: category.toUpperCase(),
+        label: category,
         children: children.sort((a, b) =>
           (a.label ?? "").localeCompare(b.label ?? ""),
         ),

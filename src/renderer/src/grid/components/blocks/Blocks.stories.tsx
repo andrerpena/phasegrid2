@@ -12,6 +12,7 @@ import { blockStyle } from "./Block";
 import { JackBlock } from "./JackBlock";
 import { KnobBlock } from "./KnobBlock";
 import { MeterBlock } from "./MeterBlock";
+import { PianoBlock } from "./PianoBlock";
 import { ScopeBlock } from "./ScopeBlock";
 import { ValueBlock } from "./ValueBlock";
 import { WaveBlock } from "./WaveBlock";
@@ -289,6 +290,52 @@ const MeterStage = ({ left, right, clipped }: MeterArgs) => {
     return { view, destroy: () => block.destroy() };
   }, [left, right, clipped, theme]);
   return <PixiStage build={build} width={96} height={72} />;
+};
+
+interface PianoArgs {
+  octaves: number;
+  low: number;
+  /** The MIDI notes held, as a comma-separated list. */
+  held: string;
+}
+
+const PianoStage = ({ octaves, low, held }: PianoArgs) => {
+  const theme = useThemeStore((s) => s.theme);
+  const build = useCallback(() => {
+    const geometry = composeFace(descriptor("display.piano")).piano;
+    if (geometry === null) throw new Error("the piano has one");
+    const block = new PianoBlock(
+      geometry,
+      blockStyle(theme.grid, hexToNumber(theme.grid.signal.pitch)),
+    );
+    block.setRange({ low, octaves });
+    block.setKeys(
+      held
+        .split(",")
+        .map((s) => Number.parseInt(s.trim(), 10))
+        .filter((n) => Number.isFinite(n)),
+    );
+    block.view.position.set(12 - geometry.x, 12 - geometry.y);
+    const view = new Container();
+    view.addChild(block.view);
+    return { view, destroy: () => block.destroy() };
+  }, [octaves, low, held, theme]);
+  return <PixiStage build={build} width={geometryWidth() + 24} height={72} />;
+};
+
+/** The keyboard on the piano's face, as wide as the engine declared it. */
+function geometryWidth(): number {
+  return composeFace(descriptor("display.piano")).piano?.width ?? 168;
+}
+
+/** The keyboard: white and black keys across the block, the held ones lit in the accent. */
+export const Piano: StoryObj<PianoArgs> = {
+  args: { octaves: 2, low: 3, held: "60, 64, 67" },
+  argTypes: {
+    octaves: { control: { type: "range", min: 1, max: 6, step: 1 } },
+    low: { control: { type: "range", min: -1, max: 8, step: 1 } },
+  },
+  render: (args) => <PianoStage {...args} />,
 };
 
 /** The level meter: a bar per channel, the held peak over it, and the clip light. */

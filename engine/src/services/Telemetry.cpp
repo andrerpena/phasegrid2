@@ -177,6 +177,14 @@ void TelemetryWriter::writeNotes(uint32_t slot, const TelemetryNote* notes, uint
   });
 }
 
+void TelemetryWriter::writeKeys(uint32_t slot, const float* keys, uint32_t count,
+                                uint64_t blockIndex) noexcept PG_RT_NONBLOCKING {
+  const uint32_t n = std::min(count, kTelemetryMaxKeys);
+  publish(slot, TelemetryKind::Keys, 1, n, blockIndex, [&](float* out) noexcept {
+    for (uint32_t i = 0; i < n; ++i) out[i] = keys[i];
+  });
+}
+
 void TelemetryWriter::writePreview(uint32_t slot, const float* samples, uint32_t count,
                                    uint64_t index) noexcept {
   const uint32_t n = std::min(count, kTelemetryScopeFrames);

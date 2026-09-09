@@ -15,7 +15,7 @@ const ModuleDescriptor& modRandom() {
     vendor::ModuleSpec spec;
     spec.id = "mod.random";
     spec.name = "Random";
-    spec.category = "mod";
+    spec.category = "Modulation";
     spec.doc = "Random modulator: perlin, sample & hold, sine interpolation or a Lorenz attractor. Output is "
                "0..1. Frequency is a power of two in hertz (2 = 4 Hz) while Sync is Seconds.";
     spec.prefix = "random_1";

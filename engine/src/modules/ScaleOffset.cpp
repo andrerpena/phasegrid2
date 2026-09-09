@@ -28,7 +28,7 @@ class ScaleOffset final : public VoicedModule<int> {
 }  // namespace
 
 // Explicit `extern` (see AudioOut.cpp): a namespace-scope `const` is internal linkage by default.
-extern const ModuleDescriptor kScaleOffset{kModuleAbiVersion, "math.scaleOffset", "Scale / Offset", "math",
+extern const ModuleDescriptor kScaleOffset{kModuleAbiVersion, "math.scaleOffset", "Scale / Offset", "Math",
   "Affine map of one signal: out = in * Scale + Offset, lane by lane. The usual way to turn a unipolar "
   "envelope or LFO into the bipolar range a pitch or pan input wants, and back.",
   kIn, countOf(kIn), kOut, countOf(kOut), kParams, countOf(kParams), 0, 0,

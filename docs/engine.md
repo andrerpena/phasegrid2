@@ -112,13 +112,39 @@ attributed to our sources.
 ## Modules
 
 Built-ins are registered in `engine/src/modules/builtin.cpp`, one line each. Own modules are a single `.cpp` under
-`engine/src/modules`; vendored-backed ones a single `ModuleSpec` under `engine/src/modules/vital`. Today, twenty-seven:
+`engine/src/modules`; vendored-backed ones a single `ModuleSpec` under `engine/src/modules/vital`. Today, thirty-five:
 
-- own: `io.audioOut`, `note.toCv`, `note.toPoly`, `notes.clip`, `phase.clock`, `math.scaleOffset`, `mix.mixer`,
-  `amp.vca`, `osc.sawtooth`, `osc.pulse`, `osc.sine`, `mod.lfo`
+- own: `io.audioOut`, `note.toCv`, `note.toPoly`, `notes.clip`, `notes.pattern`, `phase.clock`, `math.scaleOffset`,
+  `mix.mixer`, `amp.vca`, `osc.sawtooth`, `osc.pulse`, `osc.sine`, `mod.lfo`, `display.meter`, `display.scope`,
+  `display.value`, `display.piano`, and the four note effects `notefx.chord`, `notefx.quantize`, `notefx.arp`, `notefx.humanize`
 - vendored-backed: `osc.wavetable`, `sampler.player`, `filter.multi`, `env.dahdsr`, `mod.random`, and the
-  eight effects `fx.reverb`, `fx.delay`, `fx.chorus`, `fx.flanger`, `fx.phaser`, `fx.distortion`, `fx.compressor`,
-  `fx.eq`.
+  eight audio effects `fx.reverb`, `fx.delay`, `fx.chorus`, `fx.flanger`, `fx.phaser`, `fx.distortion`,
+  `fx.compressor`, `fx.eq`.
+
+A descriptor's `category` is the heading a catalogue shows the module under, written as a person reads it --
+"Oscillators", "Audio FX", "Note FX" -- so an interface shows it as it is and adds nothing. Ids stay slugs.
+
+### Note effects
+
+A note effect is a module with a note stream in and a different one out: `engine/src/modules/NoteFx.hpp` is
+what they share, and each of the four is one file on top of it. Two rules shape all of them:
+
+- **An off releases what the on emitted.** The converters downstream (`note.toCv`, `note.toPoly`) match a note
+  off to its note on by pitch, so an effect that changes a pitch or turns one note into several remembers, per
+  incoming note, exactly the pitches it emitted (`HeldTable`) and releases those when the off arrives. The chord
+  is fixed at the note on; changing the chord type or the project's key under a held note still releases what is
+  actually sounding, and a tone that clamps onto another is dropped rather than doubled.
+- **Once per block, on pair 0.** The note stream is the same for every voice, and an event buffer is cleared
+  and refilled once per pair, so the block's outgoing events are worked out once and pushed again for every
+  pair -- the shape `notes.clip` and `notes.pattern` follow.
+
+`notefx.quantize` reads the project's key and scale from the transport snapshot (`scaleRoot`, `scaleMask`), which
+the renderer pushes with `transport.setScale` beside the tempo and the meter; the engine keeps a twelve-bit mask
+and never learns a scale's name. `notefx.arp` derives its step clock from the transport the way `phase.clock`
+does, so it lines up with the grid, follows a seek, and free-runs at the project tempo while stopped.
+`notefx.humanize` delays -- never advances -- each note by a random amount and its off by the same amount, keeping
+notes in engine time (`samplePos`) in a fixed sorted queue; its random source is a seeded xorshift, so a part
+plays the same way on every pass.
 
 ### Modulation, and the LFO built for it
 

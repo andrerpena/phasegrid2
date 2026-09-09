@@ -12,9 +12,10 @@ import { PatchDocSchema } from "./patch";
 /**
  * The scale a project is in.
  *
- * Nothing consumes it yet. It is here because it is a property of the piece rather than of any module,
- * and because the modules that will read it — quantisers, arpeggiators, generative note sources — need
- * somewhere to read it from that is not one of their own parameters.
+ * It is here because it is a property of the piece rather than of any module, and because the modules
+ * that read it — `notefx.quantize` today; arpeggiators and generative note sources later — need
+ * somewhere to read it from that is not one of their own parameters. It reaches them through the
+ * engine's transport, beside the tempo and the meter (`transport.setScale`).
  */
 export const SCALE_NAMES = [
   "chromatic",
@@ -32,6 +33,32 @@ export const SCALE_NAMES = [
   "blues",
   "wholeTone",
 ] as const;
+
+export type ScaleName = (typeof SCALE_NAMES)[number];
+
+/**
+ * What each scale is: the semitones above its root, ascending, starting at 0.
+ *
+ * The one table a scale name resolves through. The engine takes intervals, not names
+ * (`transport.setScale`), so it never has to know what "dorian" means, and a scale added here is a
+ * scale everywhere. The `Record` type is what makes forgetting one a type error rather than a silent gap.
+ */
+export const SCALE_INTERVALS: Record<ScaleName, readonly number[]> = {
+  chromatic: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+  major: [0, 2, 4, 5, 7, 9, 11],
+  minor: [0, 2, 3, 5, 7, 8, 10],
+  harmonicMinor: [0, 2, 3, 5, 7, 8, 11],
+  melodicMinor: [0, 2, 3, 5, 7, 9, 11],
+  dorian: [0, 2, 3, 5, 7, 9, 10],
+  phrygian: [0, 1, 3, 5, 7, 8, 10],
+  lydian: [0, 2, 4, 6, 7, 9, 11],
+  mixolydian: [0, 2, 4, 5, 7, 9, 10],
+  locrian: [0, 1, 3, 5, 6, 8, 10],
+  majorPentatonic: [0, 2, 4, 7, 9],
+  minorPentatonic: [0, 3, 5, 7, 10],
+  blues: [0, 3, 5, 6, 7, 10],
+  wholeTone: [0, 2, 4, 6, 8, 10],
+};
 
 export const NOTE_NAMES = [
   "C",

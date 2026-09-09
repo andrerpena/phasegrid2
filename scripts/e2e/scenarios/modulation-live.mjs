@@ -88,7 +88,7 @@ export default {
     );
   },
   async run({ evaluate, pg, idle, checkEventually, screenshot, check }) {
-    await evaluate(`click("button", "Modulation");`);
+    await evaluate(`openProject("Modulation");`);
     await idle();
     // A project opens stopped, and a held patch has nothing live: the knobs rest where they are set.
     await pg('commands.run("transport.play")');

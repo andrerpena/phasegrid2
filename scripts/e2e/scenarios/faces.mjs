@@ -1,7 +1,7 @@
 import { projectDoc, seedProject } from "../harness.mjs";
 
 /**
- * The eight modules with a declared face, drawn as the engine laid them out, beside one that left
+ * The nine modules with a declared face, drawn as the engine laid them out, beside one that left
  * its face to the interface; and a cable dropped on a knob landing in the socket at its foot.
  */
 const PATCH = {
@@ -18,6 +18,7 @@ const PATCH = {
     { id: "scope", type: "display.scope", x: 600, y: 336 },
     { id: "readout", type: "display.value", x: 600, y: 192 },
     { id: "level", type: "display.meter", x: 600, y: 48 },
+    { id: "keys", type: "display.piano", x: 840, y: 192 },
   ],
   edges: [
     {
@@ -52,7 +53,7 @@ export default {
     screenshot,
     check,
   }) {
-    await evaluate(`click("button", "Faces");`);
+    await evaluate(`openProject("Faces");`);
     await idle();
     // Framed, so every module is on screen for the pointer to reach.
     await evaluate(
@@ -72,6 +73,7 @@ export default {
       ["scope", "display.scope"],
       ["readout", "display.value"],
       ["level", "display.meter"],
+      ["keys", "display.piano"],
     ]) {
       const rows = declared(catalog, type);
       check(

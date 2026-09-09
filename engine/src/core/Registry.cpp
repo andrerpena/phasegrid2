@@ -21,7 +21,7 @@ bool hasImplicitPort(const ParamDesc& p) {
 }
 
 /// What one face token names, once resolved against the descriptor.
-enum class Cell : uint8_t { Empty, Input, Output, Param, Text, Wave, Scope, Value, Meter, PianoRoll };
+enum class Cell : uint8_t { Empty, Input, Output, Param, Text, Wave, Scope, Value, Meter, PianoRoll, Piano };
 
 struct Resolved {
   Cell cell = Cell::Empty;
@@ -69,6 +69,11 @@ std::optional<std::string> resolveToken(const ModuleDescriptor& d, const std::st
   if (token == "pianoRoll") {
     if (!(d.flags & kModulePublishesNotes)) return "face names `pianoRoll` but the module publishes no notes";
     out = {Cell::PianoRoll, -1};
+    return std::nullopt;
+  }
+  if (token == "piano") {
+    if (!(d.flags & kModulePublishesKeys)) return "face names `piano` but the module publishes no keys";
+    out = {Cell::Piano, -1};
     return std::nullopt;
   }
   // A text property is always written `text:<id>`, never bare. Unlike a port or a param it is
@@ -193,6 +198,9 @@ std::optional<std::string> validateFace(const ModuleDescriptor& d, std::vector<s
     // A piano roll is two axes at once: it needs height for the pitches and real width for the bars.
     if (a.what.cell == Cell::PianoRoll && (h < 2 || w < 4))
       return "face gives `pianoRoll` less than four cells by two";
+    // A keyboard is read across: an octave is seven keys, and below four cells they are slivers.
+    if (a.what.cell == Cell::Piano && (h < 2 || w < 4))
+      return "face gives `piano` less than four cells by two";
   }
   for (uint32_t i = 0; i < d.numInputs; ++i)
     if (!seen.contains({Cell::Input, static_cast<int32_t>(i)})) return std::string("face leaves out input `") + d.inputs[i].id + "`";
@@ -235,6 +243,8 @@ std::optional<std::string> Registry::add(const ModuleDescriptor& d) {
     return id + ": publishes a meter but does not write telemetry";
   if ((d.flags & kModulePublishesNotes) && !(d.flags & kModuleWritesTelemetry))
     return id + ": publishes notes but does not write telemetry";
+  if ((d.flags & kModulePublishesKeys) && !(d.flags & kModuleWritesTelemetry))
+    return id + ": publishes keys but does not write telemetry";
 
   std::set<std::string> ids;
   for (uint32_t i = 0; i < d.numInputs; ++i)

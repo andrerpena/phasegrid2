@@ -28,7 +28,10 @@ export const ProjectsPanel = () => {
     );
 
   return (
-    <ul className="m-0 flex list-none flex-col gap-px overflow-y-auto p-1">
+    <ul
+      className="m-0 flex list-none flex-col gap-px overflow-y-auto p-1"
+      data-testid="projects"
+    >
       {projects.map((summary) => {
         const tab = open.find((p) => p.slug === summary.slug);
         return (

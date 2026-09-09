@@ -11,7 +11,7 @@ const ModuleDescriptor& filterMulti() {
     vendor::ModuleSpec spec;
     spec.id = "filter.multi";
     spec.name = "Filter";
-    spec.category = "filter";
+    spec.category = "Filters";
     spec.doc = "Multi-model filter: analog, dirty, ladder, digital, diode, formant, comb, phaser. "
                "Cutoff is a MIDI note number, so a semitone of modulation is a semitone of cutoff.";
     spec.prefix = "filter_1";

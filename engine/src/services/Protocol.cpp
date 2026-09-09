@@ -255,12 +255,17 @@ nlohmann::json transportPositionJson(const Transport& transport) {
   // fields that can disagree with it would be two more chances to be wrong.
   const double quartersPerBar = t.quartersPerBar();
   const double bars = quartersPerBar > 0.0 ? t.ppq / quartersPerBar : 0.0;
+  json intervals = json::array();
+  for (int k = 0; k < 12; ++k)
+    if ((t.scaleMask >> k) & 1u) intervals.push_back(k);
   return json{{"playing", t.playing},
               {"tempo", t.tempo},
               {"ppq", t.ppq},
               {"samplePos", t.samplePos},
               {"timeSigNumerator", t.timeSigNumerator},
               {"timeSigDenominator", t.timeSigDenominator},
+              {"scaleRoot", t.scaleRoot},
+              {"scaleIntervals", intervals},
               {"bar", static_cast<uint64_t>(bars < 0.0 ? 0.0 : bars)},
               {"beat", (t.ppq - std::floor(bars) * quartersPerBar) / t.quartersPerBeat()}};
 }
@@ -563,6 +568,25 @@ json dispatchCommand(const std::string& cmd, const json& id, const json& args, P
     if (!a) return errorResponse(id, a.result());
     if (Result r = ctx.transport.setTimeSignature(static_cast<uint32_t>(numerator), static_cast<uint32_t>(denominator)); !r)
       return errorResponse(id, r);
+    return okResponse(id, positionJson(ctx.transport));
+  }
+  // The project's key and scale, as the pitch classes above the root: `{root: 2, intervals: [0, 2, 4, 5,
+  // 7, 9, 11]}` is D major. The engine keeps a mask and never learns the scale's name.
+  if (cmd == "transport.setScale") {
+    ArgReader a(args);
+    const double root = a.num("root");
+    if (!a) return errorResponse(id, a.result());
+    if (!args.contains("intervals") || !args["intervals"].is_array())
+      return errorResponse(id, "E_SCHEMA", "intervals must be an array of semitones above the root");
+    uint32_t mask = 0;
+    for (const json& v : args["intervals"]) {
+      if (!v.is_number_integer() || v.get<int>() < 0 || v.get<int>() > 11)
+        return errorResponse(id, "E_SCHEMA", "each interval must be a whole number of semitones, 0..11");
+      mask |= 1u << v.get<int>();
+    }
+    if (root < 0.0 || root > 11.0 || root != std::floor(root))
+      return errorResponse(id, "E_SCHEMA", "root must be a pitch class, 0..11");
+    if (Result r = ctx.transport.setScale(static_cast<uint32_t>(root), mask); !r) return errorResponse(id, r);
     return okResponse(id, positionJson(ctx.transport));
   }
   if (cmd == "transport.seek") {

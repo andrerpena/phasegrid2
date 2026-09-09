@@ -81,7 +81,7 @@ class PhaseClock final : public VoicedModule<State> {
 }  // namespace
 
 // Explicit `extern` (see AudioOut.cpp): a namespace-scope `const` is internal linkage by default.
-extern const ModuleDescriptor kPhaseClock{kModuleAbiVersion, "phase.clock", "Clock", "time",
+extern const ModuleDescriptor kPhaseClock{kModuleAbiVersion, "phase.clock", "Clock", "Time",
   "A phase ramp locked to the transport, plus a one-frame trigger at the start of each cycle. Drives "
   "sequencers and ramp-fed oscillators. While the transport is stopped it free-runs at its tempo.",
   nullptr, 0, kOut, countOf(kOut), kParams, countOf(kParams), kModuleNeedsTransport, 0,

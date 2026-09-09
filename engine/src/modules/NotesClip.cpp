@@ -249,7 +249,7 @@ private:
 }  // namespace
 
 // Explicit `extern` (see AudioOut.cpp): a namespace-scope `const` is internal linkage by default.
-extern const ModuleDescriptor kNotesClip{kModuleAbiVersion, "notes.clip", "Clip", "note",
+extern const ModuleDescriptor kNotesClip{kModuleAbiVersion, "notes.clip", "Clip", "Notes",
   "Plays a list of notes against the transport and emits them as a note stream. The notes live in the "
   "node's data as \"notes\": an array of {start, length, pitch, velocity} objects, start and length in "
   "beats from the clip's start, pitch a MIDI note number and velocity 0..1. Anything else in that array is "

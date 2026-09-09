@@ -98,6 +98,11 @@ const cases: Record<CommandName, { valid: unknown; invalid: unknown }> = {
     // A denominator is a note value, so 3 is not one.
     invalid: { numerator: 4, denominator: 3 },
   },
+  "transport.setScale": {
+    valid: { root: 2, intervals: [0, 2, 4, 5, 7, 9, 11] },
+    // An empty scale would snap every note to nothing.
+    invalid: { root: 0, intervals: [] },
+  },
   "transport.seek": { valid: { ppq: 16 }, invalid: { ppq: -1 } },
   "audio.setOutputGain": { valid: { gain: 0 }, invalid: { gain: 4 } },
   "audio.setRunning": { valid: { running: false }, invalid: { running: "no" } },
@@ -131,6 +136,7 @@ describe("command table", () => {
       "transport.stop",
       "transport.setTempo",
       "transport.setTimeSignature",
+      "transport.setScale",
       "transport.seek",
       "audio.setOutputGain",
       "audio.setRunning",
@@ -244,6 +250,8 @@ describe("command results", () => {
       samplePos: 96000,
       timeSigNumerator: 6,
       timeSigDenominator: 8,
+      scaleRoot: 2,
+      scaleIntervals: [0, 2, 4, 5, 7, 9, 11],
       bar: 1,
       beat: 2,
     };
@@ -252,6 +260,7 @@ describe("command results", () => {
       "transport.stop",
       "transport.setTempo",
       "transport.setTimeSignature",
+      "transport.setScale",
       "transport.seek",
     ] as const) {
       expect(COMMANDS[name].result.parse(position)).toEqual(position);

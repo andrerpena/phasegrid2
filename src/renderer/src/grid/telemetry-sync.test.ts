@@ -66,6 +66,7 @@ const opened: string[] = [];
 beforeEach(() => {
   subscriptions.length = 0;
   noteReadings.length = 0;
+  keyReadings.length = 0;
   live.length = 0;
   waves.length = 0;
   traces.length = 0;
@@ -123,6 +124,7 @@ beforeEach(() => {
 });
 
 const noteReadings: [string, string, number][] = [];
+const keyReadings: [string, string, number[]][] = [];
 
 const target = {
   setLive: (module: string, param: string, fraction: number | null) =>
@@ -140,6 +142,14 @@ const target = {
   ) => levels.push([module, index.toString(), level.peak, level.clipped]),
   setNotes: (module: string, index: bigint, reading: NotesReading) =>
     noteReadings.push([module, index.toString(), reading.notes.length]),
+  setKeys: (module: string, index: bigint, held: number[]) =>
+    keyReadings.push([module, index.toString(), held]),
+};
+
+/** A keyboard, watched like the rest: what it shows is what it is for. */
+const KEYED: PatchDoc = {
+  ...MODULATED,
+  modules: [...MODULATED.modules, moduleNode("keys", "display.piano")],
 };
 
 /** A meter on the sine, watched for the same reason a scope and a readout are. */
@@ -228,6 +238,7 @@ describe("which modules are watched", () => {
     // A readout and a meter are watched by the same rule, and the three are one list.
     expect(displayModules(READOUT, DESCRIPTORS)).toEqual(["readout"]);
     expect(displayModules(METERED, DESCRIPTORS)).toEqual(["level"]);
+    expect(displayModules(KEYED, DESCRIPTORS)).toEqual(["keys"]);
     // Nothing modulates it, so the modulated set does not know it; the subscription has to merge.
     expect(modulatedModules(SCOPED, DESCRIPTORS).has("scope")).toBe(false);
   });

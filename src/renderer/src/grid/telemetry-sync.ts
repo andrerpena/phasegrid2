@@ -56,6 +56,8 @@ export interface TelemetryTarget {
   ): void;
   /** The notes a note source is playing: what its piano roll draws, and which steps light up. */
   setNotes(moduleId: string, index: bigint, reading: NotesReading): void;
+  /** The keys down on the wire into a keyboard module, as MIDI numbers, and the engine's count. */
+  setKeys(moduleId: string, index: bigint, held: number[]): void;
 }
 
 export interface TelemetrySync {
@@ -115,7 +117,8 @@ export function displayModules(
         flags?.publishesScope === true ||
         flags?.publishesValue === true ||
         flags?.publishesMeter === true ||
-        flags?.publishesNotes === true
+        flags?.publishesNotes === true ||
+        flags?.publishesKeys === true
       );
     })
     .map((m) => m.id)
@@ -270,7 +273,8 @@ export function startTelemetrySync(
         reading.kind !== TelemetryKind.Scope &&
         reading.kind !== TelemetryKind.Value &&
         reading.kind !== TelemetryKind.Meter &&
-        reading.kind !== TelemetryKind.Notes
+        reading.kind !== TelemetryKind.Notes &&
+        reading.kind !== TelemetryKind.Keys
       )
         continue;
       if (shown.get(moduleId) === reading.blockIndex) continue;
@@ -281,6 +285,8 @@ export function startTelemetrySync(
         target.setValue(moduleId, reading.blockIndex, reading.values);
       else if (reading.kind === TelemetryKind.Notes)
         target.setNotes(moduleId, reading.blockIndex, reading);
+      else if (reading.kind === TelemetryKind.Keys)
+        target.setKeys(moduleId, reading.blockIndex, reading.held);
       else
         target.setLevel(moduleId, reading.blockIndex, {
           peak: reading.peak,

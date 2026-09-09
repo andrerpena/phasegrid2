@@ -41,7 +41,7 @@ class Vca final : public VoicedModule<int> {
 }  // namespace
 
 // Explicit `extern` (see AudioOut.cpp): a namespace-scope `const` is internal linkage by default.
-extern const ModuleDescriptor kVca{kModuleAbiVersion, "amp.vca", "VCA", "amp",
+extern const ModuleDescriptor kVca{kModuleAbiVersion, "amp.vca", "VCA", "Amplifiers",
   "Voltage-controlled amplifier: multiplies its input by the Gain knob plus the gain input, clamped at "
   "zero. Plug an envelope into gain and turn the knob down to shape a note.",
   kIn, countOf(kIn), kOut, countOf(kOut), kParams, countOf(kParams), 0, 0,

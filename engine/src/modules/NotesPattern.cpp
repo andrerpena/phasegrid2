@@ -341,7 +341,7 @@ private:
 
 }  // namespace
 
-extern const ModuleDescriptor kNotesPattern{kModuleAbiVersion, "notes.pattern", "Pattern", "note",
+extern const ModuleDescriptor kNotesPattern{kModuleAbiVersion, "notes.pattern", "Pattern", "Notes",
   "A note source written as a string, in the mini-notation TidalCycles invented and Strudel "
   "carries: `<c4 eb4> g3*2 [~ bb3]` is a whole musical idea in a text field. The pattern is "
   "played against the transport, one cycle at a time, and comes out as a note stream. A second "

@@ -162,7 +162,7 @@ TEST_CASE("every command in the shared table has a handler", "[protocol]") {
                           "patch.clear", "patch.render", "patch.batch", "patch.setVoiceCount", "patch.setFeedbackMode",
                           "module.add", "module.remove", "edge.add", "edge.remove", "param.set",
                           "transport.play", "transport.stop", "transport.setTempo", "transport.setTimeSignature",
-                          "transport.seek",
+                          "transport.setScale", "transport.seek",
                           "audio.setOutputGain", "audio.setRunning",
                           "device.list", "device.select"}) {
     const json response = f.call(cmd);
@@ -430,6 +430,35 @@ TEST_CASE("the transport carries the project's meter, and modules read it", "[pr
   REQUIRE(snapshot.quartersPerBar() == Catch::Approx(3.0));
   REQUIRE(snapshot.quartersPerBeat() == Catch::Approx(0.5));
   REQUIRE(pg::TransportSnapshot{}.quartersPerBar() == Catch::Approx(4.0));
+}
+
+TEST_CASE("the transport carries the project's key and scale, and modules read it", "[protocol]") {
+  Fixture f;
+  // Chromatic until told otherwise: every pitch class, root C.
+  const json chromatic = f.call("transport.play")["result"];
+  REQUIRE(chromatic["scaleRoot"] == 0);
+  REQUIRE(chromatic["scaleIntervals"].size() == 12);
+
+  const json dMajor = f.call("transport.setScale", json{{"root", 2}, {"intervals", json::array({0, 2, 4, 5, 7, 9, 11})}});
+  REQUIRE(dMajor["ok"] == true);
+  REQUIRE(dMajor["result"]["scaleRoot"] == 2);
+  REQUIRE(dMajor["result"]["scaleIntervals"] == json::array({0, 2, 4, 5, 7, 9, 11}));
+
+  // An empty scale would snap every note to nothing; a root outside the octave is a typo, not a key.
+  REQUIRE(errorCode(f.call("transport.setScale", json{{"root", 0}, {"intervals", json::array()}})) == "E_SCHEMA");
+  REQUIRE(errorCode(f.call("transport.setScale", json{{"root", 12}, {"intervals", json::array({0})}})) == "E_SCHEMA");
+  REQUIRE(errorCode(f.call("transport.setScale", json{{"root", 0}, {"intervals", json::array({0, 13})}})) == "E_SCHEMA");
+  REQUIRE(errorCode(f.call("transport.setScale", json{{"root", 0}})) == "E_SCHEMA");
+  REQUIRE(f.call("transport.stop")["result"]["scaleRoot"] == 2);
+
+  // And the snapshot the audio thread hands every module carries it, as a question a module can ask.
+  const pg::TransportSnapshot snapshot = f.transport.advance(64);
+  REQUIRE(snapshot.scaleRoot == 2);
+  REQUIRE(snapshot.inScale(62));        // D
+  REQUIRE(snapshot.inScale(61));        // C# is the seventh of D major
+  REQUIRE_FALSE(snapshot.inScale(60));  // C is not
+  REQUIRE(snapshot.inScale(-1));        // B: pitch classes wrap below zero too
+  REQUIRE(pg::TransportSnapshot{}.inScale(61));
 }
 
 TEST_CASE("device commands say so when this process has no device", "[protocol]") {

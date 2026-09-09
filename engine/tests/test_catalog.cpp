@@ -54,7 +54,7 @@ TEST_CASE("the catalog lists every registered module, sorted, with its conventio
 TEST_CASE("the catalog describes a module the UI has never heard of", "[catalog]") {
   const nlohmann::json catalog = builtinCatalog();
   const nlohmann::json& filter = moduleById(catalog, "filter.multi");
-  REQUIRE(filter["category"] == "filter");
+  REQUIRE(filter["category"] == "Filters");
   REQUIRE(filter["doc"].get<std::string>().size() > 10);
   REQUIRE(filter["flags"]["terminal"] == false);
 
@@ -129,6 +129,35 @@ TEST_CASE("the catalog carries no vendored library name into the user interface"
                  [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
   REQUIRE(dump.find("vital") == std::string::npos);
   REQUIRE(dump.find("tytel") == std::string::npos);
+}
+
+TEST_CASE("the catalog groups the effects by what they work on", "[catalog]") {
+  const nlohmann::json catalog = builtinCatalog();
+  REQUIRE(moduleById(catalog, "fx.reverb")["category"] == "Audio FX");
+  for (const char* id : {"notefx.chord", "notefx.quantize", "notefx.arp", "notefx.humanize"}) {
+    const nlohmann::json& m = moduleById(catalog, id);
+    INFO(id);
+    REQUIRE(m["category"] == "Note FX");
+    const nlohmann::json* in = findByField(m["inputs"], "id", "notes");
+    const nlohmann::json* out = findByField(m["outputs"], "id", "notes");
+    REQUIRE(in != nullptr);
+    REQUIRE(out != nullptr);
+    REQUIRE((*in)["role"] == "note");
+    REQUIRE((*out)["role"] == "note");
+  }
+}
+
+TEST_CASE("the piano publishes keys and declares a keyboard on its face", "[catalog]") {
+  const nlohmann::json catalog = builtinCatalog();
+  const nlohmann::json& piano = moduleById(catalog, "display.piano");
+  REQUIRE(piano["category"] == "Display");
+  REQUIRE(piano["flags"]["publishesKeys"] == true);
+  REQUIRE(piano["flags"]["writesTelemetry"] == true);
+  REQUIRE(moduleById(catalog, "display.meter")["flags"]["publishesKeys"] == false);
+  REQUIRE(piano["face"].size() == 2);
+  REQUIRE(piano["face"][0][1] == "piano");
+  REQUIRE(piano["face"][0][0] == "pitch");
+  REQUIRE(piano["face"][1][0] == "gate");
 }
 
 TEST_CASE("golden/catalog.json is what --catalog prints today", "[catalog]") {

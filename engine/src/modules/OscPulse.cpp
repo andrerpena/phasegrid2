@@ -51,7 +51,7 @@ class OscPulse final : public VoicedModule<osc::OscillatorState> {
 }  // namespace
 
 // Explicit `extern` (see AudioOut.cpp): a namespace-scope `const` is internal linkage by default.
-extern const ModuleDescriptor kOscPulse{kModuleAbiVersion, "osc.pulse", "Pulse", "osc",
+extern const ModuleDescriptor kOscPulse{kModuleAbiVersion, "osc.pulse", "Pulse", "Oscillators",
   "A band-limited pulse with hard sync. Sync, in semitones, runs the wave faster than the pitch and restarts "
   "it every cycle, which keeps the pitch and packs more pulses into it. The face shows the resulting shape.",
   osc::kOscInputs, countOf(osc::kOscInputs), osc::kOscOutputs, countOf(osc::kOscOutputs),

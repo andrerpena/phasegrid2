@@ -44,7 +44,7 @@ class OscSawtooth final : public VoicedModule<osc::OscillatorState> {
 }  // namespace
 
 // Explicit `extern` (see AudioOut.cpp): a namespace-scope `const` is internal linkage by default.
-extern const ModuleDescriptor kOscSawtooth{kModuleAbiVersion, "osc.sawtooth", "Sawtooth", "osc",
+extern const ModuleDescriptor kOscSawtooth{kModuleAbiVersion, "osc.sawtooth", "Sawtooth", "Oscillators",
   "A band-limited sawtooth with hard sync. Sync, in semitones, runs a second ramp faster than the pitch and "
   "restarts it every cycle, which keeps the pitch and adds the classic sync harmonics. The face shows the "
   "resulting shape.",

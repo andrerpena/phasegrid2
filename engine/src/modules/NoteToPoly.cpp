@@ -150,7 +150,7 @@ private:
 }  // namespace
 
 // Explicit `extern` (see AudioOut.cpp): a namespace-scope `const` is internal linkage by default.
-extern const ModuleDescriptor kNoteToPoly{kModuleAbiVersion, "note.toPoly", "Note to Poly", "note",
+extern const ModuleDescriptor kNoteToPoly{kModuleAbiVersion, "note.toPoly", "Note to Poly", "Notes",
   "Spreads note events across the program's voices: each output carries a different value per voice lane. A "
   "note takes a free voice, or steals the one that has been sounding longest, and releases its voice on the "
   "matching note off.",

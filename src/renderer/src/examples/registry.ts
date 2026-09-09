@@ -573,54 +573,69 @@ function noteExample(args: {
   converter: "note.toPoly" | "note.toCv";
   /** What plays the notes. The clip, unless the example is about something else that does. */
   source?: Omit<PatchModule, "id" | "x" | "y">;
+  /** A note effect between the source and the converter, for the examples that are about one. */
+  through?: Omit<PatchModule, "id" | "x" | "y">;
+  voiceCount?: number;
 }): ModuleExample {
+  // With an effect in the chain everything after the source moves right to make room for it.
+  const shift = args.through === undefined ? 0 : 9;
+  const modules: PatchModule[] = [
+    {
+      id: "clip",
+      ...(args.source ?? CLIP_SOURCE),
+      x: col(2),
+      y: col(2),
+    },
+    { id: "voices", type: args.converter, x: col(11 + shift), y: col(2) },
+    {
+      id: "osc",
+      type: "osc.wavetable",
+      x: col(15 + shift),
+      y: col(2),
+      params: { level: 0.7 },
+    },
+    {
+      id: "vca",
+      type: "amp.vca",
+      x: col(28 + shift),
+      y: col(2),
+      params: { gain: 0 },
+    },
+    {
+      id: "env",
+      type: "env.dahdsr",
+      x: col(15 + shift),
+      y: col(9),
+      params: { attack: 0.15, decay: 0.85, sustain: 0, release: 0.6 },
+    },
+    { ...OUT, x: col(34 + shift) },
+  ];
+  const edges = [
+    edge("e2", ["voices", "pitch"], ["osc", "pitch"]),
+    edge("e3", ["voices", "gate"], ["env", "gate"]),
+    edge("e4", ["osc", "out"], ["vca", "in"]),
+    edge("e5", ["env", "out"], ["vca", "gain"]),
+    edge("e6", ["vca", "out"], ["out", "inL"]),
+  ];
+  if (args.through === undefined) {
+    edges.unshift(edge("e1", ["clip", "notes"], ["voices", "notes"]));
+  } else {
+    modules.splice(1, 0, { id: "fx", ...args.through, x: col(11), y: col(2) });
+    edges.unshift(
+      edge("e1", ["clip", "notes"], ["fx", "notes"]),
+      edge("e0", ["fx", "notes"], ["voices", "notes"]),
+    );
+  }
   return {
     moduleId: args.moduleId,
     name: args.name,
     description: args.description,
     patch: {
       schemaVersion: 1,
-      voiceCount: 1,
+      voiceCount: args.voiceCount ?? 1,
       feedbackMode: "sample",
-      modules: [
-        {
-          id: "clip",
-          ...(args.source ?? CLIP_SOURCE),
-          x: col(2),
-          y: col(2),
-        },
-        { id: "voices", type: args.converter, x: col(11), y: col(2) },
-        {
-          id: "osc",
-          type: "osc.wavetable",
-          x: col(15),
-          y: col(2),
-          params: { level: 0.7 },
-        },
-        {
-          id: "vca",
-          type: "amp.vca",
-          x: col(28),
-          y: col(2),
-          params: { gain: 0 },
-        },
-        {
-          id: "env",
-          type: "env.dahdsr",
-          x: col(15),
-          y: col(9),
-          params: { attack: 0.15, decay: 0.85, sustain: 0, release: 0.6 },
-        },
-        { ...OUT, x: col(34) },
-      ],
-      edges: [
-        edge("e1", ["clip", "notes"], ["voices", "notes"]),
-        edge("e2", ["voices", "pitch"], ["osc", "pitch"]),
-        edge("e3", ["voices", "gate"], ["env", "gate"]),
-        edge("e4", ["osc", "out"], ["vca", "in"]),
-        edge("e5", ["env", "out"], ["vca", "gain"]),
-        edge("e6", ["vca", "out"], ["out", "inL"]),
-      ],
+      modules,
+      edges,
     },
   };
 }
@@ -675,6 +690,70 @@ register(
       "The monophonic converter: whichever note wins the priority rule sounds. Turn Glide to slide " +
       "from one note to the next, and Priority to change which one wins.",
     converter: "note.toCv",
+  }),
+);
+
+// --- Note effects: between the clip and the converter ----------------------------------------------
+
+register(
+  noteExample({
+    moduleId: "notefx.chord",
+    name: "Chord",
+    description:
+      "Every note of the clip becomes a minor triad on its way to the voices. Change Chord in the " +
+      "inspector to hear a major one, a seventh, a suspension; four voices, so the tones sound together.",
+    converter: "note.toPoly",
+    through: { type: "notefx.chord", params: { chord: 1 } },
+    voiceCount: 4,
+  }),
+);
+
+register(
+  noteExample({
+    moduleId: "notefx.quantize",
+    name: "Quantize",
+    description:
+      "A chromatic run snapped to the project's scale. Set the scale in the strip above the grid, " +
+      "C Major Pentatonic say, and hear the run fall onto it; chromatic lets every note through.",
+    converter: "note.toPoly",
+    source: {
+      type: "notes.pattern",
+      params: { cycle: 4, legato: 0.8 },
+      data: { pattern: "c4 cs4 d4 ds4 e4 f4 fs4 g4 gs4 a4 as4 b4" },
+    },
+    through: { type: "notefx.quantize" },
+  }),
+);
+
+register(
+  noteExample({
+    moduleId: "notefx.arp",
+    name: "Arpeggiator",
+    description:
+      "A held chord played one note at a time. Turn Octaves to make the run climb and Gate to " +
+      "make the notes short or joined; Rate and Mode are in the inspector.",
+    converter: "note.toPoly",
+    source: {
+      type: "notes.pattern",
+      params: { cycle: 4, legato: 1 },
+      data: { pattern: "[c3,eb3,g3,bb3]" },
+    },
+    through: { type: "notefx.arp", params: { octaves: 2, gate: 0.6 } },
+  }),
+);
+
+register(
+  noteExample({
+    moduleId: "notefx.humanize",
+    name: "Humanize",
+    description:
+      "The clip played a little unevenly, the way a person would. Turn Timing to loosen when the " +
+      "notes land and Velocity to loosen how hard; both at zero and it is the clip again.",
+    converter: "note.toPoly",
+    through: {
+      type: "notefx.humanize",
+      params: { timing: 0.03, velocity: 0.4 },
+    },
   }),
 );
 
@@ -773,6 +852,50 @@ register(
       "move; it reads the signal itself, sign and all, rather than how loud it is.",
   ),
 );
+
+/**
+ * The piano lights the keys the voices are playing. It taps the converter's pitch and gate rather
+ * than the note stream, so it shows exactly what the voices got -- a chord across four voices, or
+ * the one note a monophonic converter chose.
+ */
+register({
+  moduleId: "display.piano",
+  name: "Piano",
+  description:
+    "A keyboard lighting the keys the voices are playing. Press play and watch the chord land; " +
+    "turn Octaves to show more of the keyboard and set Low in the inspector to move it.",
+  patch: {
+    ...noteExample({
+      moduleId: "display.piano",
+      name: "",
+      description: "",
+      converter: "note.toPoly",
+      voiceCount: 4,
+      source: {
+        type: "notes.pattern",
+        params: { cycle: 4, legato: 0.9 },
+        data: { pattern: "[c4,e4,g4] [a3,c4,e4] [f3,a3,c4] [g3,b3,d4]" },
+      },
+    }).patch,
+  },
+});
+// The keyboard sits under the converter, fed by the same pitch and gate the oscillator gets.
+{
+  const example = EXAMPLES.get("display.piano");
+  if (example !== undefined) {
+    example.patch.modules.push({
+      id: "piano",
+      type: "display.piano",
+      x: col(11),
+      y: col(9),
+      params: { octaves: 2, low: 3 },
+    });
+    example.patch.edges.push(
+      edge("e7", ["voices", "pitch"], ["piano", "pitch"]),
+      edge("e8", ["voices", "gate"], ["piano", "gate"]),
+    );
+  }
+}
 
 register(
   displayExample(

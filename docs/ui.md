@@ -259,6 +259,13 @@ second in a proportional font shifts its digits sideways as they change. It show
 signal whose channels agree and one per channel when they do not, so a mono control voltage is one
 reading rather than two identical ones.
 
+The keyboard (`blocks/PianoBlock.ts`) is the fourth: white and black keys across an ordinary tile,
+the ones being played lit in the pitch signal's colour, fed by the `Keys` the engine publishes for a
+`publishesKeys` module. Its range is two of the module's own parameters -- Octaves on the face, Low
+in the inspector -- read from the document the way a knob's value is, so turning one reshapes the
+keys at once; the keyboard fills its block whatever the range, since the face is the engine's to
+declare and does not change with a knob.
+
 Every place a cable can plug in is a `Socket` with a `facing`: a jack's, inside its tile under the
 port's name, and the one in the bottom right corner of every knob tile whose parameter can be
 modulated (the implicit `param:<id>` port — a cable dropped on the knob lands there). Cables leave a

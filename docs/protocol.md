@@ -39,7 +39,9 @@ shapes; this is the map, not the territory.
 - **Patch:** `patch.load`, `patch.clear`, `patch.batch`, `module.add`, `module.remove`, `edge.add`,
   `edge.remove`, `param.set`, `patch.setVoiceCount`, `patch.setFeedbackMode`.
 - **Transport:** `transport.play`, `transport.stop`, `transport.setTempo`, `transport.seek`,
-  `transport.setTimeSignature`.
+  `transport.setTimeSignature`, `transport.setScale`. Tempo, meter and scale belong to the project and are
+  pushed to the engine by the renderer whenever the project changes; every transport answer, and the
+  `transport.position` event, reports all three, the scale as a root pitch class and its intervals.
 - **Devices:** `device.list`, `device.select`.
 
 MIDI and telemetry commands are absent on purpose. Neither subsystem exists yet, and a stub in a typed

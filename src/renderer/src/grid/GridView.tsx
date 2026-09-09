@@ -96,6 +96,7 @@ export const GridView = () => {
           setValue: (id, index, values) => view.setValue(id, index, values),
           setLevel: (id, index, level) => view.setLevel(id, index, level),
           setNotes: (id, index, reading) => view.setNotes(id, index, reading),
+          setKeys: (id, index, held) => view.setKeys(id, index, held),
         },
         (tick) => {
           created.ticker.add(tick);

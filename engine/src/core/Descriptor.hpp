@@ -58,6 +58,10 @@ inline constexpr uint32_t kModulePublishesMeter = 1u << 6;
 /// time, with the playhead and the meter to rule a grid under them. An interface gives such a
 /// module a piano roll on its face (`pianoRoll` in the face rows). Implies `kModuleWritesTelemetry`.
 inline constexpr uint32_t kModulePublishesNotes = 1u << 7;
+/// The module's telemetry slot carries `Keys`: which MIDI notes are down right now, one float per
+/// note. An interface gives such a module a keyboard on its face (`piano` in the face rows) and
+/// lights the keys. Implies `kModuleWritesTelemetry`, like the others.
+inline constexpr uint32_t kModulePublishesKeys  = 1u << 8;
 
 // C-layout so descriptors can cross a dlopen boundary unchanged.
 struct PortDesc {
@@ -128,6 +132,8 @@ struct ModuleDescriptor {
   uint32_t abiVersion;
   const char* id;          // "osc.wavetable"
   const char* name;
+  /// The heading the module sits under in a catalogue, as a person reads it: "Oscillators", "Audio FX",
+  /// "Note FX". A title like `name`, not a slug: an interface shows it as written and adds nothing.
   const char* category;
   const char* doc;
   const PortDesc* inputs;  uint32_t numInputs;
@@ -159,7 +165,8 @@ struct ModuleDescriptor {
    * two by two, on a module that `kModulePreviewsWave`; `scope` is the scope panel, at least two by
    * two, on a module that `kModulePublishesScope`; `value` is the readout, at least two cells by one,
    * on a module that `kModulePublishesValue`; `meter` is the level meter, at least two by two, on a
-   * module that `kModulePublishesMeter`. Every declared port appears exactly once.
+   * module that `kModulePublishesMeter`; `piano` is the keyboard, at least four cells across by two,
+   * on a module that `kModulePublishesKeys`. Every declared port appears exactly once.
    * Implicit modulation ports never appear: they ride on their param's control. A short row is
    * padded with `.`. `Registry::add` rejects anything else, so a face that is wrong is a module
    * that does not register rather than a node drawn wrong.

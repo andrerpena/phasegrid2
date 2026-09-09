@@ -116,7 +116,7 @@ class ModLfo final : public VoicedModule<State> {
 }  // namespace
 
 // Explicit `extern` (see AudioOut.cpp): a namespace-scope `const` is internal linkage by default.
-extern const ModuleDescriptor kModLfo{kModuleAbiVersion, "mod.lfo", "LFO", "mod",
+extern const ModuleDescriptor kModLfo{kModuleAbiVersion, "mod.lfo", "LFO", "Modulation",
   "A low-frequency oscillator for driving knobs. Rate is in hertz; Shape morphs sine, triangle, saw and "
   "square; Depth sets the swing. The output is bipolar, so the knob it feeds stays the centre of the "
   "movement. A rising edge on Reset restarts the cycle. The face shows the wave.",

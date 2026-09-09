@@ -49,7 +49,7 @@ export default {
     screenshot,
     check,
   }) {
-    await evaluate(`click("button", "Wiring");`);
+    await evaluate(`openProject("Wiring");`);
     await idle();
     const opened = await evaluate(
       `return [...document.querySelectorAll('[role="tab"]')].some((t) => t.textContent.includes("Wiring") && t.getAttribute("aria-selected") === "true");`,

@@ -28,7 +28,7 @@ const ModuleDescriptor& oscWavetable() {
     vendor::ModuleSpec spec;
     spec.id = "osc.wavetable";
     spec.name = "Wavetable Oscillator";
-    spec.category = "osc";
+    spec.category = "Oscillators";
     spec.doc = "Wavetable oscillator with unison, phase distortion and spectral morphing. Pitch is 0.1 per "
                "octave from middle C; the oscillator tracks it while Midi Track is on.";
     spec.prefix = "osc_1";

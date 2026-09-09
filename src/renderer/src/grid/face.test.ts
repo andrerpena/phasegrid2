@@ -80,6 +80,7 @@ const vca: ModuleDescriptor = {
     publishesValue: false,
     publishesMeter: false,
     publishesNotes: false,
+    publishesKeys: false,
   },
   inputs: [port("in"), port("gain"), port("param:gain", true)],
   outputs: [port("out")],
@@ -488,6 +489,55 @@ describe("a composed face", () => {
     expect(face.readout).toMatchObject({ col: 1, row: 1, cols: 3, rows: 2 });
     // A readout has no screen of its own: the number sits on an ordinary tile.
     expect(face.readout).not.toHaveProperty("panel");
+  });
+
+  it("gives a keyboard to the module that publishes keys, and refuses the token elsewhere", () => {
+    const keyed: ModuleDescriptor = {
+      ...vca,
+      flags: { ...vca.flags, writesTelemetry: true, publishesKeys: true },
+      inputs: [port("pitch"), port("gate")],
+      outputs: [],
+      params: [],
+    };
+    const face = defaultFace(keyed);
+    expect(face.piano).not.toBeNull();
+    expect(face.piano).toMatchObject({ cols: 6, rows: 2 });
+    expect(() =>
+      parseFace([["in", "piano", "piano", "piano", "piano"]], vca),
+    ).toThrow(/publishes no keys/);
+    // A keyboard is read across: four cells by two is the least that shows an octave.
+    expect(() =>
+      parseFace(
+        [
+          ["pitch", "piano", "piano", "piano", "piano"],
+          ["gate", "piano", "piano", "piano", "piano"],
+        ],
+        keyed,
+      ),
+    ).not.toThrow();
+    expect(() =>
+      parseFace(
+        [
+          ["pitch", "piano", "piano", "piano"],
+          ["gate", "piano", "piano", "piano"],
+        ],
+        keyed,
+      ),
+    ).toThrow(/less than four cells by two/);
+  });
+
+  it("draws the piano module the engine declares: two jacks, the keys and the octave knob", () => {
+    const face = composeFace(descriptor("display.piano"));
+    expect(face.blocks.map((b) => `${b.kind}:${b.name}`)).toEqual([
+      "title:title",
+      "jack:pitch",
+      "piano:piano",
+      "knob:octaves",
+      "jack:gate",
+    ]);
+    expect(face.piano).toMatchObject({ col: 1, row: 1, cols: 7, rows: 2 });
+    // The keys sit on an ordinary tile, like the meter's bars.
+    expect(face.piano).not.toHaveProperty("panel");
   });
 
   it("draws the meter module the engine declares: a jack and the bars", () => {

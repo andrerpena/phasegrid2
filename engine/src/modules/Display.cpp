@@ -239,17 +239,17 @@ const char* const kValueFace[] = {
 
 }  // namespace
 
-extern const ModuleDescriptor kMeter{kModuleAbiVersion, "display.meter", "Meter", "display",
+extern const ModuleDescriptor kMeter{kModuleAbiVersion, "display.meter", "Meter", "Display",
   "Shows the level on its face: a bar per channel, the held peak above it, and a clip light. Produces no audio and changes nothing.",
   kIn, countOf(kIn), nullptr, 0, nullptr, 0, kModuleWritesTelemetry | kModulePublishesMeter, 1,
   [] () -> Module* { return new Meter(); }, kMeterFace, countOf(kMeterFace)};
 
-extern const ModuleDescriptor kScope{kModuleAbiVersion, "display.scope", "Scope", "display",
+extern const ModuleDescriptor kScope{kModuleAbiVersion, "display.scope", "Scope", "Display",
   "Shows the waveform on its face: a rolling window of the signal, as long as Time says. Produces no audio and changes nothing.",
   kIn, countOf(kIn), nullptr, 0, kScopeParams, countOf(kScopeParams), kModuleWritesTelemetry | kModulePublishesScope, 1,
   [] () -> Module* { return new Scope(); }, kScopeFace, countOf(kScopeFace)};
 
-extern const ModuleDescriptor kValue{kModuleAbiVersion, "display.value", "Value", "display",
+extern const ModuleDescriptor kValue{kModuleAbiVersion, "display.value", "Value", "Display",
   "Shows the value on its input as a number, per channel, as it changes. Produces no audio and changes nothing.",
   kIn, countOf(kIn), nullptr, 0, nullptr, 0, kModuleWritesTelemetry | kModulePublishesValue, 1,
   [] () -> Module* { return new Value(); }, kValueFace, countOf(kValueFace)};

@@ -48,7 +48,7 @@ export default {
     );
   },
   async run({ evaluate, pg, idle, checkEventually, screenshot, check }) {
-    await evaluate(`click("button", "Meter");`);
+    await evaluate(`openProject("Meter");`);
     await idle();
 
     const face = await pg('grid.face("level")');

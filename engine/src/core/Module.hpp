@@ -49,6 +49,18 @@ struct TransportSnapshot {
   /// Time signature: beats per bar over the note value that gets the beat (4/4, 6/8, 7/8...).
   uint32_t timeSigNumerator = 4;
   uint32_t timeSigDenominator = 4;
+  /// The project's key and scale, for the modules that snap or generate pitch: `notefx.quantize` and
+  /// its kin. `scaleRoot` is a pitch class, 0 for C. `scaleMask` has bit k set when the semitone k
+  /// above the root is in the scale, so the default, every bit, is chromatic and passes everything.
+  /// A mask rather than a name, so the engine never has to know what "dorian" means.
+  uint32_t scaleRoot = 0;
+  uint32_t scaleMask = 0xFFFu;
+
+  /// Is this MIDI note number's pitch class in the scale?
+  bool inScale(int midi) const {
+    const int k = ((midi - static_cast<int>(scaleRoot)) % 12 + 12) % 12;
+    return (scaleMask >> k) & 1u;
+  }
 
   /// Quarter notes in one bar, which is what turns `ppq` into bars: 4/4 is 4, 6/8 is 3, 7/8 is 3.5.
   double quartersPerBar() const {

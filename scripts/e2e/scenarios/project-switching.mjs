@@ -41,11 +41,11 @@ export default {
   async run({ evaluate, pg, idle, waitFor, checkEventually, check }) {
     const open = async () =>
       (await pg("snapshot().projects.open")).map((p) => p.name);
-    await evaluate(`click("button", "Alpha");`);
+    await evaluate(`openProject("Alpha");`);
     await waitFor('window.pg.grid.node("pat") !== null', {
       label: "the pattern is on the canvas",
     });
-    await evaluate(`click("button", "Beta");`);
+    await evaluate(`openProject("Beta");`);
     await waitFor("window.pg.snapshot().projects.open.length === 2", {
       label: "both projects are open",
     });

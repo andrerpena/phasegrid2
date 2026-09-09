@@ -15,7 +15,7 @@ inline vendor::ModuleSpec effectSpec(const char* id, const char* name, const cha
   vendor::ModuleSpec spec;
   spec.id = id;
   spec.name = name;
-  spec.category = "fx";
+  spec.category = "Audio FX";
   spec.doc = doc;
   spec.prefix = prefix;
   spec.processWithInput = true;

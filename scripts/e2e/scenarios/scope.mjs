@@ -62,7 +62,7 @@ export default {
     );
   },
   async run({ evaluate, pg, idle, checkEventually, screenshot, check }) {
-    await evaluate(`click("button", "Scope");`);
+    await evaluate(`openProject("Scope");`);
     await idle();
 
     // The face the engine declared: one jack, the screen, the time knob.

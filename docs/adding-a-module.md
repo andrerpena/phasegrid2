@@ -64,6 +64,7 @@ const char* const kFace[] = {
 | `scope` | the scope screen, at least two by two, on a module that `kModulePublishesScope`; it draws the window the module writes into its telemetry slot |
 | `value` | the readout, at least two cells across, on a module that `kModulePublishesValue`; it prints the value the module writes into its telemetry slot |
 | `meter` | the level meter, at least two by two, on a module that `kModulePublishesMeter`; it draws the level the module writes into its telemetry slot |
+| `piano` | the keyboard, at least four cells across by two, on a module that `kModulePublishesKeys`; it lights the keys the module writes into its telemetry slot |
 
 Implicit modulation ports (`param:<id>`) never appear: the socket for one sits at its knob's foot, and a cable dropped
 on the knob connects to it. A jack in the leftmost or rightmost column sits its socket on the module's border; one on

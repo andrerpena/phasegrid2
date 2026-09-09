@@ -39,7 +39,7 @@ class Mixer final : public VoicedModule<int> {
 }  // namespace
 
 // Explicit `extern` (see AudioOut.cpp): a namespace-scope `const` is internal linkage by default.
-extern const ModuleDescriptor kMixer{kModuleAbiVersion, "mix.mixer", "Mixer", "mix",
+extern const ModuleDescriptor kMixer{kModuleAbiVersion, "mix.mixer", "Mixer", "Mixing",
   "Adds four signals, each through its own level. Unconnected channels are silent.",
   kIn, countOf(kIn), kOut, countOf(kOut), kParams, countOf(kParams), 0, 0,
   [] () -> Module* { return new Mixer(); }, nullptr, 0};

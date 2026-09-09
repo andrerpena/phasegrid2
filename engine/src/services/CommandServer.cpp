@@ -158,7 +158,8 @@ bool CommandServer::tickTransport() {
   const bool moved = !publishedOnce_ || now.samplePos != lastPublished_.samplePos || now.ppq != lastPublished_.ppq ||
                      now.playing != lastPublished_.playing || now.tempo != lastPublished_.tempo ||
                      now.timeSigNumerator != lastPublished_.timeSigNumerator ||
-                     now.timeSigDenominator != lastPublished_.timeSigDenominator;
+                     now.timeSigDenominator != lastPublished_.timeSigDenominator ||
+                     now.scaleRoot != lastPublished_.scaleRoot || now.scaleMask != lastPublished_.scaleMask;
   if (!moved) return true;   // a stopped engine says nothing rather than filling the log with itself
   lastPublished_ = now;
   publishedOnce_ = true;

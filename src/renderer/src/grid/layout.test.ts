@@ -62,6 +62,7 @@ const vca: ModuleDescriptor = {
     publishesValue: false,
     publishesMeter: false,
     publishesNotes: false,
+    publishesKeys: false,
   },
   inputs: [port("in"), port("gain"), port("param:gain", true)],
   outputs: [port("out")],

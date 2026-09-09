@@ -10,6 +10,7 @@ import { type Block, type BlockStyle, blockStyle } from "./blocks/Block";
 import { JackBlock } from "./blocks/JackBlock";
 import { KnobBlock } from "./blocks/KnobBlock";
 import { type Level, MeterBlock } from "./blocks/MeterBlock";
+import { type KeyRange, PianoBlock } from "./blocks/PianoBlock";
 import { type NotesView, PianoRollBlock } from "./blocks/PianoRollBlock";
 import { ScopeBlock } from "./blocks/ScopeBlock";
 import { TextBlock } from "./blocks/TextBlock";
@@ -66,6 +67,12 @@ export interface NotesSummary {
   phase: number;
 }
 
+/** Which keys the keyboard is lighting, as a script sees it: the MIDI numbers, ascending. */
+export interface KeysSummary {
+  index: string;
+  held: number[];
+}
+
 export interface NodeStyle {
   colors: GridColors;
   /** The module's accent, from its category, used for the title and the value arcs. */
@@ -97,6 +104,8 @@ function buildBlock(
       return new TextBlock(geometry, style);
     case "pianoRoll":
       return new PianoRollBlock(geometry, style);
+    case "piano":
+      return new PianoBlock(geometry, style);
   }
 }
 
@@ -114,8 +123,11 @@ export class NodeView {
   private readonly meter: MeterBlock | null = null;
   private readonly texts = new Map<string, TextBlock>();
   private readonly pianoRoll: PianoRollBlock | null = null;
+  private readonly piano: PianoBlock | null = null;
   /** The last notes put on the roll, by the engine's count: what a script asks about. */
   private notes: NotesSummary | null = null;
+  /** The last keys lit on the keyboard, the same way. */
+  private keys: KeysSummary | null = null;
   /** The sounding steps of each text property, so the editor can light them up too. */
   private sounding = new Map<string, { from: number; to: number }[]>();
   /** The last trace put on the scope, by the engine's count, and its size: what a script asks about. */
@@ -161,6 +173,7 @@ export class NodeView {
       else if (block instanceof MeterBlock) this.meter = block;
       else if (block instanceof TextBlock) this.texts.set(geometry.name, block);
       else if (block instanceof PianoRollBlock) this.pianoRoll = block;
+      else if (block instanceof PianoBlock) this.piano = block;
     }
     this.applyValues(module);
     this.view.position.set(module.x ?? 0, module.y ?? 0);
@@ -286,6 +299,23 @@ export class NodeView {
     return this.notes;
   }
 
+  /** The keys that are down, as the engine published them. Ignored without a keyboard. */
+  setKeys(index: bigint, held: number[]): void {
+    if (this.piano === null) return;
+    this.piano.setKeys(held);
+    this.keys = { index: index.toString(), held };
+  }
+
+  /** Which keys the keyboard lit last, for a script. Null before the engine has said anything. */
+  keysOf(): KeysSummary | null {
+    return this.keys;
+  }
+
+  /** The keyboard's range as the document has it, for a script. Null for a module without one. */
+  keyRangeOf(): KeyRange | null {
+    return this.piano?.rangeOf() ?? null;
+  }
+
   /** What a text property currently holds, from the document, for a script. */
   textOf(textId: string): string | null {
     const value = this.module.data?.[textId];
@@ -301,6 +331,12 @@ export class NodeView {
           paramValue(module, this.descriptor, paramId),
         ),
       );
+    // The keyboard's range is two of the module's own parameters, read from the document like a
+    // knob's value: nothing about it crosses telemetry, so a knob turn reshapes the keys at once.
+    this.piano?.setRange({
+      low: paramValue(module, this.descriptor, "low"),
+      octaves: paramValue(module, this.descriptor, "octaves"),
+    });
     // A text property's value lives in the node's `data`, keyed by its id, and falls back to the
     // default the module declared -- exactly the rule `configure` follows in the engine.
     for (const [textId, block] of this.texts) {

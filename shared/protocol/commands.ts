@@ -62,6 +62,10 @@ export const TransportPositionSchema = z.object({
   samplePos: z.number().int().nonnegative(),
   timeSigNumerator: z.number().int().min(1).max(64),
   timeSigDenominator: z.number().int().min(1).max(64),
+  /** The project's key: a pitch class, 0 for C. */
+  scaleRoot: z.number().int().min(0).max(11),
+  /** The scale as semitones above the root, ascending; twelve of them is chromatic. */
+  scaleIntervals: z.array(z.number().int().min(0).max(11)).min(1).max(12),
   /** Derived from `ppq` and the meter, for a display that would otherwise redo the arithmetic. */
   bar: z.number().int().nonnegative(),
   beat: z.number(),
@@ -249,6 +253,17 @@ export const COMMANDS = {
           message:
             "a time signature denominator is a note value: 1, 2, 4, 8, 16...",
         }),
+    }),
+    result: TransportPositionSchema,
+  },
+  /**
+   * The project's key and scale, as the pitch classes above the root. The engine keeps a mask and
+   * never learns a scale's name; `SCALE_INTERVALS` in `project.ts` is where a name becomes intervals.
+   */
+  "transport.setScale": {
+    args: z.object({
+      root: z.number().int().min(0).max(11),
+      intervals: z.array(z.number().int().min(0).max(11)).min(1).max(12),
     }),
     result: TransportPositionSchema,
   },

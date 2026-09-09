@@ -3,6 +3,7 @@
 #include <atomic>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <nlohmann/json.hpp>
 #include <string>
 #include <vector>
 
@@ -357,6 +358,153 @@ TEST_CASE("a readout reads the end of the block, and every voice of it", "[displ
     if (i > 0) REQUIRE(w2.payload(0)[0] != last);   // and it is a signal, not a stuck reading
     last = w2.payload(0)[0];
   }
+}
+
+namespace {
+
+/// Which keys a slot says are down, as MIDI numbers, ascending.
+std::vector<int> heldKeys(TelemetryWriter& writer, uint32_t slot) {
+  std::vector<int> held;
+  REQUIRE(writer.slot(slot)->kind == static_cast<uint32_t>(TelemetryKind::Keys));
+  REQUIRE(writer.slot(slot)->frames == kTelemetryMaxKeys);
+  for (uint32_t k = 0; k < kTelemetryMaxKeys; ++k)
+    if (writer.payload(slot)[k] > 0.5f) held.push_back(static_cast<int>(k));
+  return held;
+}
+
+/// A clip holding a C major triad from the first beat, so every voice has a key down at once.
+nlohmann::json triadClip() {
+  nlohmann::json notes = nlohmann::json::array();
+  for (const int pitch : {60, 64, 67})
+    notes.push_back({{"start", 0.0}, {"length", 4.0}, {"pitch", pitch}, {"velocity", 0.8}});
+  return nlohmann::json{{"notes", notes}};
+}
+
+}  // namespace
+
+TEST_CASE("a piano lights one key per voice, whatever pair the voice is in", "[display]") {
+  Registry registry;
+  registerBuiltinModules(registry);
+  Engine engine{registry, EngineConfig{48000.0, 64}};
+  TelemetryWriter writer;
+  std::string error;
+  REQUIRE(writer.create(uniqueName("piano"), 2, 48000.0, 64, error));
+  engine.setTelemetry(&writer);
+
+  // Three voices is two pairs, with the second pair half empty: the mask has to be honoured.
+  REQUIRE(engine.model().setVoiceCount(3));
+  REQUIRE(engine.model().addNode(registry, {"clip", "notes.clip", {{"length", 4.f}}}));
+  REQUIRE(engine.model().setNodeData("clip", triadClip()));
+  REQUIRE(engine.model().addNode(registry, {"voices", "note.toPoly", {}}));
+  REQUIRE(engine.model().addNode(registry, {"piano", "display.piano", {}}));
+  REQUIRE(engine.model().addEdge(registry, {"e1", "clip", "notes", "voices", "notes"}));
+  REQUIRE(engine.model().addEdge(registry, {"e2", "voices", "pitch", "piano", "pitch"}));
+  REQUIRE(engine.model().addEdge(registry, {"e3", "voices", "gate", "piano", "gate"}));
+  REQUIRE(engine.commit());
+
+  std::vector<float> l(64), r(64);
+  float* planar[2] = {l.data(), r.data()};
+  TransportSnapshot t;
+  engine.renderBlock(planar, 2, 64, t);
+  // Nobody watching: a piano is as inert as a meter.
+  REQUIRE(writer.slot(0)->seq.load() == 0);
+
+  REQUIRE(engine.setSlot("piano", TelemetryChannel::Display, 0));
+  engine.renderBlock(planar, 2, 64, t);
+  REQUIRE(heldKeys(writer, 0) == std::vector<int>{60, 64, 67});
+  const uint64_t once = writer.slot(0)->blockIndex;
+  engine.renderBlock(planar, 2, 64, t);
+  REQUIRE(writer.slot(0)->blockIndex == once + 1);   // published once per block, not once per pair
+}
+
+TEST_CASE("a piano with its gate unconnected lights the pitch alone, and a low gate lights nothing", "[display]") {
+  Registry registry;
+  registerBuiltinModules(registry);
+  Engine engine{registry, EngineConfig{48000.0, 64}};
+  TelemetryWriter writer;
+  std::string error;
+  REQUIRE(writer.create(uniqueName("pianogate"), 2, 48000.0, 64, error));
+  engine.setTelemetry(&writer);
+
+  // Pitch 0.1 is one octave above middle C: MIDI 72.
+  REQUIRE(engine.model().addNode(registry, {"pitch", "math.scaleOffset", {{"offset", 0.1f}}}));
+  REQUIRE(engine.model().addNode(registry, {"low", "math.scaleOffset", {{"offset", 0.f}}}));
+  REQUIRE(engine.model().addNode(registry, {"held", "display.piano", {}}));
+  REQUIRE(engine.model().addNode(registry, {"gated", "display.piano", {}}));
+  REQUIRE(engine.model().addEdge(registry, {"e1", "pitch", "out", "held", "pitch"}));
+  REQUIRE(engine.model().addEdge(registry, {"e2", "pitch", "out", "gated", "pitch"}));
+  REQUIRE(engine.model().addEdge(registry, {"e3", "low", "out", "gated", "gate"}));
+  REQUIRE(engine.commit());
+  REQUIRE(engine.setSlot("held", TelemetryChannel::Display, 0));
+  REQUIRE(engine.setSlot("gated", TelemetryChannel::Display, 1));
+
+  std::vector<float> l(64), r(64);
+  float* planar[2] = {l.data(), r.data()};
+  TransportSnapshot t;
+  engine.renderBlock(planar, 2, 64, t);
+  REQUIRE(heldKeys(writer, 0) == std::vector<int>{72});
+  REQUIRE(heldKeys(writer, 1).empty());
+}
+
+TEST_CASE("a piano shows every tone of a chord the chord module built, across the voices", "[display]") {
+  // The whole note path at once: a pattern of one note, a chord on it, the voices, the keys.
+  Registry registry;
+  registerBuiltinModules(registry);
+  Engine engine{registry, EngineConfig{48000.0, 64}};
+  TelemetryWriter writer;
+  std::string error;
+  REQUIRE(writer.create(uniqueName("pianochord"), 2, 48000.0, 64, error));
+  engine.setTelemetry(&writer);
+
+  REQUIRE(engine.model().setVoiceCount(4));
+  REQUIRE(engine.model().addNode(registry, {"pat", "notes.pattern", {{"legato", 1.f}}}));
+  REQUIRE(engine.model().setNodeData("pat", nlohmann::json{{"pattern", "c4"}}));
+  REQUIRE(engine.model().addNode(registry, {"chord", "notefx.chord", {}}));
+  REQUIRE(engine.model().addNode(registry, {"voices", "note.toPoly", {}}));
+  REQUIRE(engine.model().addNode(registry, {"piano", "display.piano", {}}));
+  REQUIRE(engine.model().addEdge(registry, {"e1", "pat", "notes", "chord", "notes"}));
+  REQUIRE(engine.model().addEdge(registry, {"e2", "chord", "notes", "voices", "notes"}));
+  REQUIRE(engine.model().addEdge(registry, {"e3", "voices", "pitch", "piano", "pitch"}));
+  REQUIRE(engine.model().addEdge(registry, {"e4", "voices", "gate", "piano", "gate"}));
+  REQUIRE(engine.commit());
+  REQUIRE(engine.setSlot("piano", TelemetryChannel::Display, 0));
+
+  std::vector<float> l(64), r(64);
+  float* planar[2] = {l.data(), r.data()};
+  TransportSnapshot t;
+  for (int i = 0; i < 4; ++i) engine.renderBlock(planar, 2, 64, t);
+  REQUIRE(heldKeys(writer, 0) == std::vector<int>{60, 64, 67});
+}
+
+TEST_CASE("a subscribed piano allocates nothing while rendering", "[display][rt]") {
+  Registry registry;
+  registerBuiltinModules(registry);
+  Engine engine{registry, EngineConfig{48000.0, 64}};
+  TelemetryWriter writer;
+  std::string error;
+  REQUIRE(writer.create(uniqueName("pianort"), 2, 48000.0, 64, error));
+  engine.setTelemetry(&writer);
+  REQUIRE(engine.model().setVoiceCount(4));
+  REQUIRE(engine.model().addNode(registry, {"clip", "notes.clip", {{"length", 4.f}}}));
+  REQUIRE(engine.model().setNodeData("clip", triadClip()));
+  REQUIRE(engine.model().addNode(registry, {"voices", "note.toPoly", {}}));
+  REQUIRE(engine.model().addNode(registry, {"piano", "display.piano", {}}));
+  REQUIRE(engine.model().addEdge(registry, {"e1", "clip", "notes", "voices", "notes"}));
+  REQUIRE(engine.model().addEdge(registry, {"e2", "voices", "pitch", "piano", "pitch"}));
+  REQUIRE(engine.model().addEdge(registry, {"e3", "voices", "gate", "piano", "gate"}));
+  REQUIRE(engine.commit());
+  REQUIRE(engine.setSlot("piano", TelemetryChannel::Display, 0));
+
+  std::vector<float> l(64), r(64);
+  float* planar[2] = {l.data(), r.data()};
+  TransportSnapshot t;
+  engine.renderBlock(planar, 2, 64, t);
+  REQUIRE(heldKeys(writer, 0).size() == 3);
+  {
+    pg::test::RtScope rt;
+    for (int i = 0; i < 200; ++i) engine.renderBlock(planar, 2, 64, t);
+  }
+  REQUIRE(writer.slot(0)->seq.load() > 200);
 }
 
 TEST_CASE("a subscribed display module allocates nothing while rendering", "[display][rt]") {

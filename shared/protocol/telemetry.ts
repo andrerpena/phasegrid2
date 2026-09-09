@@ -29,6 +29,8 @@ export const TELEMETRY_MAX_NOTES = 256;
 export const TELEMETRY_NOTE_BYTES = 32;
 /** Floats in front of the notes: quarters per cycle, quarters per bar, the playhead, and a spare. */
 export const TELEMETRY_NOTE_HEADER_FLOATS = 4;
+/** Keys a `Keys` slot may carry: one per MIDI note number. */
+export const TELEMETRY_MAX_KEYS = 128;
 /** `flags` bit 0 of a note record: it is sounding right now. */
 export const TELEMETRY_NOTE_SOUNDING = 1;
 
@@ -73,6 +75,12 @@ export enum TelemetryKind {
    * recomputed them would be guessing at a pattern it cannot parse.
    */
   Notes = 6,
+  /**
+   * Which keys are down: one float per MIDI note number, 1 held and 0 up, `frames` of them. What a
+   * keyboard on a module's face lights. Per note rather than per voice, so a reader never has to
+   * know how many voices the program runs.
+   */
+  Keys = 7,
 }
 
 export interface TelemetryHeader {
@@ -152,13 +160,21 @@ export interface NotesReading {
   phase: number;
 }
 
+export interface KeysReading {
+  kind: TelemetryKind.Keys;
+  blockIndex: bigint;
+  /** The MIDI note numbers that are down, ascending. Already what a keyboard draws. */
+  held: number[];
+}
+
 export type SlotReading =
   | MeterReading
   | ScopeReading
   | ParamsReading
   | PreviewReading
   | ValueReading
-  | NotesReading;
+  | NotesReading
+  | KeysReading;
 
 /** Where a slot begins, given its index. */
 export function slotOffset(index: number): number {
@@ -304,6 +320,16 @@ export function decodeSlot(bytes: Uint8Array): SlotReading | null {
       quartersPerBar: view.getFloat32(payload + 4, true),
       phase: view.getFloat32(payload + 8, true),
     };
+  }
+
+  if (kind === TelemetryKind.Keys) {
+    // `frames` carries the key count. Bounded before it is used as a length.
+    if (frames > TELEMETRY_MAX_KEYS) return null;
+    if (payload + frames * 4 > bytes.byteLength) return null;
+    const held: number[] = [];
+    for (let i = 0; i < frames; i++)
+      if (view.getFloat32(payload + i * 4, true) > 0.5) held.push(i);
+    return { kind, blockIndex, held };
   }
 
   return null; // kind None, or one this build does not know

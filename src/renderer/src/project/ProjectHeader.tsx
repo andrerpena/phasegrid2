@@ -7,6 +7,7 @@ import { cn } from "@renderer/utils/cn";
 import {
   DEFAULT_TIME_SIGNATURE,
   NOTE_NAMES,
+  SCALE_INTERVALS,
   SCALE_NAMES,
   scaleLabel,
 } from "@shared/protocol/project";
@@ -80,6 +81,15 @@ export const ProjectHeader = () => {
     void call("transport.setTimeSignature", {
       numerator: project.timeSignature.numerator,
       denominator: project.timeSignature.denominator,
+    }).catch(() => {});
+  }, [project, call]);
+
+  // And the scale, for the modules that snap pitch to it. The engine takes intervals, not a name.
+  useEffect(() => {
+    if (project === null) return;
+    void call("transport.setScale", {
+      root: project.scale.root,
+      intervals: [...SCALE_INTERVALS[project.scale.name]],
     }).catch(() => {});
   }, [project, call]);
 

@@ -41,7 +41,7 @@ class AudioOut final : public VoicedModule<int> {
 // Explicit `extern` here (not just in builtin.cpp) is required: a namespace-scope `const`
 // defaults to internal linkage in C++, and with no use inside this TU the optimizer would
 // otherwise discard it, leaving builtin.cpp's reference undefined at link time.
-extern const ModuleDescriptor kAudioOut{kModuleAbiVersion, "io.audioOut", "Audio Out", "io",
+extern const ModuleDescriptor kAudioOut{kModuleAbiVersion, "io.audioOut", "Audio Out", "I/O",
   "Sends stereo audio to the engine output. Voices are summed.",
   kIn, countOf(kIn), nullptr, 0, kParams, countOf(kParams), kModuleTerminal, 0, [] () -> Module* { return new AudioOut(); }, kFace, countOf(kFace)};
 }  // namespace pg::modules

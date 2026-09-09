@@ -96,7 +96,7 @@ class OscSine final : public VoicedModule<osc::OscillatorState> {
 }  // namespace
 
 // Explicit `extern` (see AudioOut.cpp): a namespace-scope `const` is internal linkage by default.
-extern const ModuleDescriptor kOscSine{kModuleAbiVersion, "osc.sine", "Sine", "osc",
+extern const ModuleDescriptor kOscSine{kModuleAbiVersion, "osc.sine", "Sine", "Oscillators",
   "A sine with a wavefolder. Turning Fold up drives the wave through a sine curve, which folds it back on itself "
   "in round lobes and fills the spectrum with odd harmonics. Fold is in semitones, so every twelve doubles the "
   "drive: at twelve, two lobes meet at the centre. The face shows the resulting shape.",

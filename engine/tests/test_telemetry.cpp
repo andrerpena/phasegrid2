@@ -120,6 +120,29 @@ TEST_CASE("a value slot carries one signed float per channel", "[telemetry]") {
   REQUIRE(w.payload(0)[1] == 0.5f);
 }
 
+TEST_CASE("a keys slot carries one float per MIDI note", "[telemetry]") {
+  TelemetryWriter w;
+  std::string error;
+  REQUIRE(w.create(uniqueName("keys"), 1, 48000.0, 64, error));
+
+  float keys[pg::kTelemetryMaxKeys] = {};
+  keys[60] = 1.f;
+  keys[67] = 1.f;
+  w.writeKeys(0, keys, pg::kTelemetryMaxKeys, 7);
+
+  REQUIRE(w.slot(0)->kind == static_cast<uint32_t>(pg::TelemetryKind::Keys));
+  REQUIRE(w.slot(0)->channels == 1);
+  REQUIRE(w.slot(0)->frames == pg::kTelemetryMaxKeys);
+  REQUIRE(w.slot(0)->blockIndex == 7);
+  REQUIRE(w.payload(0)[60] == 1.f);
+  REQUIRE(w.payload(0)[67] == 1.f);
+  REQUIRE(w.payload(0)[61] == 0.f);
+
+  // A count past the keyboard is capped rather than written past the note range.
+  w.writeKeys(0, keys, 1000, 8);
+  REQUIRE(w.slot(0)->frames == pg::kTelemetryMaxKeys);
+}
+
 TEST_CASE("a reader never observes a half-written slot", "[telemetry]") {
   TelemetryWriter w;
   std::string error;

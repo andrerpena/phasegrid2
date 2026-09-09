@@ -163,6 +163,11 @@ export const ModuleFlagsSchema = z
     publishesMeter: z.boolean(),
     /** Publishes the notes it is playing, which is what a piano roll on its face is drawn from. */
     publishesNotes: z.boolean(),
+    /**
+     * Its telemetry slot carries which keys are down (`TelemetryKind.Keys`). The editor gives such a
+     * module a keyboard on its face and lights the keys.
+     */
+    publishesKeys: z.boolean(),
   })
   .strict();
 
@@ -170,7 +175,7 @@ export const ModuleFlagsSchema = z
  * A module's face: rows of tokens, one per grid cell, as the engine padded them (every row the same
  * length). Equal neighbouring tokens form one rectangular block, as CSS `grid-template-areas`. `.` is
  * an empty cell, `wave` the wave panel, `scope` the scope panel, `value` the readout, `meter` the
- * level meter, `text:<id>` a text property, anything else names a port (`in:`/`out:` when the two
+ * level meter, `piano` the keyboard, `text:<id>` a text property, anything else names a port (`in:`/`out:` when the two
  * sides share an id) or a param (`param:` when it collides with a port). The engine's registry has already
  * checked the geometry; the check here is only that every token still names something on the
  * module, which is what `composeFace` needs to be true.
@@ -193,6 +198,7 @@ export function resolveFaceToken(
   | { kind: "value" }
   | { kind: "meter" }
   | { kind: "pianoRoll" }
+  | { kind: "piano" }
   | { kind: "input" | "output" | "param" | "text"; id: string }
   | null {
   if (token === ".") return { kind: "empty" };
@@ -201,6 +207,7 @@ export function resolveFaceToken(
   if (token === "value") return { kind: "value" };
   if (token === "meter") return { kind: "meter" };
   if (token === "pianoRoll") return { kind: "pianoRoll" };
+  if (token === "piano") return { kind: "piano" };
   // Implicit modulation ports never sit on a face; they ride on their param's control, so only a
   // declared input is a jack.
   const declared = module.inputs.filter(

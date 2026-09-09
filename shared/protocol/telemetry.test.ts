@@ -144,6 +144,34 @@ describe("decoding a slot", () => {
     expect(reading.values).toEqual([-0.25, 0.5]);
   });
 
+  it("reads a keys slot as the MIDI numbers that are down", () => {
+    const slot = buildSlot({
+      seq: 2,
+      kind: TelemetryKind.Keys,
+      channels: 1,
+      frames: 128,
+      fill: (view, at) => {
+        view.setFloat32(at + 60 * 4, 1, true);
+        view.setFloat32(at + 64 * 4, 1, true);
+        view.setFloat32(at + 67 * 4, 1, true);
+      },
+    });
+    const reading = decodeSlot(slot);
+    if (reading?.kind !== TelemetryKind.Keys) throw new Error("expected keys");
+    expect(reading.held).toEqual([60, 64, 67]);
+  });
+
+  it("declines a keys slot claiming more keys than there are MIDI notes", () => {
+    const slot = buildSlot({
+      seq: 2,
+      kind: TelemetryKind.Keys,
+      channels: 1,
+      frames: 129,
+      fill: () => {},
+    });
+    expect(decodeSlot(slot)).toBeNull();
+  });
+
   it("reads a params slot as one value per parameter, in order", () => {
     const bytes = buildSlot({
       seq: 2,

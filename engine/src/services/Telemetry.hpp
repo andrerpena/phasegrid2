@@ -48,8 +48,11 @@ inline constexpr uint32_t kTelemetryMaxSlots = 128;
 /// musical time, with the playhead and enough of the meter to rule a grid under them. It is what a
 /// piano roll on a module's face is drawn from -- the engine has already worked out where the notes
 /// are, and an interface that recomputed them would be guessing at a pattern it cannot parse.
+/// `Keys` is which keys are down: one float per MIDI note number, 1 held and 0 up, `frames` of them.
+/// What a keyboard on a module's face lights. Per note rather than per voice, so a reader never has to
+/// know how many voices the program runs or which lane is which.
 enum class TelemetryKind : uint32_t {
-  None = 0, Meter = 1, Scope = 2, Params = 3, Preview = 4, Value = 5, Notes = 6
+  None = 0, Meter = 1, Scope = 2, Params = 3, Preview = 4, Value = 5, Notes = 6, Keys = 7
 };
 
 /// "nobody is watching this module". Not a valid slot index, and the default for every instance.
@@ -100,6 +103,8 @@ inline constexpr uint32_t kTelemetryNoteFlagSounding = 1u << 0;
 inline constexpr uint32_t kTelemetryNoteHeaderFloats = 4;
 /// Notes one slot may carry. Matches the pattern engine's per-cycle cap, and a slot holds far more.
 inline constexpr uint32_t kTelemetryMaxNotes = 256;
+/// Keys a `Keys` slot may carry: one per MIDI note number.
+inline constexpr uint32_t kTelemetryMaxKeys = 128;
 
 /**
  * The segment header. Written once, when the segment is created, and read by anyone attaching.
@@ -170,6 +175,10 @@ public:
   /// under them and the playhead within it. Capped at `kTelemetryMaxNotes`.
   void writeNotes(uint32_t slot, const TelemetryNote* notes, uint32_t count, float quartersPerCycle,
                   float quartersPerBar, float phase, uint64_t blockIndex) noexcept PG_RT_NONBLOCKING;
+  /// Audio thread. One float per MIDI note number, 1 for a key that is down: `count` of them, capped
+  /// at `kTelemetryMaxKeys`; `channels` is 1 and `frames` carries the count.
+  void writeKeys(uint32_t slot, const float* keys, uint32_t count, uint64_t blockIndex) noexcept
+      PG_RT_NONBLOCKING;
   /// Message thread (it is the preview publisher's), but built the same way so a reader cannot tell.
   /// One channel of `count` samples, capped at `kTelemetryScopeFrames`; `index` counts publishes.
   void writePreview(uint32_t slot, const float* samples, uint32_t count, uint64_t index) noexcept;

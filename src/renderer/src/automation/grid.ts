@@ -59,7 +59,7 @@ export interface FaceBlock {
   kind: Block["kind"];
   /**
    * The face token: the port id, the param id, the text property's id, `wave`, `scope`, `value`,
-   * `meter`, `pianoRoll`, or `title`.
+   * `meter`, `pianoRoll`, `piano`, or `title`.
    */
   name: string;
   rect: Rect;
@@ -83,6 +83,13 @@ export interface FaceBlock {
    * What a meter last showed: the engine's count of the publish, the held peak and RMS per channel,
    * and whether each has clipped. Null until the engine has published one.
    */
+  /**
+   * Which keys a keyboard lit last: the engine's count of the publish, and the MIDI numbers that
+   * are down. Null until the engine has published one.
+   */
+  keys?: { index: string; held: number[] } | null;
+  /** A keyboard's range as the document has it: the octave it starts on, and how many it shows. */
+  range?: { low: number; octaves: number } | null;
   level?: {
     index: string;
     peak: number[];
@@ -251,6 +258,10 @@ export function createGridApi(source: GridSource = fromRegistry) {
         if (block.kind === "value") out.reading = node.readingOf();
         if (block.kind === "meter") out.level = node.levelOf();
         if (block.kind === "pianoRoll") out.notes = node.notesOf();
+        if (block.kind === "piano") {
+          out.keys = node.keysOf();
+          out.range = node.keyRangeOf();
+        }
         if (block.kind === "text") out.text = node.textOf(block.name);
         return out;
       });

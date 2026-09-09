@@ -47,6 +47,16 @@ public:
     return {};
   }
 
+  /// The project's key and scale, as `TransportSnapshot` carries them: a pitch class and a twelve-bit
+  /// mask of the semitones above it. An empty scale would quantise every note to nothing, so it is refused.
+  Result setScale(uint32_t root, uint32_t mask) {
+    if (root > 11) return Result::fail("E_SCHEMA", "scale root must be a pitch class, 0..11");
+    if (mask == 0 || mask > 0xFFFu) return Result::fail("E_SCHEMA", "scale must have between one and twelve pitch classes");
+    scaleRoot_.store(root, std::memory_order_relaxed);
+    scaleMask_.store(mask, std::memory_order_relaxed);
+    return {};
+  }
+
   /// Requests a musical position. The audio thread applies it at the top of its next block and
   /// acknowledges by serial, which is how `state()` can answer truthfully before that happens -- and
   /// keeps answering truthfully when there is no audio thread at all, as in `--render` and in tests.
@@ -64,6 +74,8 @@ public:
     t.playing = playing_.load(std::memory_order_relaxed);
     t.timeSigNumerator = numerator_.load(std::memory_order_relaxed);
     t.timeSigDenominator = denominator_.load(std::memory_order_relaxed);
+    t.scaleRoot = scaleRoot_.load(std::memory_order_relaxed);
+    t.scaleMask = scaleMask_.load(std::memory_order_relaxed);
     const Published p = published();
     t.samplePos = p.samplePos;
     const uint64_t requested = seekSerial_.load(std::memory_order_relaxed);
@@ -86,6 +98,8 @@ public:
     t.playing = playing_.load(std::memory_order_relaxed);
     t.timeSigNumerator = numerator_.load(std::memory_order_relaxed);
     t.timeSigDenominator = denominator_.load(std::memory_order_relaxed);
+    t.scaleRoot = scaleRoot_.load(std::memory_order_relaxed);
+    t.scaleMask = scaleMask_.load(std::memory_order_relaxed);
     t.ppq = ppq_;
     t.samplePos = samplePos_;
 
@@ -134,6 +148,8 @@ private:
   std::atomic<double> sampleRate_{48000.0};
   std::atomic<uint32_t> numerator_{4};
   std::atomic<uint32_t> denominator_{4};
+  std::atomic<uint32_t> scaleRoot_{0};
+  std::atomic<uint32_t> scaleMask_{0xFFFu};
   std::atomic<double> seekPpq_{0.0};
   std::atomic<uint64_t> seekSerial_{0};
 

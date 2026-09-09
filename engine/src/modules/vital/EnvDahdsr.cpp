@@ -12,7 +12,7 @@ const ModuleDescriptor& envDahdsr() {
     vendor::ModuleSpec spec;
     spec.id = "env.dahdsr";
     spec.name = "Envelope";
-    spec.category = "mod";
+    spec.category = "Modulation";
     spec.doc = "Delay/attack/hold/decay/sustain/release envelope. The gate holds it at the sustain level; "
                "a falling edge starts the release. Times are in seconds after the stage curve is applied.";
     spec.prefix = "env_1";
