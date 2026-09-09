@@ -17,7 +17,7 @@ import type { ModalConfig, ModalInstance } from "./types";
  * whole `ModalConfig` and lets `ModalRenderer` put it on screen. Both end up in the same stack, so
  * `anyOpen` is true for either and escape closes whichever is on top.
  */
-interface ModalState {
+export interface ModalState {
   stack: ModalInstance[];
   isOpen: (id: string) => boolean;
   anyOpen: () => boolean;

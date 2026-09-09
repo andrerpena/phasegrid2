@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+import type { AutomationApi } from "@renderer/automation/api";
 import type { EngineBridge, TelemetryBridge } from "@shared/protocol/bridge";
 import type { AppStorageBridge } from "@shared/protocol/storage";
 import type { WorkspaceBridge } from "@shared/protocol/workspace";
@@ -16,5 +17,7 @@ declare global {
     appStorage: AppStorageBridge;
     /** The workspace folder: its settings, its projects, and the dialogs about them. */
     workspace: WorkspaceBridge;
+    /** The automation API: the application driveable by name. Set by the renderer itself. */
+    pg: AutomationApi;
   }
 }

@@ -9,10 +9,12 @@ import {
   EngineSupervisor,
   resolveEnginePath,
 } from "./engine/supervisor";
+import { parseLaunchOptions } from "./launch-options";
 import { registerAppStorageIpc } from "./storage/app-storage";
 import { guardClose, registerWorkspaceIpc } from "./workspace/workspace-ipc";
 
 let supervisor: EngineSupervisor | null = null;
+const launch = parseLaunchOptions(process.argv);
 
 function createWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
@@ -56,7 +58,11 @@ async function startEngine(window: BrowserWindow): Promise<void> {
     resourcesPath: process.resourcesPath,
   });
 
-  supervisor = new EngineSupervisor({ enginePath, socketPath });
+  supervisor = new EngineSupervisor({
+    enginePath,
+    socketPath,
+    ...(launch.audio === null ? {} : { device: launch.audio }),
+  });
   registerEngineIpc(ipcMain, supervisor);
   const stopForwarding = forwardEngineEvents(supervisor, window);
   window.on("closed", stopForwarding);
@@ -84,6 +90,7 @@ app.whenReady().then(() => {
   registerWorkspaceIpc(ipcMain, {
     window,
     userData: app.getPath("userData"),
+    launchWorkspace: launch.workspace,
   });
   // The window asks before it goes. The renderer owns the answer, because it is the only side that
   // knows which projects have unsaved work in them.

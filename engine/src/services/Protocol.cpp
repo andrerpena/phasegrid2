@@ -1,7 +1,9 @@
 #include "services/Protocol.hpp"
+#include <algorithm>
 #include <cmath>
 #include <utility>
 #include "core/Version.hpp"
+#include "render/OfflineRenderer.hpp"
 #include "render/PatchFile.hpp"
 #include "services/Catalog.hpp"
 
@@ -396,6 +398,47 @@ json dispatchCommand(const std::string& cmd, const json& id, const json& args, P
   }
   if (cmd == "patch.clear")
     return editGraph(ctx, id, [](GraphModel& model) { model.clear(); return Result{}; });
+  // The loaded patch, rendered offline and measured: the way a script finds out whether what it
+  // built makes a sound. A second engine is built from the model so the one playing is untouched,
+  // and a WAV is written only when asked for a place to put it.
+  if (cmd == "patch.render") {
+    ArgReader a(args);
+    const double seconds = a.num("seconds", 1.0);
+    const std::string out = a.str("out", "");
+    if (!a) return errorResponse(id, a.result());
+    if (!(seconds > 0.0) || seconds > 30.0) return errorResponse(id, "E_SCHEMA", "seconds must be in (0, 30]");
+    Engine offline{ctx.registry, ctx.engine.config()};
+    if (Result r = loadPatchJson(savePatchJson(ctx.engine.model()), ctx.registry, offline.model()); !r) return errorResponse(id, r);
+    if (Result r = offline.commit(); !r) return errorResponse(id, r);
+    constexpr uint32_t kChannels = 2;
+    const std::vector<float> data = renderInterleaved(offline, RenderOptions{seconds, kChannels});
+    double sumSquares[kChannels] = {0.0, 0.0};
+    float peak[kChannels] = {0.0f, 0.0f};
+    const size_t frames = data.size() / kChannels;
+    for (size_t i = 0; i < frames; ++i)
+      for (uint32_t c = 0; c < kChannels; ++c) {
+        const float v = data[i * kChannels + c];
+        sumSquares[c] += static_cast<double>(v) * v;
+        peak[c] = std::max(peak[c], std::fabs(v));
+      }
+    json rms = json::array();
+    json peaks = json::array();
+    for (uint32_t c = 0; c < kChannels; ++c) {
+      rms.push_back(frames == 0 ? 0.0 : std::sqrt(sumSquares[c] / static_cast<double>(frames)));
+      peaks.push_back(peak[c]);
+    }
+    if (!out.empty()) {
+      std::string error;
+      if (!writeWav(out, data, kChannels, offline.config().sampleRate, error)) return errorResponse(id, "E_IO", error);
+    }
+    return okResponse(id, json{{"seconds", seconds},
+                                {"sampleRate", offline.config().sampleRate},
+                                {"channels", kChannels},
+                                {"frames", frames},
+                                {"rms", std::move(rms)},
+                                {"peak", std::move(peaks)},
+                                {"out", out.empty() ? json(nullptr) : json(out)}});
+  }
   if (cmd == "patch.batch") {
     ArgReader a(args);
     const json& ops = a.arr("ops");

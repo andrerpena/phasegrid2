@@ -2,16 +2,13 @@ import { existsSync } from "node:fs";
 import type { BrowserWindow, IpcMain } from "electron";
 import type { StorageResult } from "../../../shared/protocol/storage";
 import {
+  isDialogKind,
   isWorkspaceOp,
   WORKSPACE_CALL_CHANNEL,
   type WorkspaceInfo,
   type WorkspaceOp,
 } from "../../../shared/protocol/workspace";
-import {
-  chooseWorkspaceFolder,
-  confirmDelete,
-  confirmUnsaved,
-} from "./dialogs";
+import { type DialogHost, nativeDialogs, scriptedDialogs } from "./dialogs";
 import { readPointer, rememberWorkspace } from "./pointer";
 import * as fs from "./workspace-fs";
 
@@ -31,6 +28,14 @@ import * as fs from "./workspace-fs";
 export interface WorkspaceHost {
   window: BrowserWindow;
   userData: string;
+  /**
+   * A folder named on the command line (`--workspace`), opened for this launch instead of the
+   * remembered one and never remembered itself. It is how a scripted run gets a folder of its own
+   * without touching the pointer to the workspace the person was in.
+   */
+  launchWorkspace?: string | null;
+  /** Who asks the native questions. The real boxes unless a test supplies something else. */
+  dialogs?: DialogHost;
 }
 
 let root: string | null = null;
@@ -73,6 +78,9 @@ async function open(
   return opened;
 }
 
+/** Every question goes through the scripted host, so an answer can be queued for any of them. */
+let dialogs = scriptedDialogs(nativeDialogs);
+
 async function run(
   host: WorkspaceHost,
   op: WorkspaceOp,
@@ -83,6 +91,12 @@ async function run(
 
   switch (op) {
     case "current": {
+      if (host.launchWorkspace) {
+        const opened = await fs.openWorkspace(host.launchWorkspace);
+        if (!opened.ok) return opened;
+        root = opened.value.root;
+        return ok(opened.value);
+      }
       const pointer = await readPointer(host.userData);
       // Verified against the disk rather than trusted: a workspace can be moved or deleted between one
       // launch and the next, and reopening the shell onto a folder that is not there would be worse
@@ -98,7 +112,7 @@ async function run(
       return ok(pointer.recent.filter((path) => existsSync(path)));
     }
     case "choose": {
-      const picked = await chooseWorkspaceFolder(host.window);
+      const picked = await dialogs.chooseWorkspaceFolder(host.window);
       if (picked === null) return ok(null);
       return await open(host, picked);
     }
@@ -137,14 +151,32 @@ async function run(
           )
         : [];
       if (names.length === 0) return ok("discard");
-      return ok(await confirmUnsaved(host.window, names));
+      return ok(await dialogs.confirmUnsaved(host.window, names));
     }
     case "confirmDelete":
-      return ok(await confirmDelete(host.window, text(0)));
+      return ok(await dialogs.confirmDelete(host.window, text(0)));
 
     case "allowClose": {
       closing = true;
       host.window.close();
+      return ok(undefined);
+    }
+
+    case "answerDialog": {
+      const kind = text(0);
+      if (!isDialogKind(kind))
+        return { ok: false, error: `unknown dialog kind ${kind}` };
+      const answer = args[1];
+      if (
+        typeof answer !== "string" &&
+        typeof answer !== "boolean" &&
+        answer !== null
+      )
+        return {
+          ok: false,
+          error: "a dialog answer is a string, a boolean or null",
+        };
+      dialogs.answer(kind, answer);
       return ok(undefined);
     }
   }
@@ -154,6 +186,7 @@ export function registerWorkspaceIpc(
   ipcMain: IpcMain,
   host: WorkspaceHost,
 ): void {
+  dialogs = scriptedDialogs(host.dialogs ?? nativeDialogs);
   ipcMain.handle(
     WORKSPACE_CALL_CHANNEL,
     async (_event, op: unknown, ...args: unknown[]) => {

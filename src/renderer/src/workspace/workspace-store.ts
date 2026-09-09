@@ -21,7 +21,7 @@ import { restoreSession } from "./session";
 
 export type WorkspaceStatus = "booting" | "unset" | "ready";
 
-interface WorkspaceState {
+export interface WorkspaceState {
   status: WorkspaceStatus;
   root: string | null;
   name: string;
@@ -31,7 +31,7 @@ interface WorkspaceState {
   error: string | null;
 }
 
-interface WorkspaceActions {
+export interface WorkspaceActions {
   /** Reopens the remembered workspace, or leaves the gate up. Called once, at startup. */
   boot: () => Promise<void>;
   choose: () => Promise<void>;

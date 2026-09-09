@@ -11,6 +11,14 @@ const build = spawnSync(
 );
 if (build.status !== 0) process.exit(build.status ?? 1);
 
+// Anything after the script's own name goes to Electron: `npm run dev -- --audio null
+// --remote-debugging-port=9222` is a development session an agent can attach to. electron-vite
+// forwards what follows its own `--`.
+const passthrough = process.argv.slice(2).filter((arg) => arg !== "--");
 const bin = resolve(root, "node_modules/.bin/electron-vite");
-const child = spawn(bin, ["dev"], { cwd: root, stdio: "inherit" });
+const child = spawn(
+  bin,
+  ["dev", ...(passthrough.length > 0 ? ["--", ...passthrough] : [])],
+  { cwd: root, stdio: "inherit" },
+);
 child.on("exit", (code) => process.exit(code ?? 0));

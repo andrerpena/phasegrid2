@@ -96,6 +96,18 @@ export function afterSync(task: () => Promise<void>): void {
   enqueue(task);
 }
 
+/**
+ * Resolves once every document edit made so far has reached the engine.
+ *
+ * The same queue as `afterSync`, with nothing to do at the end of it: what a caller gets is the
+ * moment, not a task. It is what lets "the engine has it" be awaited rather than slept for.
+ */
+export function flushSync(): Promise<void> {
+  return new Promise((resolve) => {
+    enqueue(async () => resolve());
+  });
+}
+
 async function sendBatch(ops: PatchOp[]): Promise<void> {
   try {
     await useEngineStore.getState().call("patch.batch", { ops });

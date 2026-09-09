@@ -20,7 +20,14 @@ static void dataCallback(ma_device* dev, void* out, const void*, ma_uint32 frame
   self->onData(static_cast<float*>(out), frames, dev->playback.channels);
 }
 
-MiniaudioBackend::MiniaudioBackend() : impl_(std::make_unique<Impl>()) {
+MiniaudioBackend::MiniaudioBackend(AudioBackendKind kind) : impl_(std::make_unique<Impl>()), kind_(kind) {
+  if (kind == AudioBackendKind::Null) {
+    // Asked for by name rather than left to fall back to: miniaudio only tries the null backend when
+    // every real one failed, and a machine with a working device would then never be silent.
+    const ma_backend backends[] = {ma_backend_null};
+    impl_->contextInit = ma_context_init(backends, 1, nullptr, &impl_->context) == MA_SUCCESS;
+    return;
+  }
   impl_->contextInit = ma_context_init(nullptr, 0, nullptr, &impl_->context) == MA_SUCCESS;
 }
 

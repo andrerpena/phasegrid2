@@ -5,6 +5,7 @@
 //   node scripts/engine-cli.mjs hello
 //   node scripts/engine-cli.mjs catalog.get '{"detail":"summary"}'
 //   node scripts/engine-cli.mjs --demo            # build a synth voice and hold it for a few seconds
+//   node scripts/engine-cli.mjs --device null hello   # the silent backend: no hardware, no sound
 //   echo '{"cmd":"engine.ping","args":{}}' | node scripts/engine-cli.mjs
 //
 // This is the manual verification path for the protocol phase. It deliberately uses the same framing
@@ -60,9 +61,16 @@ function die(message) {
 
 async function main() {
   const argv = process.argv.slice(2);
+  // `--device <id|null>` goes to the engine; everything else is a command for it.
+  const engineArgs = ["--socket", socketPath];
+  const at = argv.indexOf("--device");
+  if (at >= 0 && argv[at + 1] !== undefined) {
+    engineArgs.push("--device", argv[at + 1]);
+    argv.splice(at, 2);
+  }
   const demo = argv[0] === "--demo";
 
-  const engine = spawn(enginePath, ["--socket", socketPath], {
+  const engine = spawn(enginePath, engineArgs, {
     stdio: ["ignore", "pipe", "pipe"],
   });
   engine.on("error", (error) =>

@@ -1,6 +1,7 @@
 import { commandRegistry } from "@renderer/commands/registry";
 import { useEngineStore } from "@renderer/engine/engine-store";
 import { useProjectStore } from "@renderer/project/project-store";
+import { useTransportStore } from "@renderer/transport/transport-store";
 import { cn } from "@renderer/utils/cn";
 import { NOTE_NAMES, SCALE_NAMES, scaleLabel } from "@shared/protocol/project";
 import { useEffect, useState } from "react";
@@ -24,8 +25,8 @@ export const ProjectHeader = () => {
   const setTimeSignature = useProjectStore((s) => s.setTimeSignature);
   const setScale = useProjectStore((s) => s.setScale);
   const call = useEngineStore((s) => s.call);
-  const setRunning = useEngineStore((s) => s.setRunning);
-  const [playing, setPlaying] = useState(false);
+  const playing = useTransportStore((s) => s.playing);
+  const toggle = useTransportStore((s) => s.toggle);
   const [position, setPosition] = useState({ bar: 0, beat: 0 });
 
   // The engine owns the playhead, so the header follows it rather than counting time itself. Two
@@ -33,36 +34,11 @@ export const ProjectHeader = () => {
   useEffect(() => {
     return window.engine.onEvent((event) => {
       if (event.event !== "transport.position") return;
-      const data = event.data as {
-        bar?: number;
-        beat?: number;
-        playing?: boolean;
-      };
+      const data = event.data as { bar?: number; beat?: number };
       if (typeof data.bar === "number" && typeof data.beat === "number")
         setPosition({ bar: data.bar, beat: data.beat });
-      if (typeof data.playing === "boolean") setPlaying(data.playing);
     });
   }, []);
-
-  /**
-   * The engine follows the button, including the moment a project opens.
-   *
-   * Without the initial pass the engine starts with its output open while the button says Play, so a
-   * project makes sound before anyone asks it to and the control that is supposed to start it appears
-   * to do nothing. Running on mount as well as on every change keeps the two in step from the start.
-   */
-  useEffect(() => {
-    // Three facts, because a piece playing is three things: the clock rolls, the patch advances, and
-    // the output is open. Holding the patch is what actually stops it -- a modular is not gated by
-    // its clock, so stopping the transport alone leaves an oscillator droning, and silencing the
-    // output alone leaves it droning unheard while every modulated knob on the canvas goes on
-    // turning. The gain stays in the gesture as the plain guarantee of silence.
-    void call(playing ? "transport.play" : "transport.stop", {}).catch(
-      () => {},
-    );
-    void setRunning(playing);
-    void call("audio.setOutputGain", { gain: playing ? 1 : 0 }).catch(() => {});
-  }, [playing, call, setRunning]);
 
   // Tempo and meter are pushed to the engine when they change here, because the engine is what plays.
   useEffect(() => {
@@ -91,13 +67,9 @@ export const ProjectHeader = () => {
         The transport is the clock and the output is the output, and for a while these were separate
         buttons on the honest grounds that a modular patch is not gated by its clock. That was true and
         useless: a person presses stop to make it stop, and a stop button that leaves an oscillator
-        droning is a stop button that does not work. So this does both — and, since the canvas learned
-        to show what the engine is doing, a third thing: it holds the patch. Silencing the output hid
-        a running patch rather than stopping it, which was invisible until the knobs it drove kept
-        turning with nothing to hear.
-
-        The click only moves the state. The effect above is what talks to the engine, so opening a
-        project and pressing the button take the same path and cannot disagree.
+        droning is a stop button that does not work. So this does both, and holds the patch as well;
+        the store says why. The button is a view of that store, so a key, the palette and this click
+        are the same gesture.
       */}
       <button
         type="button"
@@ -112,7 +84,7 @@ export const ProjectHeader = () => {
             ? "Stops the clock, holds the patch and silences the output"
             : "Starts the clock, runs the patch and opens the output"
         }
-        onClick={() => setPlaying(!playing)}
+        onClick={toggle}
       >
         {playing ? "■" : "▶"}
       </button>

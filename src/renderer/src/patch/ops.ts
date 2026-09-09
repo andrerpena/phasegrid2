@@ -102,13 +102,17 @@ export function applyOps(doc: PatchDoc, ops: readonly PatchOp[]): PatchDoc {
  * two operations touch the same thing.
  */
 export function invert(doc: PatchDoc, ops: readonly PatchOp[]): PatchOp[] {
-  const inverses: PatchOp[] = [];
+  const groups: PatchOp[][] = [];
   let current = doc;
   for (const op of ops) {
-    inverses.push(...inverseOf(current, op));
+    groups.push(inverseOf(current, op));
     current = applyOp(current, op);
   }
-  return inverses.reverse();
+  // The operations are undone last first, but each operation's own inverse is a sequence that has
+  // to stay in its order: a removed module comes back before the cables plugged into it, or the
+  // engine is asked for an edge to a node it does not have. Reversing the flat list did exactly
+  // that whenever two removals were undone together.
+  return groups.reverse().flat();
 }
 
 /** One operation's inverse. Several, where undoing needs more steps than doing did. */

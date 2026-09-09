@@ -124,7 +124,7 @@ function persist(layout: WidgetLayout): void {
   useConfigStore.getState().set(CONFIG_KEY, layout as never);
 }
 
-interface WidgetLayoutStore {
+export interface WidgetLayoutStore {
   layout: WidgetLayout;
   /** Returns false when placement rules forbid it. */
   addWidgetToSlot: (widgetId: WidgetId, slotId: WidgetSlotId) => boolean;

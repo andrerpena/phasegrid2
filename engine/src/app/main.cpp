@@ -29,8 +29,9 @@ static int usage() {
       "  --tone [seconds]      play a 440 Hz test tone on the default device\n"
       "  --render <patch.json> --out <file.wav> [--seconds N] [--sr N] [--block N]\n"
       "  --catalog             print the module catalog as JSON\n"
-      "  --socket <path> [--shm <name>]\n"
-      "                        open the audio device and take commands on a Unix socket");
+      "  --socket <path> [--shm <name>] [--device <id|null>]\n"
+      "                        open the audio device and take commands on a Unix socket;\n"
+      "                        `--device null` runs silently with no hardware");
   return 2;
 }
 
@@ -156,8 +157,14 @@ private:
   pg::Transport& transport_;
 };
 
+/// What `--device` asked for: a device id for the native backend, or the null backend.
+struct DeviceChoice {
+  std::string id;
+  pg::AudioBackendKind kind = pg::AudioBackendKind::Native;
+};
+
 /// Opens the audio device, then takes commands on a Unix socket until the client goes away.
-static int runSocket(const std::string& path, const std::string& shmName) {
+static int runSocket(const std::string& path, const std::string& shmName, const DeviceChoice& choice) {
   pg::Registry registry;
   pg::registerBuiltinModules(registry);
   pg::Transport transport;
@@ -166,7 +173,7 @@ static int runSocket(const std::string& path, const std::string& shmName) {
   // device negotiated; the callback cannot be written after the device is open, because `open` takes it.
   // So the callback reads the engine through a pointer that is null for the first few milliseconds.
   std::atomic<pg::Engine*> live{nullptr};
-  pg::MiniaudioBackend backend;
+  pg::MiniaudioBackend backend{choice.kind};
   pg::RenderFn render = [&live, &transport](float* out, uint32_t frames, uint32_t channels) {
     const pg::TransportSnapshot moment = transport.advance(frames);
     pg::Engine* engine = live.load(std::memory_order_acquire);
@@ -178,6 +185,7 @@ static int runSocket(const std::string& path, const std::string& shmName) {
   };
 
   pg::DeviceConfig config;
+  config.deviceId = choice.id;
   std::string error;
   if (!backend.open(config, render, error)) {
     std::fprintf(stderr, "open failed: %s\n", error.c_str());
@@ -243,11 +251,18 @@ int main(int argc, char** argv) {
   if (argc >= 2 && std::strcmp(argv[1], "--render") == 0) return runRender(argc, argv);
   if (argc >= 2 && std::strcmp(argv[1], "--catalog") == 0) return runCatalog();
   if (argc >= 2 && std::strcmp(argv[1], "--socket") == 0) {
-    if (argc < 3) { std::fprintf(stderr, "usage: --socket <path> [--shm <name>]\n"); return 2; }
+    if (argc < 3) { std::fprintf(stderr, "usage: --socket <path> [--shm <name>] [--device <id|null>]\n"); return 2; }
     std::string shmName;
-    for (int i = 3; i + 1 < argc; ++i)
+    DeviceChoice choice;
+    for (int i = 3; i + 1 < argc; ++i) {
       if (std::strcmp(argv[i], "--shm") == 0) shmName = argv[i + 1];
-    return runSocket(argv[2], shmName);
+      if (std::strcmp(argv[i], "--device") == 0) {
+        const std::string wanted = argv[i + 1];
+        if (wanted == "null") choice.kind = pg::AudioBackendKind::Null;
+        else choice.id = wanted;
+      }
+    }
+    return runSocket(argv[2], shmName, choice);
   }
   return usage();
 }

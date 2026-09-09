@@ -22,7 +22,7 @@ import { create } from "zustand";
  * The price is that switching has to save the outgoing document back here, which `activate` does.
  */
 
-interface ProjectState {
+export interface ProjectState {
   projects: ProjectDoc[];
   activeId: string | null;
   /**
@@ -34,7 +34,7 @@ interface ProjectState {
   dirtyIds: string[];
 }
 
-interface ProjectActions {
+export interface ProjectActions {
   open: (project: ProjectDoc) => void;
   close: (id: string) => void;
   activate: (id: string) => void;

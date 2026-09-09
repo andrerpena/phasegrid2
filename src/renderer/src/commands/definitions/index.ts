@@ -4,6 +4,7 @@ import { useHistoryStore } from "@renderer/history/history-store";
 import { useLayoutStore } from "@renderer/layout/layout-store";
 import { deleteSelection } from "@renderer/patch/delete-selection";
 import { emptyProject, useProjectStore } from "@renderer/project/project-store";
+import { useTransportStore } from "@renderer/transport/transport-store";
 import { SAVE_AS_MODAL } from "@renderer/workspace/SaveAsDialog";
 import { closeProject, resolveUnsaved } from "@renderer/workspace/unsaved";
 import { useWorkspaceStore } from "@renderer/workspace/workspace-store";
@@ -138,6 +139,28 @@ const PATCH_COMMANDS: CommandDefinition<never>[] = [
   },
 ];
 
+/** Play and stop by name, so a key, the palette and a script reach the same button. */
+const TRANSPORT_COMMANDS: CommandDefinition<never>[] = [
+  {
+    id: "transport.play",
+    name: "Play",
+    category: "Transport",
+    execute: () => useTransportStore.getState().play(),
+  },
+  {
+    id: "transport.stop",
+    name: "Stop",
+    category: "Transport",
+    execute: () => useTransportStore.getState().stop(),
+  },
+  {
+    id: "transport.toggle",
+    name: "Play / Stop",
+    category: "Transport",
+    execute: () => useTransportStore.getState().toggle(),
+  },
+];
+
 const WORKSPACE_COMMANDS: CommandDefinition<never>[] = [
   {
     id: "workspace.open",
@@ -157,6 +180,7 @@ export function registerShellCommands(): void {
   commandRegistry.registerAll(SHELL_COMMANDS);
   commandRegistry.registerAll(PROJECT_COMMANDS);
   commandRegistry.registerAll(PATCH_COMMANDS);
+  commandRegistry.registerAll(TRANSPORT_COMMANDS);
   commandRegistry.registerAll(WORKSPACE_COMMANDS);
   commandRegistry.registerAll(exampleCommands());
 }

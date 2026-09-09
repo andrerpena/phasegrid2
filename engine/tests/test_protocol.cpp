@@ -1,6 +1,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <filesystem>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <string>
@@ -158,7 +159,7 @@ TEST_CASE("every command in the shared table has a handler", "[protocol]") {
   FakeDeviceHost host;
   f.ctx.device = &host;
   for (const char* cmd : {"hello", "engine.ping", "engine.shutdown", "catalog.get", "patch.load",
-                          "patch.clear", "patch.batch", "patch.setVoiceCount", "patch.setFeedbackMode",
+                          "patch.clear", "patch.render", "patch.batch", "patch.setVoiceCount", "patch.setFeedbackMode",
                           "module.add", "module.remove", "edge.add", "edge.remove", "param.set",
                           "transport.play", "transport.stop", "transport.setTempo", "transport.setTimeSignature",
                           "transport.seek",
@@ -731,4 +732,53 @@ TEST_CASE("module.preview refuses what it cannot draw", "[protocol][preview]") {
   REQUIRE(errorCode(f.call("module.preview", {{"module", "vca"}})) == "E_UNSUPPORTED");
   REQUIRE(errorCode(f.call("module.preview", {{"module", "nobody"}})) == "E_NODE_NOT_FOUND");
   REQUIRE(errorCode(f.call("module.preview", {{"module", "vca"}, {"count", "lots"}})) == "E_SCHEMA");
+}
+
+// ---- patch.render: hearing the loaded patch without touching the one playing --------------------
+
+TEST_CASE("patch.render measures the loaded patch offline and leaves the live engine alone", "[protocol][render]") {
+  Fixture f;
+  f.buildWorkingPatch();
+  const uint64_t before = f.revision();
+
+  const json answer = f.call("patch.render", json{{"seconds", 0.25}});
+  INFO(answer.dump());
+  REQUIRE(answer["ok"] == true);
+  const json& r = answer["result"];
+  REQUIRE(r["channels"] == 2);
+  REQUIRE(r["sampleRate"] == 48000.0);
+  REQUIRE(r["frames"] == 12000);
+  // A constant 0.5 through unity gain into the sink is 0.5 on both channels, so its RMS and its
+  // peak are 0.5: a measurement, not a "something came out".
+  REQUIRE(r["rms"][0].get<double>() == Catch::Approx(0.5).margin(0.01));
+  REQUIRE(r["rms"][1].get<double>() == Catch::Approx(0.5).margin(0.01));
+  REQUIRE(r["peak"][0].get<double>() == Catch::Approx(0.5).margin(0.01));
+  REQUIRE(r["out"].is_null());
+  // Nothing was committed to the live engine.
+  REQUIRE(f.revision() == before);
+}
+
+TEST_CASE("patch.render on an empty patch is silence", "[protocol][render]") {
+  Fixture f;
+  const json answer = f.call("patch.render", json{{"seconds", 0.1}});
+  REQUIRE(answer["ok"] == true);
+  REQUIRE(answer["result"]["rms"][0].get<double>() == 0.0);
+  REQUIRE(answer["result"]["peak"][1].get<double>() == 0.0);
+}
+
+TEST_CASE("patch.render writes a WAV when given a path, and refuses a bad duration", "[protocol][render]") {
+  Fixture f;
+  f.buildWorkingPatch();
+  const std::string wav = (std::filesystem::temp_directory_path() / "pg_protocol_render.wav").string();
+  std::filesystem::remove(wav);
+  const json answer = f.call("patch.render", json{{"seconds", 0.1}, {"out", wav}});
+  INFO(answer.dump());
+  REQUIRE(answer["ok"] == true);
+  REQUIRE(answer["result"]["out"] == wav);
+  REQUIRE(std::filesystem::file_size(wav) > 44);
+  std::filesystem::remove(wav);
+
+  REQUIRE(f.call("patch.render", json{{"seconds", 0}})["error"]["code"] == "E_SCHEMA");
+  REQUIRE(f.call("patch.render", json{{"seconds", 31}})["error"]["code"] == "E_SCHEMA");
+  REQUIRE(f.call("patch.render", json{{"seconds", "long"}})["error"]["code"] == "E_SCHEMA");
 }

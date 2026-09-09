@@ -19,7 +19,7 @@ export interface HistoryEntry {
   revert: () => void;
 }
 
-interface HistoryState {
+export interface HistoryState {
   past: HistoryEntry[];
   future: HistoryEntry[];
   /** While an undo or redo is running, so the change it causes is not recorded as a new entry. */
@@ -27,7 +27,7 @@ interface HistoryState {
   limit: number;
 }
 
-interface HistoryActions {
+export interface HistoryActions {
   /** Records an entry. The caller has already made the change; this only remembers how to take it back. */
   push: (entry: HistoryEntry) => void;
   undo: () => void;

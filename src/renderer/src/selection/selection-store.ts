@@ -12,7 +12,7 @@ import { create } from "zustand";
  * is named `modules` rather than `ids` so that edges can join without renaming anything.
  */
 
-interface SelectionState {
+export interface SelectionState {
   modules: string[];
   set: (ids: readonly string[]) => void;
   clear: () => void;

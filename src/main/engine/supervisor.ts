@@ -184,6 +184,12 @@ export interface SupervisorOptions {
    * engine unlinks whatever a previous life left at the name before creating its own.
    */
   shmName?: string;
+  /**
+   * The audio device the engine opens: a device id, or `null` for the silent backend. Absent means
+   * the system default. Passed straight through as `--device`; the engine is the one that knows what
+   * the ids mean.
+   */
+  device?: string;
   /** Injected in tests. */
   spawnEngine?: SpawnEngine;
   createClient?: (socketPath: string) => EngineClient;
@@ -227,6 +233,7 @@ export class EngineSupervisor {
   constructor(options: SupervisorOptions) {
     this.options = {
       shmName: `/pg-${process.pid}`,
+      device: "",
       spawnEngine: spawnEngineProcess,
       createClient: (path) => new EngineSocketClient(path),
       connectAttempts: 200,
@@ -323,6 +330,7 @@ export class EngineSupervisor {
       this.options.socketPath,
       "--shm",
       this.options.shmName,
+      ...(this.options.device === "" ? [] : ["--device", this.options.device]),
     ]);
     this.child = child;
     child.onLog((level, message) =>

@@ -15,6 +15,7 @@ import { useEffect, useRef } from "react";
 import { createSizeSync } from "./canvas-size";
 import { GridInteraction } from "./GridInteraction";
 import { GridRenderer } from "./GridRenderer";
+import { gridRegistry } from "./grid-registry";
 import { startPreviewSync } from "./preview-sync";
 import { startTelemetrySync } from "./telemetry-sync";
 import { viewportStore } from "./viewport-store";
@@ -118,6 +119,9 @@ export const GridView = () => {
       // through React, because all of this lives outside the tree.
       viewportStore.set(view.viewport, measure());
       stop.push(() => viewportStore.set(null));
+      // And the renderer itself, for the automation API's geometry questions.
+      gridRegistry.set({ renderer: view, canvas: created.canvas });
+      stop.push(() => gridRegistry.set(null));
 
       // The one place the canvas learns how big it is.
       //

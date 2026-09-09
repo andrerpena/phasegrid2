@@ -36,13 +36,13 @@ interface ApplyOptions {
   inverse?: PatchOp[];
 }
 
-interface PatchState {
+export interface PatchState {
   doc: PatchDoc;
   /** Bumped on every change, so a renderer can tell "something moved" without diffing. */
   version: number;
 }
 
-interface PatchActions {
+export interface PatchActions {
   apply: (ops: PatchOp[], options?: ApplyOptions) => void;
   replace: (doc: PatchDoc) => void;
   subscribeOps: (listener: OpsListener) => () => void;

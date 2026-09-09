@@ -95,6 +95,22 @@ describe("inverting operations", () => {
     expect(roundTrips(base, [{ op: "moduleRemove", id: "osc" }])).toBe(true);
   });
 
+  it("puts a module back before the cables plugged into it, for every module undone", () => {
+    // Deleting a selection is several removals in one edit. The inverse of each is a module and then
+    // its cables, and reversing the list of inverses one operation at a time -- rather than one
+    // group at a time -- put the first module's cable ahead of the module itself. The document
+    // tolerated it; the engine refused the batch with "no node osc" and a full resend hid the fault.
+    const inverse = invert(base, [
+      { op: "moduleRemove", id: "osc" },
+      { op: "moduleRemove", id: "out" },
+    ]);
+    expect(inverse.map((o) => `${o.op}:${"id" in o ? o.id : "?"}`)).toEqual([
+      "moduleAdd:out",
+      "moduleAdd:osc",
+      "edgeAdd:e1",
+    ]);
+  });
+
   it("undoes a param change back to its previous value", () => {
     expect(
       roundTrips(base, [

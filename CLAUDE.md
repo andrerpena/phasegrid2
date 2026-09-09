@@ -11,6 +11,13 @@ Spec: docs/superpowers/specs/2026-09-07-phasegrid2-architecture-design.md. Engin
 - `npm run engine:build` / `npm run engine:test` — CMake build and Catch2 tests; REQUIRED after any C++ change
 - `npm run engine:render -- patch.json --seconds 2 --out out.wav` — headless render
 
+## Testing a change (for an agent)
+- Unit: `npm test`. Engine: `npm run engine:test`. Always, after the relevant change.
+- End to end: `npm run e2e` builds the app and runs every scenario in `scripts/e2e/scenarios/`, each in a fresh throwaway workspace, headless on the silent audio backend. One scenario: `node scripts/e2e.mjs --only patch-editing`. `--list`, `--shots <dir>` (read the PNGs; they are 2x), `--keep` (leave the last app running for `drive`).
+- Exploring: `npm run dev:drive` starts the app silent with a debugging port on 9222; then `node scripts/drive.mjs 'pg.snapshot()'`, `'pg.commands.run("project.new")'`, `'pg.grid.knob("osc","level")'`, `--shot now.png`, `--text`, or no argument for a REPL. A dev session hot-reloads only the renderer: restart it after an engine, main, preload or protocol change.
+- `window.pg` (docs/automation.md) is the API: `snapshot()`, `stores`, `commands`, `patch` edits, `grid` geometry in window pixels for a real pointer, `idle()` instead of sleeps, `dialogs.answer` for native boxes, `engine.render` to measure whether a patch makes sound, `log.tail`. Use the DevTools protocol only for what needs a real mouse or keyboard, or a picture.
+- A new feature gets a scenario. A new panel, control or flow gets a way to be reached through `pg` (a command, a store field, a geometry query) before it gets a button; anything a person can do should have a name a script can call.
+
 ## Layout
 - `engine/` C++20 audio engine (separate process). `src/core` graph/scheduler, `src/modules` one file per module, `src/services` device/midi/telemetry/socket, `tests/` Catch2.
 - `src/main/workspace/` the workspace folder: path guard, filesystem, dialogs, one IPC channel.

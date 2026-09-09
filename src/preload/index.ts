@@ -197,6 +197,8 @@ const workspace: WorkspaceBridge = {
   confirmDelete: (name) => workspaceCall<boolean>("confirmDelete", name),
 
   allowClose: () => workspaceCall<void>("allowClose"),
+  answerDialog: (kind, answer) =>
+    workspaceCall<void>("answerDialog", kind, answer),
 
   // Wrapped rather than passed through, for the same reason engine events are: handing the renderer an
   // `IpcRendererEvent` would leak `sender`, and with it a path back into the main process.

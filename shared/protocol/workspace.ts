@@ -134,12 +134,29 @@ export const WORKSPACE_OPS = [
   "confirmUnsaved",
   "confirmDelete",
   "allowClose",
+  "answerDialog",
 ] as const;
 
 export type WorkspaceOp = (typeof WORKSPACE_OPS)[number];
 
 export function isWorkspaceOp(op: string): op is WorkspaceOp {
   return (WORKSPACE_OPS as readonly string[]).includes(op);
+}
+
+/**
+ * The native questions a script can answer ahead of time: the folder chooser (a path, or null for
+ * cancel), the unsaved-work box (`save`, `discard`, `cancel`) and the delete confirmation (a boolean).
+ */
+export const DIALOG_KINDS = [
+  "chooseWorkspace",
+  "confirmUnsaved",
+  "confirmDelete",
+] as const;
+export type DialogKind = (typeof DIALOG_KINDS)[number];
+export type DialogAnswer = string | boolean | null;
+
+export function isDialogKind(kind: string): kind is DialogKind {
+  return (DIALOG_KINDS as readonly string[]).includes(kind);
 }
 
 export const WORKSPACE_CALL_CHANNEL = "workspace:call";
@@ -178,6 +195,11 @@ export interface WorkspaceBridge {
 
   /** The renderer has finished asking about unsaved work and the window may now go. */
   allowClose(): Promise<StorageResult<void>>;
+  /** Queues the answer the next native dialog of `kind` gives, instead of showing it. */
+  answerDialog(
+    kind: DialogKind,
+    answer: DialogAnswer,
+  ): Promise<StorageResult<void>>;
   /** Main is asking. Returns the unsubscribe. */
   onConfirmClose(listener: () => void): () => void;
 }

@@ -20,9 +20,11 @@ import {
 import { useEngineStore, watchEngine } from "@renderer/engine/engine-store";
 import { useKeybindings } from "@renderer/keybindings/use-keybindings";
 import { useLayoutStore } from "@renderer/layout/layout-store";
+import { watchLog } from "@renderer/log/log-store";
 import { startEngineSync } from "@renderer/patch/engine-sync";
 import { startDirtyTracking } from "@renderer/project/dirty";
 import { watchWorkspaceThemes } from "@renderer/theming/workspace-themes";
+import { watchTransport } from "@renderer/transport/transport-store";
 import { startProjectCommands } from "@renderer/workspace/project-commands";
 import { SaveAsDialog } from "@renderer/workspace/SaveAsDialog";
 import { startSessionPersistence } from "@renderer/workspace/session";
@@ -82,6 +84,9 @@ export const App = () => {
     // is applied to the document that the engine never hears about.
     const stopSync = startEngineSync();
     const stopWatch = watchEngine();
+    // What the engine says lands in the log, and the play button's state reaches the engine.
+    const stopLog = watchLog();
+    const stopTransport = watchTransport();
     const stopDirty = startDirtyTracking();
     const stopSession = startSessionPersistence();
     const stopCommands = startProjectCommands();
@@ -94,6 +99,8 @@ export const App = () => {
       stopStatus();
       stopSync();
       stopWatch();
+      stopLog();
+      stopTransport();
       stopDirty();
       stopSession();
       stopCommands();

@@ -27,3 +27,6 @@ jobs:
       - run: npm run engine:test
         env:
           PG_WERROR: "ON"
+      # The built application, driven through its scenarios on the silent audio backend. The macOS
+      # runner has a window server, so Electron opens a real window; no sound device is needed.
+      - run: npm run e2e

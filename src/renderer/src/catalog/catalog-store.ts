@@ -10,7 +10,7 @@ import { create } from "zustand";
  * appears with its ports, their colours and its parameters, with no change here at all.
  */
 
-interface CatalogState {
+export interface CatalogState {
   modules: ModuleDescriptor[];
   byId: Map<string, ModuleDescriptor>;
   byCategory: Map<string, ModuleDescriptor[]>;
@@ -19,7 +19,7 @@ interface CatalogState {
   error: string | null;
 }
 
-interface CatalogActions {
+export interface CatalogActions {
   load: () => Promise<void>;
   get: (typeId: string) => ModuleDescriptor | undefined;
 }

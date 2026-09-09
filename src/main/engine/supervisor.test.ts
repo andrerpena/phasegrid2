@@ -130,7 +130,9 @@ interface Harness {
   args: string[][];
 }
 
-function harness(overrides: { refusals?: number } = {}): Harness {
+function harness(
+  overrides: { refusals?: number; device?: string } = {},
+): Harness {
   const processes: FakeProcess[] = [];
   const clients: FakeClient[] = [];
   const events: EventEnvelope[] = [];
@@ -139,6 +141,7 @@ function harness(overrides: { refusals?: number } = {}): Harness {
   const supervisor = new EngineSupervisor({
     enginePath: "/opt/phasegrid/phasegrid-engine",
     socketPath: "/tmp/pg-test.sock",
+    ...(overrides.device === undefined ? {} : { device: overrides.device }),
     spawnEngine: (_binary, spawnArgs) => {
       args.push(spawnArgs);
       const process = new FakeProcess();
@@ -246,6 +249,26 @@ describe("engine supervisor", () => {
     ]);
     expect(h.supervisor.connected).toBe(true);
     expect(h.supervisor.engineInfo?.engineVersion).toBe("0.1.0-test");
+  });
+
+  it("names the device it was asked for, and nothing when it was not", async () => {
+    // `--audio null` on the application's command line has to reach the engine as `--device null`,
+    // or a headless run opens the real device after all -- and fails on a machine without one.
+    const silent = harness({ device: "null" });
+    await silent.supervisor.start();
+    expect(silent.args[0]).toEqual([
+      "--socket",
+      "/tmp/pg-test.sock",
+      "--shm",
+      `/pg-${process.pid}`,
+      "--device",
+      "null",
+    ]);
+    // And the flag is absent rather than empty when nothing was asked: the engine treats an empty
+    // id as the default device, but an argument list should say what it means.
+    const plain = harness();
+    await plain.supervisor.start();
+    expect(plain.args[0]).not.toContain("--device");
   });
 
   it("retries the connection while the engine is still opening its device", async () => {

@@ -5,7 +5,7 @@ import type { PhasegridTheme } from "./theme";
 import { injectThemeVariables } from "./theme-variables";
 import { DEFAULT_THEME_ID, THEMES, themeById } from "./themes";
 
-interface ThemeState {
+export interface ThemeState {
   theme: PhasegridTheme;
   /** Every theme that can be chosen: the built-ins, plus whatever the workspace defines. */
   available: PhasegridTheme[];

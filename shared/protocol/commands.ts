@@ -144,6 +144,26 @@ export const COMMANDS = {
   },
   "patch.clear": { args: NoArgs, result: RevisionResultSchema },
   /**
+   * The loaded patch, rendered offline and measured: RMS and peak per channel, and a WAV at `out`
+   * when a path is given. A second engine is built from the model, so the one playing is untouched.
+   * It is how a script finds out whether what it built makes a sound.
+   */
+  "patch.render": {
+    args: z.object({
+      seconds: z.number().positive().max(30).optional(),
+      out: z.string().min(1).optional(),
+    }),
+    result: z.object({
+      seconds: z.number().positive(),
+      sampleRate: z.number().positive(),
+      channels: z.number().int().positive(),
+      frames: z.number().int().nonnegative(),
+      rms: z.array(z.number().nonnegative()),
+      peak: z.array(z.number().nonnegative()),
+      out: z.string().nullable(),
+    }),
+  },
+  /**
    * Several ops, one commit, all or nothing. A failing op anywhere in the list leaves the engine exactly
    * as it was, which is what lets the interface treat one user gesture as one atomic edit.
    */

@@ -16,7 +16,7 @@ import { create } from "zustand";
 
 export type EngineStatus = "connecting" | "ready" | "error";
 
-interface EngineState {
+export interface EngineState {
   status: EngineStatus;
   /** A sentence for the status bar. */
   detail: string;
@@ -35,7 +35,7 @@ interface EngineState {
   revision: number;
 }
 
-interface EngineActions {
+export interface EngineActions {
   connect: () => Promise<void>;
   /** Runs or holds the patch, and records which, so everything drawing from it agrees. */
   setRunning: (running: boolean) => Promise<void>;

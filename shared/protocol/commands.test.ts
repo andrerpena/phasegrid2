@@ -55,6 +55,7 @@ const cases: Record<CommandName, { valid: unknown; invalid: unknown }> = {
     invalid: { patch: { schemaVersion: 1, modules: {}, edges: [] } },
   },
   "patch.clear": { valid: {}, invalid: [] },
+  "patch.render": { valid: { seconds: 0.5 }, invalid: { seconds: "long" } },
   "patch.batch": {
     valid: { ops: [{ op: "moduleRemove", id: "osc1" }] },
     invalid: { ops: [{ op: "moduleRemove" }] },
@@ -112,6 +113,7 @@ describe("command table", () => {
       "module.preview",
       "patch.load",
       "patch.clear",
+      "patch.render",
       "patch.batch",
       "patch.setVoiceCount",
       "patch.setFeedbackMode",
