@@ -29,6 +29,26 @@ export function check(label, condition, extra = "") {
 }
 export const failureCount = () => failures;
 
+/**
+ * Polls `predicate` until it answers something truthy, and returns it.
+ *
+ * For the conditions that are not in the page: a file appearing, a file saying what it should. The
+ * ones inside the window have `waitFor` on the driver instead.
+ */
+export async function until(
+  predicate,
+  { timeoutMs = 8000, intervalMs = 50, label = "the condition" } = {},
+) {
+  const started = Date.now();
+  for (;;) {
+    const value = await predicate();
+    if (value) return value;
+    if (Date.now() - started > timeoutMs)
+      throw new Error(`until: ${label} did not happen within ${timeoutMs} ms`);
+    await sleep(intervalMs);
+  }
+}
+
 export const newWorkspace = () => mkdtempSync(join(tmpdir(), "pg-ws-"));
 export const newUserData = () => mkdtempSync(join(tmpdir(), "pg-ud-"));
 
@@ -83,11 +103,74 @@ let nextPort = 9400 + Math.floor(Math.random() * 400);
  * log can be told apart.
  */
 async function makeDriver(url, { shots, label = "page" }) {
+  /**
+   * Everything the page reported as an error, and the patterns a scenario said to expect.
+   *
+   * This exists because of a bug that hid here. A batch the engine refused was logged, the sync
+   * layer recovered by resending the whole patch, and the run passed: the only trace was a line in
+   * the scroll-back that nothing was looking at. An application that recovers from its own errors
+   * is a good application and a bad test subject, so the errors are collected and a scenario fails
+   * on any it did not say to expect. The log store echoes engine errors to the console, so this
+   * catches the engine's as well as the renderer's.
+   */
+  const errors = [];
+  const expected = [];
+
   const cdp = await connect(url, {
-    onConsole: (type, text) => console.log(`      [${label}:${type}] ${text}`),
+    onConsole: (type, text) => {
+      console.log(`      [${label}:${type}] ${text}`);
+      if (type === "error") errors.push(text);
+    },
   });
   const evaluate = (source) => cdp.evaluate(source, HELPERS);
   const text = () => evaluate("return document.body.innerText;");
+
+  /**
+   * Waits until `source`, evaluated in the page, is truthy, and returns what it evaluated to.
+   *
+   * `source` is an expression: `'document.querySelector("dialog") !== null'`, or anything reaching
+   * `window.pg`. This is what replaces a sleep. A sleep says how long someone guessed the thing
+   * takes on the machine they wrote it on; this says what is being waited for, and fails saying so.
+   */
+  const waitFor = async (
+    source,
+    { timeoutMs = 8000, intervalMs = 50, label } = {},
+  ) => {
+    const started = Date.now();
+    for (;;) {
+      let value;
+      try {
+        value = await evaluate(`return (${source});`);
+      } catch {
+        // A condition that cannot even be evaluated yet -- a store not built, an element not there
+        // -- is simply not true yet. It becomes a timeout if it stays that way.
+        value = undefined;
+      }
+      if (value) return value;
+      if (Date.now() - started > timeoutMs)
+        throw new Error(
+          `waitFor: ${label ?? source} was not true within ${timeoutMs} ms`,
+        );
+      await sleep(intervalMs);
+    }
+  };
+
+  /**
+   * An assertion that is allowed to take a moment: waits for `source`, then reports it as a check.
+   *
+   * The difference from `waitFor` matters. `waitFor` is for getting somewhere -- a dialog to be
+   * open before typing into it -- and throwing is the right failure. This is for the assertion
+   * itself, so a slow machine does not turn a true statement into a failed one, and a false one
+   * still prints as a FAIL line beside its neighbours rather than ending the scenario.
+   */
+  const checkEventually = async (labelText, source, options = {}) => {
+    try {
+      await waitFor(source, options);
+      return check(labelText, true);
+    } catch {
+      return check(labelText, false, `never became true: ${source}`);
+    }
+  };
 
   /**
    * Runs an expression against `window.pg`, the application's automation API, and returns its
@@ -200,6 +283,21 @@ async function makeDriver(url, { shots, label = "page" }) {
     text,
     pg,
     idle,
+    waitFor,
+    checkEventually,
+    /** Errors matching any of these are the scenario's business, not a failure. */
+    expectErrors: (...patterns) => expected.push(...patterns),
+    /** Everything the page reported as an error, expected or not. */
+    errors: () => [...errors],
+    unexpectedErrors: () =>
+      errors.filter(
+        (message) =>
+          !expected.some((pattern) =>
+            pattern instanceof RegExp
+              ? pattern.test(message)
+              : message.includes(pattern),
+          ),
+      ),
     mouse,
     clickAt,
     dragTo,
@@ -267,6 +365,7 @@ export async function launch(options, run) {
     await sleep(1800);
     await run({ ...driver, port, userData, workspace, shots });
   } finally {
+    reportErrors(driver);
     driver?.cdp.close();
     if (keep) {
       console.log(
@@ -304,6 +403,23 @@ export async function attach(port, run, { shots, label = "page" } = {}) {
       shots,
     });
   } finally {
+    reportErrors(driver);
     driver.cdp.close();
   }
+}
+
+/**
+ * The check every scenario gets whether it asked for one or not.
+ *
+ * Reported in the `finally`, so a scenario that threw still says what the page was complaining
+ * about -- which is usually the reason it threw.
+ */
+function reportErrors(driver) {
+  if (driver === null || driver === undefined) return;
+  const unexpected = driver.unexpectedErrors();
+  check(
+    "nothing errored that the scenario did not expect",
+    unexpected.length === 0,
+    unexpected.join(" | "),
+  );
 }

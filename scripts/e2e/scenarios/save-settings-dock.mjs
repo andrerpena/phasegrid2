@@ -1,9 +1,15 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { until } from "../harness.mjs";
 
 /**
  * A project saved for the first time, the settings editor writing to the workspace and taking
  * effect without a relaunch, and the dock's panels being closed and put back.
+ *
+ * Nothing here sleeps. Where a fact takes a moment to become true, the wait names the fact: the
+ * dialog is open, the colour reached CSS, the project is no longer dirty, the settings write
+ * reached the file. `idle()` covers that last one, which is the one that is easy to forget --
+ * a settings write is fired and forgotten, so the store moves before the file does.
  */
 export default {
   name: "save-settings-dock",
@@ -13,18 +19,24 @@ export default {
     workspace: ws,
     evaluate,
     text,
+    idle,
+    waitFor,
+    checkEventually,
     screenshot,
     replaceDocument,
     mouse,
-    sleep,
     check,
   }) {
     await evaluate(`click("button", "+");`);
-    await sleep(400);
+    await waitFor("window.pg.snapshot().projects.open.length === 1", {
+      label: "a new project opens",
+    });
     await evaluate(
       `setValue(document.querySelector('input[aria-label="Tempo"]'), "137");`,
     );
-    await sleep(300);
+    await waitFor("window.pg.snapshot().projects.open[0].dirty === true", {
+      label: "editing the tempo marks the project unsaved",
+    });
     check("the tab shows a dot once edited", (await text()).includes("•"));
     check(
       "the button offers Save As, having nowhere to save yet",
@@ -32,11 +44,19 @@ export default {
     );
 
     await evaluate(`click("button", "Save As…");`);
-    await sleep(400);
+    await waitFor(
+      `document.querySelector('[data-testid="save-as"]') !== null`,
+      {
+        label: "the Save As dialog is open",
+      },
+    );
     await evaluate(
       `setValue(document.querySelector("dialog input"), "My Track");`,
     );
-    await sleep(250);
+    await waitFor(
+      `document.querySelector("dialog input").value === "My Track"`,
+      { label: "the name is typed" },
+    );
     const hint = await evaluate(
       "return document.querySelector('dialog')?.innerText ?? '';",
     );
@@ -48,7 +68,9 @@ export default {
     await evaluate(
       `[...document.querySelectorAll("dialog button")].find((b) => b.textContent.trim() === "Save").click();`,
     );
-    await sleep(700);
+    await waitFor("window.pg.snapshot().projects.open[0].dirty === false", {
+      label: "the project is saved",
+    });
 
     const file = join(ws, "projects", "my-track", "project.json");
     check("the project is on disk", existsSync(file));
@@ -66,31 +88,60 @@ export default {
     check("the dot cleared", !after.includes("•"));
     check("the Projects panel lists it", after.includes("My Track"));
 
-    const session = JSON.parse(
-      readFileSync(join(ws, ".phasegrid", "session.json"), "utf8"),
+    // The session is written on a debounce of its own, so it is waited for from here rather than
+    // through `idle`, which knows nothing about that timer.
+    const session = await until(
+      () => {
+        try {
+          const parsed = JSON.parse(
+            readFileSync(join(ws, ".phasegrid", "session.json"), "utf8"),
+          );
+          return parsed.open.includes("my-track") ? parsed : null;
+        } catch {
+          return null;
+        }
+      },
+      { label: "the session file records the open tab" },
     );
     check(
-      "the session records the open tab",
-      session.open.includes("my-track") && session.active === "my-track",
+      "and which tab was in front",
+      session.active === "my-track",
       JSON.stringify(session),
+    );
+
+    // The settings panel is kept mounted behind the grid, and must be truly hidden there: its own
+    // inner tab strip once declared itself visible and painted its toolbar and editor over the grid
+    // while the Grid tab was selected. `offsetParent` is null exactly when an element is
+    // `display: none`, which no descendant can undo.
+    const settingsToolbarShown = `(() => { const b = [...document.querySelectorAll('[data-widget="settings"] button')].find((x) => x.textContent.includes("Reset")); return b !== undefined && b.offsetParent !== null; })()`;
+    check(
+      "the settings panel paints nothing while the grid is in front",
+      (await evaluate(`return ${settingsToolbarShown};`)) === false,
+    );
+    // And it is not built at all until it is opened. The editor behind it is several megabytes
+    // fetched by a dynamic import; keeping the panel mounted used to mean building it at launch,
+    // which is what that import exists to avoid.
+    const editorBuilt = `document.querySelector('[data-widget="settings"] .monaco-editor') !== null`;
+    check(
+      "and the editor is not built until the tab is opened",
+      (await evaluate(`return ${editorBuilt};`)) === false,
     );
 
     // Settings, and a keybinding taking effect without a relaunch.
     await evaluate(`click('[role="tab"]', "Settings");`);
-    await sleep(300);
-    // The catalogue's own search field: present exactly when the left column is.
+    await checkEventually("opening the tab builds the editor", editorBuilt, {
+      timeoutMs: 15000,
+    });
+    // The catalogue's own search field: present exactly when the left column is. Matching on the
+    // panel title does not work, because the title is uppercased by the stylesheet.
     const leftShown = `document.querySelector('[data-kb-scope="catalog"]') !== null`;
-    const toggled = await evaluate(
-      `press("b", { metaKey: true }); await new Promise(r => setTimeout(r, 250)); return ${leftShown};`,
-    );
-    check(
+    await evaluate(`press("b", { metaKey: true });`);
+    await checkEventually(
       "mod+b toggles the left panel by default",
-      toggled === false,
-      String(toggled),
+      `${leftShown} === false`,
     );
     await evaluate(`press("b", { metaKey: true });`);
-    await sleep(300);
-    check("and toggles it back", await evaluate(`return ${leftShown};`));
+    await checkEventually("and toggles it back", leftShown);
 
     // ── The dock: a panel can be closed, and put back from the slot it left ──
     await screenshot("shell");
@@ -117,11 +168,13 @@ export default {
     await evaluate(
       `[...document.querySelectorAll('[aria-label="Close Performance"]')][0].click();`,
     );
-    await sleep(400);
-    check(
+    await checkEventually(
       "closing a panel removes its tab",
-      !(await tabNames()).includes("Performance"),
+      `[...document.querySelectorAll('[role="tab"]')].every((t) => t.textContent.trim() !== "Performance")`,
     );
+    // Closing writes the layout to the workspace, which is the point of it living in the settings.
+    // `idle` is what makes that write have happened rather than be about to.
+    await idle();
     const savedLayout = JSON.parse(
       readFileSync(join(ws, "workspace.json"), "utf8"),
     ).settings["layout.widgets"];
@@ -138,7 +191,9 @@ export default {
        add.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, button: 0, isPrimary: true, pointerType: "mouse" }));
        add.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, cancelable: true, button: 0, isPrimary: true, pointerType: "mouse" }));`,
     );
-    await sleep(400);
+    await waitFor(`document.querySelectorAll('[role="menuitem"]').length > 0`, {
+      label: "the add-panel menu is open",
+    });
     const offered = await evaluate(
       `return [...document.querySelectorAll('[role="menuitem"]')].map((i) => i.textContent.trim());`,
     );
@@ -150,11 +205,11 @@ export default {
     await evaluate(
       `[...document.querySelectorAll('[role="menuitem"]')].find((i) => i.textContent.trim() === "Performance").click();`,
     );
-    await sleep(400);
-    check(
+    await checkEventually(
       "and adding it back restores the tab",
-      (await tabNames()).includes("Performance"),
+      `[...document.querySelectorAll('[role="tab"]')].some((t) => t.textContent.trim() === "Performance")`,
     );
+    // A pinned panel has no close button at all: nothing in the interface could put the grid back.
     check(
       "the grid cannot be closed",
       (await evaluate(
@@ -180,31 +235,39 @@ export default {
       if (box === null) throw new Error("no settings editor to type into");
       await mouse("mousePressed", box.x, box.y);
       await mouse("mouseReleased", box.x, box.y);
-      await sleep(150);
+      // Typing before the editor has focus types into the window, which looks exactly like the
+      // editor ignoring what was typed.
+      await waitFor(
+        `document.querySelector('[data-widget="settings"]').contains(document.activeElement)`,
+        { label: "the settings editor has focus" },
+      );
       await replaceDocument(json);
     };
 
     // ── Colours written in the settings reach both CSS and the canvas ──────
+    // `ui.*` was the path that silently did nothing while the palette lived in a hand-written
+    // stylesheet: the editor offered these keys and nothing could write them into CSS.
+    const cssVar = (name) =>
+      `getComputedStyle(document.documentElement).getPropertyValue("${name}").trim()`;
     await typeSettings(
       '{"theme": {"ui.background": "#123456", "grid.gridLine": "#654321"}, "themes": {"midnight": {"name": "Midnight", "extends": "dark", "colors": {"card": "#0a0b0c"}}}}',
     );
-    await sleep(600);
-    const colours = await evaluate(`
-      const read = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-      return { background: read("--background"), gridLine: read("--grid-line"), card: read("--card") };`);
-    check(
+    await checkEventually(
       "an interface colour written in the settings reaches CSS",
-      colours.background === "#123456",
-      JSON.stringify(colours),
+      `${cssVar("--background")} === "#123456"`,
     );
     check(
       "and so does a canvas colour",
-      colours.gridLine === "#654321",
-      JSON.stringify(colours),
+      (await evaluate(`return ${cssVar("--grid-line")};`)) === "#654321",
     );
 
+    // A theme the workspace defined is offered beside the built-ins. `mod+alt+t` is the default
+    // binding for the picker; the settings above do not rebind anything.
     await evaluate(`press("t", { metaKey: true, altKey: true });`);
-    await sleep(400);
+    await waitFor(
+      `document.querySelector('[data-testid="theme-picker"]') !== null`,
+      { label: "the theme picker is open" },
+    );
     const offeredThemes = await evaluate(
       `return [...document.querySelectorAll('[data-testid="theme-picker-navigator-list"] button')].map((b) => b.textContent.trim());`,
     );
@@ -216,11 +279,19 @@ export default {
     await evaluate(
       `document.querySelector("dialog").dispatchEvent(new Event("cancel", { cancelable: true }));`,
     );
-    await sleep(250);
+    await waitFor(
+      `document.querySelector('[data-testid="theme-picker"]') === null`,
+      { label: "the theme picker is closed" },
+    );
 
     // ── The theme, all the way through ───────────────────────────────────────
+    // One picture in a theme that is not the default, as a check that nothing is styled by
+    // accident rather than by token: an unstyled component looks fine in dark and wrong here.
     await typeSettings('{"ui.theme": "terminal"}');
-    await sleep(700);
+    await checkEventually(
+      "`ui.theme` in the settings switches the theme",
+      `document.documentElement.dataset.theme === "terminal"`,
+    );
     await screenshot("terminal");
     const themed = await evaluate(`
       // The same two steps the application takes to resolve a colour for Monaco: this Chromium
@@ -240,15 +311,9 @@ export default {
       const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
       const editor = document.querySelector('[data-widget="settings"] .monaco-editor');
       return {
-        theme: document.documentElement.dataset.theme,
         ground: "rgb(" + r + ", " + g + ", " + b + ")",
         editorBackground: editor === null ? null : getComputedStyle(editor).backgroundColor,
       };`);
-    check(
-      "`ui.theme` in the settings switches the theme",
-      themed.theme === "terminal",
-      JSON.stringify(themed),
-    );
     check(
       "and the settings editor takes the theme's own ground rather than Monaco's",
       themed.editorBackground === themed.ground,
@@ -258,7 +323,10 @@ export default {
     await typeSettings(
       '{"grid.snap": 16, "keybindings": [{"key": "mod+b", "remove": true}]}',
     );
-    await sleep(600);
+    await waitFor("window.pg.snapshot().config['grid.snap'] === 16", {
+      label: "the setting is in force",
+    });
+    await idle();
     const written = JSON.parse(
       readFileSync(join(ws, "workspace.json"), "utf8"),
     );
@@ -268,55 +336,56 @@ export default {
       JSON.stringify(written.settings),
     );
     check("the file kept its name field", typeof written.name === "string");
-    const stillThere = await evaluate(
-      `press("b", { metaKey: true }); await new Promise(r => setTimeout(r, 250)); return ${leftShown};`,
-    );
+    // The binding is gone, so the panel must NOT toggle. `idle` gives the keypress two frames to
+    // have done something before the absence of a change means anything.
+    await evaluate(`press("b", { metaKey: true });`);
+    await idle();
     check(
       "removing a binding takes effect without a relaunch",
-      stillThere === true,
-      String(stillThere),
+      (await evaluate(`return ${leftShown};`)) === true,
     );
 
+    // And adding one does too, on the same read of the file.
     await typeSettings(
       '{"grid.snap": 16, "keybindings": [{"key": "mod+b", "remove": true}, {"key": "mod+alt+j", "command": "workbench.setTheme"}]}',
     );
-    await sleep(500);
+    await waitFor("window.pg.snapshot().config.keybindings.length === 2", {
+      label: "the new binding is in force",
+    });
+    // The document says which theme is on -- the stylesheet keys off it -- so that is what to read.
     const activeTheme = `document.documentElement.dataset.theme`;
     const themeBefore = await evaluate(`return ${activeTheme};`);
     await evaluate(`press("j", { metaKey: true, altKey: true });`);
-    await sleep(400);
-    check(
+    await checkEventually(
       "adding a binding takes effect without a relaunch",
-      (await evaluate(
-        `return document.querySelector('[data-testid="theme-picker"]') !== null;`,
-      )) === true,
-      "the theme picker did not open",
+      `document.querySelector('[data-testid="theme-picker"]') !== null`,
     );
     // Arrowing through the picker previews each theme, and escape puts back the one you had.
+    // Twice: the list opens with the active theme first, so one press lands back on where you are.
     await evaluate(
       `const input = document.querySelector('[data-testid="theme-picker-navigator-search"]');
        input.focus();
        for (let i = 0; i < 2; i++) input.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));`,
     );
-    await sleep(250);
-    const themePreviewed = await evaluate(`return ${activeTheme};`);
-    check(
+    await checkEventually(
       "arrowing through the theme picker previews",
-      themePreviewed !== themeBefore,
-      `${themeBefore} -> ${themePreviewed}`,
+      `${activeTheme} !== ${JSON.stringify(themeBefore)}`,
     );
     await evaluate(
       `document.querySelector("dialog").dispatchEvent(new Event("cancel", { cancelable: true }));`,
     );
-    await sleep(250);
-    check(
+    await checkEventually(
       "and escaping puts the old one back",
-      (await evaluate(`return ${activeTheme};`)) === themeBefore,
+      `${activeTheme} === ${JSON.stringify(themeBefore)}`,
     );
 
-    // Text that does not parse never reaches the file.
+    // Text that does not parse never reaches the file. The wait is for the editor to have noticed,
+    // which is a thing that happens, rather than for the write that must not.
     await typeSettings('{"grid.snap": ');
-    await sleep(500);
+    await waitFor("window.pg.stores.config.getState().parseError !== null", {
+      label: "the editor reports the syntax error",
+    });
+    await idle();
     check(
       "text that does not parse is not written",
       JSON.parse(readFileSync(join(ws, "workspace.json"), "utf8")).settings[
@@ -326,6 +395,24 @@ export default {
     check(
       "and the editor says why",
       (await text()).toLowerCase().includes("json"),
+    );
+
+    // Back to the grid: the settings go away entirely, and the canvas, which saw a zero size while
+    // its panel was hidden, is its panel's size again.
+    await evaluate(`click('[role="tab"]', "Grid");`);
+    await checkEventually(
+      "switching back to the grid hides the settings entirely",
+      `${settingsToolbarShown} === false`,
+    );
+    // Hidden, not thrown away: rebuilding the editor on every glance is what keeping it mounted
+    // exists to avoid.
+    check(
+      "but keeps it built",
+      (await evaluate(`return ${editorBuilt};`)) === true,
+    );
+    await checkEventually(
+      "and the canvas fills its panel again",
+      `(() => { const host = document.querySelector('[data-kb-scope="grid"]'); const c = host?.querySelector("canvas"); if (!c) return false; const r = c.getBoundingClientRect(); return r.width > 100 && Math.abs(r.width - host.clientWidth) <= 1 && Math.abs(r.height - host.clientHeight) <= 1; })()`,
     );
 
     const escaped = await evaluate(

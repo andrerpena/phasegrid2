@@ -80,7 +80,30 @@ A scenario is a module under `scripts/e2e/scenarios/` exporting `{ name, descrip
 plus `seed(workspace)` to put files in the folder first, or `launches: true` to start the application
 itself and get `launch` instead of a driver. The driver has `pg(expr)`, `idle()`, `evaluate(js)`,
 `text()`, `clickAt`, `dragTo`, `mouse`, `chord`, `insertText`, `replaceDocument`, `screenshot(name)`,
-`check(label, condition, detail)` and the workspace path.
+`check(label, condition, detail)` and the workspace path, plus the three below.
+
+**Scenarios do not sleep.** A sleep says how long someone guessed something takes on the machine
+they wrote it on, which is a failure waiting for a slower one. Two helpers replace it, and both take
+an expression evaluated in the page:
+
+- `waitFor(source, {timeoutMs, label})` waits to get somewhere: a dialog open before typing into it,
+  a project saved before reading its file. A timeout throws, naming the label.
+- `checkEventually(label, source)` is the assertion itself, allowed to take a moment. It prints an
+  ok or FAIL line like `check` rather than ending the scenario, so a slow machine does not turn a
+  true statement into a failure.
+- `until(predicate, {label})`, imported from the harness, is the same thing for conditions outside
+  the page: a file appearing, a file saying what it should.
+
+Wait on the slowest thing that has to be true, and assert the rest. The zoom readout is polled five
+times a second by design, so a check that reads it immediately after the viewport moved is racing
+something deliberate.
+
+**Every scenario fails on an unexpected error.** The harness collects everything the page reports as
+an error, the engine's included, since the log store echoes those to the console. Any that a
+scenario did not declare fails it. This exists because an application that recovers from its own
+errors is a good application and a bad test subject: a batch the engine refused was logged, the
+sync layer resent the whole patch, and the run passed with the fault visible only in the
+scroll-back. Declare an expected one with `expectErrors(/pattern/)`, and read them with `errors()`.
 
 ## What the protocol is still for
 
@@ -98,10 +121,13 @@ itself and get `launch` instead of a driver. The driver has `pg(expr)`, `idle()`
   repository assume a fresh workspace, so most of their checks are about state an attached
   application does not start from; attach is for a scenario written for it, or for `drive`.
 
-- `pg.idle()` does not cover a settings save in flight. A file read right after typing settings
-  still wants a short wait or a `waitFor` on the file.
+- `pg.idle()` covers document edits, the catalogue and settings writes, but not timers of the
+  application's own: the session file is written on a debounce, so wait for it with `until`.
 - `Input.insertText` into the command palette does not land; click a row.
 - A module added at a default position may land past the canvas edge; give it `x` and `y`, or
   `commands.run("view.zoomToFit")` if there is one, or read `grid.nodes()` and pan.
+- Read `grid` geometry immediately before clicking it. A coordinate is only true at the moment it
+  was asked for, and anything that moves or resizes a panel in between sends the press somewhere
+  else. The symptom is a gesture that silently does nothing.
 - Chromium's named editing commands (`selectAll`) act on a textarea or contenteditable; the settings
   editor is neither. The chord helper sends `key` and `code` as the editor's keymap wants.

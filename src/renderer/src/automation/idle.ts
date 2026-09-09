@@ -1,20 +1,27 @@
 import { useCatalogStore } from "@renderer/catalog/catalog-store";
+import { useConfigStore } from "@renderer/config/config-store";
 import { flushSync } from "@renderer/patch/engine-sync";
 
 /**
  * Resolves when the application has nothing in flight.
  *
  * "Nothing" means: every document edit has reached the engine, the catalogue is not mid-load, the
- * telemetry subscription that queues behind an edit has been answered, and the screen has painted
- * twice since. It is the replacement for `sleep(400)` in a script: a wait that ends when the thing
- * has happened rather than when a guess about how long it takes runs out.
+ * telemetry subscription that queues behind an edit has been answered, every settings write has
+ * reached the file, and the screen has painted twice since. It is the replacement for `sleep(400)`
+ * in a script: a wait that ends when the thing has happened rather than when a guess about how long
+ * it takes runs out.
  *
- * What it does not cover: a settings save in flight (small, and a file read after it is the
- * only thing that would notice), and animations. `waitFor` is for those.
+ * The settings write is the one that is easy to forget and expensive to get wrong, because it is
+ * fired and forgotten: changing a setting and then reading `workspace.json` reads the file as it
+ * was. Waiting here means a script never has to know that.
+ *
+ * What it does not cover: animations, and anything on a timer of its own, such as the debounce
+ * before the session file is written. `waitFor` is for those.
  */
 export interface IdleDeps {
   flush(): Promise<void>;
   catalogLoading(): boolean;
+  settingsSaving(): boolean;
   frame(): Promise<void>;
   sleep(ms: number): Promise<void>;
 }
@@ -22,6 +29,7 @@ export interface IdleDeps {
 const real: IdleDeps = {
   flush: flushSync,
   catalogLoading: () => useCatalogStore.getState().status === "loading",
+  settingsSaving: () => useConfigStore.getState().saving > 0,
   frame: () => new Promise((resolve) => requestAnimationFrame(() => resolve())),
   sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 };
@@ -34,6 +42,9 @@ export async function idle(deps: IdleDeps = real): Promise<void> {
   // reacts to, and `afterSync` callers add to the same queue.
   await deps.flush();
   await deps.flush();
+  // After the flushes, because an edit can change a setting on its way through -- closing a panel
+  // writes the layout -- and a wait that ran first would miss the write it caused.
+  for (let i = 0; i < 200 && deps.settingsSaving(); i++) await deps.sleep(25);
   await deps.frame();
   await deps.frame();
 }

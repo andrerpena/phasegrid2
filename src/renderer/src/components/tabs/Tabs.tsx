@@ -1,8 +1,31 @@
 import { cn } from "@renderer/utils/cn";
 import { useRef } from "react";
 import { Tab } from "./Tab";
-import type { TabsProps } from "./types";
+import type { TabItem, TabsProps } from "./types";
 import { useTabs } from "./useTabs";
+
+/**
+ * Which panels a kept-mounted strip renders, and which of them are hidden.
+ *
+ * Kept mounted means "not thrown away once built", not "built whether or not anyone looks". A panel
+ * nobody has opened is not rendered at all: the settings panel loads a code editor of several
+ * megabytes behind a dynamic import precisely so that a launch does not pay for a panel most
+ * launches never open, and mounting it eagerly quietly undid that.
+ *
+ * Hidden is the `hidden` attribute, which is `display: none` and cannot be undone from inside. It
+ * was `visibility: hidden`, which a descendant can override -- and the settings panel's own inner
+ * tab strip did, with a `visible` on its active panel, so its toolbar and editor painted over the
+ * grid whenever the Grid tab was the one selected.
+ */
+export function keptPanels(
+  tabs: TabItem[],
+  activeTabId: string | undefined,
+  everShown: ReadonlySet<string>,
+): { tab: TabItem; hidden: boolean }[] {
+  return tabs
+    .filter((tab) => everShown.has(tab.id))
+    .map((tab) => ({ tab, hidden: tab.id !== activeTabId }));
+}
 
 export function Tabs({
   tabs,
@@ -17,6 +40,13 @@ export function Tabs({
 }: TabsProps) {
   const tabListRef = useRef<HTMLDivElement>(null);
 
+  /**
+   * Every tab that has been in front. Accumulated during render rather than in an effect, so the
+   * first render of a newly selected panel is the one that mounts it; adding to a set is
+   * idempotent, so a double render costs nothing.
+   */
+  const everShown = useRef(new Set<string>());
+
   const { activeTabId, setActiveTabId, handleClose } = useTabs({
     tabs,
     activeTabId: controlledActiveTabId,
@@ -26,6 +56,8 @@ export function Tabs({
   });
 
   const activeTab = keepMounted ? null : tabs.find((t) => t.id === activeTabId);
+  if (keepMounted && activeTabId !== undefined)
+    everShown.current.add(activeTabId);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     const currentIndex = tabs.findIndex((t) => t.id === activeTabId);
@@ -93,28 +125,26 @@ export function Tabs({
 
       {/* Tab Panel(s) */}
       {keepMounted ? (
-        // Render all panels, hide inactive ones with CSS
         <div className="flex-1 min-h-0 min-w-0 relative">
-          {tabs.map((tab) => (
-            <div
-              key={tab.id}
-              id={`tabpanel-${tab.id}`}
-              role="tabpanel"
-              aria-labelledby={tab.id}
-              aria-hidden={tab.id !== activeTabId}
-              className={cn(
-                "absolute inset-0",
-                (tab.scrollable ?? true)
-                  ? "overflow-y-auto"
-                  : "overflow-hidden",
-                tab.id === activeTabId
-                  ? "visible z-10"
-                  : "invisible z-0 pointer-events-none",
-              )}
-            >
-              {tab.content}
-            </div>
-          ))}
+          {keptPanels(tabs, activeTabId, everShown.current).map(
+            ({ tab, hidden }) => (
+              <div
+                key={tab.id}
+                id={`tabpanel-${tab.id}`}
+                role="tabpanel"
+                aria-labelledby={tab.id}
+                hidden={hidden}
+                className={cn(
+                  "absolute inset-0",
+                  (tab.scrollable ?? true)
+                    ? "overflow-y-auto"
+                    : "overflow-hidden",
+                )}
+              >
+                {tab.content}
+              </div>
+            ),
+          )}
         </div>
       ) : (
         // Only render active panel

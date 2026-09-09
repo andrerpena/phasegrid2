@@ -10,7 +10,15 @@ export default {
   name: "automation-api",
   description:
     "pg.snapshot, commands, patch edits, grid geometry, idle, and the log",
-  async run({ workspace: ws, pg, idle, clickAt, dragTo, check }) {
+  async run({
+    workspace: ws,
+    pg,
+    idle,
+    clickAt,
+    dragTo,
+    checkEventually,
+    check,
+  }) {
     await idle();
     const first = await pg("snapshot()");
     check(
@@ -132,19 +140,19 @@ export default {
       (await pg("snapshot().selection")).join() === "osc",
     );
 
-    // Dragging the knob upward raises the value: the document changes, by the same path a hand takes.
+    // Dragging the knob upward raises the value: the document changes, by the same path a hand
+    // takes. The knob is asked for again here rather than reused from above, because geometry is
+    // only true at the moment it is read -- anything that moves or resizes a panel between the
+    // question and the click sends the press somewhere else, and the symptom is a gesture that
+    // silently does nothing.
+    const grip = await pg('grid.knob("osc", "fold")');
     const before = (await pg("snapshot()")).patch.modules.find(
       (m) => m.id === "osc",
     ).params.fold;
-    await dragTo({ x: knob.x, y: knob.y }, { x: knob.x, y: knob.y - 40 });
-    await idle();
-    const after = (await pg("snapshot()")).patch.modules.find(
-      (m) => m.id === "osc",
-    ).params.fold;
-    check(
+    await dragTo({ x: grip.x, y: grip.y }, { x: grip.x, y: grip.y - 40 });
+    await checkEventually(
       "dragging a knob found by name changes the parameter",
-      after > before,
-      `${before} -> ${after}`,
+      `window.pg.snapshot().patch.modules.find((m) => m.id === "osc").params.fold > ${before}`,
     );
 
     // ── Transport by command ──

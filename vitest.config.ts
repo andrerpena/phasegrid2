@@ -15,6 +15,9 @@ const alias = {
 
 export default defineConfig({
   resolve: { alias },
+  // The automatic runtime, as the application is built with: a component test written as JSX must
+  // not need to import React to say so.
+  esbuild: { jsx: "automatic" },
   test: {
     projects: [
       {

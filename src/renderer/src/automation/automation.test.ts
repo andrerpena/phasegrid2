@@ -32,14 +32,16 @@ describe("the snapshot", () => {
 });
 
 describe("idle", () => {
-  it("waits for the catalogue, flushes twice, and paints twice, in that order", async () => {
+  it("waits for the catalogue, flushes twice, waits for settings writes, then paints twice", async () => {
     const trace: string[] = [];
     let loading = 2;
+    let saving = 1;
     await idle({
       flush: async () => {
         trace.push("flush");
       },
       catalogLoading: () => loading-- > 0,
+      settingsSaving: () => saving-- > 0,
       frame: async () => {
         trace.push("frame");
       },
@@ -52,9 +54,27 @@ describe("idle", () => {
       "sleep",
       "flush",
       "flush",
+      "sleep",
       "frame",
       "frame",
     ]);
+  });
+
+  it("waits for a settings write even when nothing else is pending", async () => {
+    // The case this exists for: a script types a setting and reads `workspace.json`. Without this
+    // it reads the file as it was, and the failure looks like the setting never took.
+    let saving = 3;
+    const trace: string[] = [];
+    await idle({
+      flush: async () => {},
+      catalogLoading: () => false,
+      settingsSaving: () => saving-- > 0,
+      frame: async () => {},
+      sleep: async () => {
+        trace.push("waited");
+      },
+    });
+    expect(trace).toHaveLength(3);
   });
 });
 

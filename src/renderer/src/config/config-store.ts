@@ -27,6 +27,15 @@ export interface ConfigState {
   overridesText: string;
   parseError: string | null;
   loaded: boolean;
+  /**
+   * How many writes to `workspace.json` are in flight.
+   *
+   * `save` is fired and forgotten by everything that changes a setting, which is right: nobody
+   * editing a value should wait for a file. It does mean that "the setting changed" and "the file
+   * says so" are different moments, and something reading the file right after has to know which
+   * one it is looking at. This is how it can tell.
+   */
+  saving: number;
 }
 
 export interface ConfigActions {
@@ -55,6 +64,7 @@ export const useConfigStore = create<ConfigState & ConfigActions>(
     overridesText: "{}",
     parseError: null,
     loaded: false,
+    saving: 0,
 
     get: (key) => get().computed[key] ?? null,
     // Typed readers rather than casts at every call site: a config file is user-editable, so a value
@@ -173,9 +183,14 @@ export const useConfigStore = create<ConfigState & ConfigActions>(
     },
 
     save: async () => {
-      // The text, not the parsed object, so reopening shows what was typed — the spacing someone chose,
-      // and the "unused key I might want back" they left at the bottom.
-      await window.workspace.writeSettings(get().overridesText);
+      set({ saving: get().saving + 1 });
+      try {
+        // The text, not the parsed object, so reopening shows what was typed — the spacing someone
+        // chose, and the "unused key I might want back" they left at the bottom.
+        await window.workspace.writeSettings(get().overridesText);
+      } finally {
+        set({ saving: Math.max(0, get().saving - 1) });
+      }
     },
   }),
 );
