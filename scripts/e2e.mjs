@@ -521,6 +521,53 @@ try {
       );
       await sleep(250);
 
+      // ── The theme, all the way through ───────────────────────────────────────
+      // One picture in a theme that is not the default, as a check that nothing is styled by
+      // accident rather than by token: an unstyled component looks fine in dark and wrong here.
+      // Switched through the settings, which is the path `ui.theme` exists for.
+      //
+      // Nothing is restored afterwards: the next write replaces the whole settings object.
+      await typeSettings('{"ui.theme": "terminal"}');
+      await sleep(700);
+      await screenshot("terminal");
+      const themed = await evaluate(`
+        // The same two steps the application takes to resolve a colour for Monaco, and the reason
+        // the second one exists: this Chromium serialises \`oklch\` verbatim, so reading the
+        // computed value gives a string no regex should be parsing. Painting it onto a canvas is
+        // what does the colour-space conversion.
+        const probe = document.createElement("span");
+        probe.style.display = "none";
+        probe.style.backgroundColor = "var(--background)";
+        document.body.appendChild(probe);
+        const computed = getComputedStyle(probe).backgroundColor;
+        probe.remove();
+
+        const canvas = document.createElement("canvas");
+        canvas.width = canvas.height = 1;
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "rgba(0,0,0,0)";
+        ctx.fillStyle = computed;
+        ctx.fillRect(0, 0, 1, 1);
+        const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+
+        const editor = document.querySelector('[data-widget="settings"] .monaco-editor');
+        return {
+          theme: document.documentElement.dataset.theme,
+          serialised: computed,
+          ground: "rgb(" + r + ", " + g + ", " + b + ")",
+          editorBackground: editor === null ? null : getComputedStyle(editor).backgroundColor,
+        };`);
+      check(
+        "6. `ui.theme` in the settings switches the theme",
+        themed.theme === "terminal",
+        JSON.stringify(themed),
+      );
+      check(
+        "6. and the settings editor takes the theme's own ground rather than Monaco's",
+        themed.editorBackground === themed.ground,
+        JSON.stringify(themed),
+      );
+
       await typeSettings(
         '{"grid.snap": 16, "keybindings": [{"key": "mod+b", "remove": true}]}',
       );
@@ -581,14 +628,6 @@ try {
         `document.querySelector("dialog").dispatchEvent(new Event("cancel", { cancelable: true }));`,
       );
       await sleep(250);
-
-      // One picture in a theme that is not the default, as a check that nothing is styled by
-      // accident rather than by token: an unstyled component looks fine in dark and wrong here.
-      await evaluate(`document.documentElement.dataset.theme = "terminal";`);
-      await sleep(300);
-      await screenshot("terminal");
-      await evaluate(`document.documentElement.dataset.theme = "dark";`);
-      await sleep(200);
 
       check(
         "6. and escaping puts the old one back",
@@ -732,7 +771,7 @@ try {
     );
     check(
       "9. and its fields are the engine's own parameter names",
-      inspector !== null && inspector.labels.includes("Level"),
+      inspector?.labels.includes("Level") === true,
       JSON.stringify(inspector?.labels?.slice(0, 12)),
     );
     await screenshot("inspector");

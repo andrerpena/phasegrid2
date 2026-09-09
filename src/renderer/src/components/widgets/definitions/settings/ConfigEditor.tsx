@@ -1,5 +1,5 @@
 import { initializeMonaco } from "@renderer/components/monaco-editor";
-import { useThemeStore } from "@renderer/theming/theme-store";
+import { THEME_ID } from "@renderer/components/monaco-theme";
 import type * as monaco from "monaco-editor";
 import { useEffect, useRef } from "react";
 
@@ -50,10 +50,9 @@ export const ConfigEditor = ({
         // The value may have moved on while Monaco was loading.
         value: latest.current,
         language: "json",
-        // Monaco's own themes, not the application's: it ships two, and picking by lightness is the
-        // closest thing to following the theme without hand-writing a token map for the editor.
-        theme:
-          useThemeStore.getState().theme.type === "light" ? "vs" : "vs-dark",
+        // The application's own palette -- see `monaco-theme.ts`. It re-derives itself when the
+        // theme changes, so nothing here has to follow it.
+        theme: THEME_ID,
         readOnly: initialReadOnly.current,
         automaticLayout: true,
         scrollBeyondLastLine: false,
@@ -104,15 +103,6 @@ export const ConfigEditor = ({
   useEffect(() => {
     editor.current?.updateOptions({ readOnly });
   }, [readOnly]);
-
-  // Follows the theme, so switching to Light does not leave a dark rectangle in the window.
-  useEffect(() =>
-    useThemeStore.subscribe((state) => {
-      editor.current?.updateOptions({
-        theme: state.theme.type === "light" ? "vs" : "vs-dark",
-      });
-    }),
-  );
 
   return <div ref={host} className="h-full w-full overflow-hidden" />;
 };

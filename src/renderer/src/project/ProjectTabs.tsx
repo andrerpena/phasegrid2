@@ -55,7 +55,7 @@ export const ProjectTabs = () => {
                 </span>
               )}
               {project.kind === "example" && (
-                <span className="rounded-sm border border-border px-1 text-[10px] uppercase tracking-wide text-signal-note">
+                <span className="rounded-sm border border-border px-1 text-2xs uppercase tracking-wide text-signal-note">
                   example
                 </span>
               )}
@@ -83,7 +83,7 @@ export const ProjectTabs = () => {
         {activeId === null ? (
           <p className="m-0 p-4 text-xs text-muted-foreground">
             No project open. Press{" "}
-            <kbd className="rounded-sm border border-border px-1 text-[11px]">
+            <kbd className="rounded-sm border border-border px-1 text-2xs">
               ⌘K
             </kbd>{" "}
             and search for a module to open its example, or pick one from

@@ -12,6 +12,7 @@ import * as monaco from "monaco-editor/editor/editor.api";
 import editorWorker from "monaco-editor/editor/editor.worker?worker";
 import jsonWorker from "monaco-editor/language/json/json.worker?worker";
 import { jsonDefaults } from "monaco-editor/languages/features/json/register";
+import { installMonacoTheme } from "./monaco-theme";
 
 /**
  * Monaco, set up once, knowing the settings schema.
@@ -143,6 +144,8 @@ let configured = false;
 export function initializeMonaco(): Promise<typeof monaco> {
   if (!configured) {
     configureJson();
+    // The editor in the application's own colours, re-derived when the theme changes.
+    installMonacoTheme(monaco);
     configured = true;
   }
   return Promise.resolve(monaco);

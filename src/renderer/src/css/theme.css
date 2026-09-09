@@ -17,6 +17,28 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
+  /*
+    The type scale, in rem against a 16px root, with a line height paired to each step.
+
+    Tailwind's defaults start at `text-xs` (12px), and a dense editor wants one step below that --
+    a port label, a unit suffix, a badge. Those were being written as `text-[10px]`, which is a
+    literal in the markup and a value nothing else can agree with.
+  */
+  --text-2xs: 0.625rem; /* 10px -- badges, units, port labels */
+  --text-2xs--line-height: 0.875rem;
+  --text-xs: 0.75rem; /* 12px -- panels, dense rows */
+  --text-xs--line-height: 1rem;
+  --text-sm: 0.875rem; /* 14px -- body, form labels */
+  --text-sm--line-height: 1.25rem;
+  --text-base: 1rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.75rem;
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl: 1.5rem; /* 24px -- the one heading, on the workspace gate */
+  --text-2xl--line-height: 2rem;
+
   /* Interface roles. `--color-x` is what makes `bg-x` / `text-x` / `border-x` exist. */
   --color-background: var(--background);
   --color-foreground: var(--foreground);

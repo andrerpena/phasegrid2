@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
  *  make the row jitter sideways. */
 const FIELD =
   "rounded-sm border border-border bg-input px-0.5 font-[inherit] text-xs text-foreground tabular-nums";
-const CAPTION = "text-[10px] uppercase tracking-wide text-muted-foreground";
+const CAPTION = "text-2xs uppercase tracking-wide text-muted-foreground";
 
 /**
  * The strip above the grid: transport, tempo, meter, scale.
@@ -234,7 +234,7 @@ export const ProjectHeader = () => {
       >
         {project.name}
         {project.kind === "example" && (
-          <span className="rounded-sm border border-border px-1 text-[10px] uppercase tracking-wide text-signal-note">
+          <span className="rounded-sm border border-border px-1 text-2xs uppercase tracking-wide text-signal-note">
             example
           </span>
         )}

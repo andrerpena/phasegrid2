@@ -47,4 +47,41 @@
     -webkit-user-select: text;
     user-select: text;
   }
+
+  /*
+    Scrollbars in the theme's own colours, on a transparent track.
+
+    The platform's are sized for a document and drawn in the platform's greys, which in a dark
+    window with narrow panels reads as a light stripe down the edge of every list. Thin, and only
+    the thumb.
+  */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--muted-foreground) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-track,
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    /* Inset by a transparent border, so the thumb reads as narrower than the track it can be
+       grabbed in -- a 4px thumb is correct to look at and hard to hit. */
+    background: var(--muted-foreground);
+    background-clip: content-box;
+    border: 3px solid transparent;
+    border-radius: 5px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--foreground);
+    background-clip: content-box;
+  }
 }
