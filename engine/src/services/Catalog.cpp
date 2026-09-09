@@ -118,6 +118,10 @@ nlohmann::json moduleJson(const RegisteredModule& m) {
   nlohmann::json params = nlohmann::json::array();
   for (uint32_t i = 0; i < d.numParams; ++i) params.push_back(paramJson(d.params[i]));
   j["params"] = params;
+  // The face as the registry padded it: rows of tokens, every row the same length, or null for a module
+  // that leaves its face to the interface. See `ModuleDescriptor::face`.
+  if (m.face.empty()) j["face"] = nullptr;
+  else j["face"] = m.face;
   return j;
 }
 

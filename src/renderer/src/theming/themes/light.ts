@@ -38,6 +38,8 @@ export const light: PhasegridTheme = {
     knobBody: "#e9ebef",
     knobPointer: "#3a3f47",
     knobLabel: "#6b7280",
+    tileFill: "#f1f2f5",
+    tileStroke: "#d6dae1",
     marquee: "#3b5bdb",
     playhead: "#b45309",
     signal: {

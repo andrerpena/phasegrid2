@@ -11,6 +11,12 @@ const ParamDesc kParams[] = {
   {"gain", "Gain", 0.f, 2.f, 1.f, ParamUnit::Ratio, ParamCurve::Linear, kParamPrimary | kParamModulatable, nullptr, 0, "slider", nullptr, "Output gain"},
 };
 
+/// The face: the two inputs down the left and the gain knob beside them.
+const char* const kFace[] = {
+  "inL gain gain",
+  "inR gain gain",
+};
+
 class AudioOut final : public VoicedModule<int> {
   void process(ProcessContext& c) override {
     if (!c.outputBus) return;
@@ -37,5 +43,5 @@ class AudioOut final : public VoicedModule<int> {
 // otherwise discard it, leaving builtin.cpp's reference undefined at link time.
 extern const ModuleDescriptor kAudioOut{kModuleAbiVersion, "io.audioOut", "Audio Out", "io",
   "Sends stereo audio to the engine output. Voices are summed.",
-  kIn, countOf(kIn), nullptr, 0, kParams, countOf(kParams), kModuleTerminal, 0, [] () -> Module* { return new AudioOut(); }};
+  kIn, countOf(kIn), nullptr, 0, kParams, countOf(kParams), kModuleTerminal, 0, [] () -> Module* { return new AudioOut(); }, kFace, countOf(kFace)};
 }  // namespace pg::modules

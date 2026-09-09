@@ -78,11 +78,11 @@ const PortDesc kIn[] = {
 extern const ModuleDescriptor kMeter{kModuleAbiVersion, "display.meter", "Meter", "display",
   "Publishes peak, RMS and clip count for the interface to draw. Produces no audio and changes nothing.",
   kIn, countOf(kIn), nullptr, 0, nullptr, 0, kModuleWritesTelemetry, 1,
-  [] () -> Module* { return new Display<false>(); }};
+  [] () -> Module* { return new Display<false>(); }, nullptr, 0};
 
 extern const ModuleDescriptor kScope{kModuleAbiVersion, "display.scope", "Scope", "display",
   "Publishes the waveform for the interface to draw. Produces no audio and changes nothing.",
   kIn, countOf(kIn), nullptr, 0, nullptr, 0, kModuleWritesTelemetry, 1,
-  [] () -> Module* { return new Display<true>(); }};
+  [] () -> Module* { return new Display<true>(); }, nullptr, 0};
 
 }  // namespace pg::modules

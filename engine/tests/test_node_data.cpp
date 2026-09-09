@@ -26,7 +26,7 @@ struct DataProbe : pg::Module {
 };
 const pg::PortDesc kProbeOut[] = {{"out", "Out", pg::PortKind::Continuous, 1, pg::SignalRole::Cv, ""}};
 const pg::ModuleDescriptor kProbe{pg::kModuleAbiVersion, "test.dataProbe", "DataProbe", "test", "",
-  nullptr, 0, kProbeOut, 1, nullptr, 0, 0, 0, [] () -> pg::Module* { return new DataProbe(); }};
+  nullptr, 0, kProbeOut, 1, nullptr, 0, 0, 0, [] () -> pg::Module* { return new DataProbe(); }, nullptr, 0};
 
 const char* kPatch = R"({
   "schemaVersion": 1,

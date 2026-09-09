@@ -1,5 +1,8 @@
 #include "core/Registry.hpp"
+#include <algorithm>
+#include <map>
 #include <set>
+#include <utility>
 #include "core/Conventions.hpp"
 
 namespace pg {
@@ -14,6 +17,143 @@ namespace {
 /// a port that is never created.
 bool hasImplicitPort(const ParamDesc& p) {
   return (p.flags & kParamModulatable) && !(p.flags & (kParamInteger | kParamEnum));
+}
+
+/// What one face token names, once resolved against the descriptor.
+enum class Cell : uint8_t { Empty, Input, Output, Param, Wave };
+
+struct Resolved {
+  Cell cell = Cell::Empty;
+  int32_t index = -1;   // into the descriptor's inputs, outputs or params
+};
+
+int32_t indexOf(const PortDesc* ports, uint32_t count, const std::string& id) {
+  for (uint32_t i = 0; i < count; ++i) if (id == ports[i].id) return static_cast<int32_t>(i);
+  return -1;
+}
+int32_t paramIndexOf(const ModuleDescriptor& d, const std::string& id) {
+  for (uint32_t i = 0; i < d.numParams; ++i) if (id == d.params[i].id) return static_cast<int32_t>(i);
+  return -1;
+}
+
+/// Resolves a token, or explains why it cannot be. A bare name may be an input, an output or a param;
+/// when it is more than one of those the token has to say which, because a face that silently picked
+/// one would draw the wrong thing on the module that happens to call two things `out`.
+std::optional<std::string> resolveToken(const ModuleDescriptor& d, const std::string& token, Resolved& out) {
+  if (token == ".") { out = {Cell::Empty, -1}; return std::nullopt; }
+  if (token == "wave") {
+    if (!(d.flags & kModulePreviewsWave)) return "face names `wave` but the module cannot preview one";
+    out = {Cell::Wave, -1};
+    return std::nullopt;
+  }
+  auto prefixed = [&](const char* prefix) -> std::optional<std::string> {
+    const std::string p(prefix);
+    return token.compare(0, p.size(), p) == 0 ? std::optional<std::string>(token.substr(p.size())) : std::nullopt;
+  };
+  if (auto id = prefixed("in:")) {
+    const int32_t i = indexOf(d.inputs, d.numInputs, *id);
+    if (i < 0) return "face names input `" + *id + "`, which the module does not declare";
+    out = {Cell::Input, i};
+    return std::nullopt;
+  }
+  if (auto id = prefixed("out:")) {
+    const int32_t i = indexOf(d.outputs, d.numOutputs, *id);
+    if (i < 0) return "face names output `" + *id + "`, which the module does not declare";
+    out = {Cell::Output, i};
+    return std::nullopt;
+  }
+  if (auto id = prefixed("param:")) {
+    const int32_t i = paramIndexOf(d, *id);
+    if (i < 0) return "face names param `" + *id + "`, which the module does not declare";
+    out = {Cell::Param, i};
+    return std::nullopt;
+  }
+  const int32_t in = indexOf(d.inputs, d.numInputs, token);
+  const int32_t o = indexOf(d.outputs, d.numOutputs, token);
+  const int32_t p = paramIndexOf(d, token);
+  const int matches = (in >= 0) + (o >= 0) + (p >= 0);
+  if (matches == 0) return "face token `" + token + "` names nothing on the module";
+  if (matches > 1) return "face token `" + token + "` is ambiguous: say in:, out: or param:";
+  if (in >= 0) out = {Cell::Input, in};
+  else if (o >= 0) out = {Cell::Output, o};
+  else out = {Cell::Param, p};
+  return std::nullopt;
+}
+
+/// Splits a row on whitespace.
+std::vector<std::string> tokenise(const char* row) {
+  std::vector<std::string> out;
+  std::string current;
+  for (const char* c = row ? row : ""; *c; ++c) {
+    if (*c == ' ' || *c == '\t') {
+      if (!current.empty()) { out.push_back(current); current.clear(); }
+    } else {
+      current.push_back(*c);
+    }
+  }
+  if (!current.empty()) out.push_back(current);
+  return out;
+}
+
+/**
+ * Checks a declared face against the rules in `Descriptor.hpp` and, when it passes, hands back the grid
+ * padded to a rectangle. The geometric rule is CSS `grid-template-areas`': every distinct token's cells
+ * must fill their own bounding box, so a block is always a rectangle.
+ */
+std::optional<std::string> validateFace(const ModuleDescriptor& d, std::vector<std::vector<std::string>>& grid) {
+  grid.clear();
+  if (d.face == nullptr || d.faceRows == 0) {
+    if (d.face != nullptr || d.faceRows != 0) return "face and faceRows disagree";
+    return std::nullopt;
+  }
+  if (d.faceRows > kMaxFaceRows) return "face has too many rows";
+  size_t cols = 0;
+  for (uint32_t r = 0; r < d.faceRows; ++r) {
+    grid.push_back(tokenise(d.face[r]));
+    cols = std::max(cols, grid.back().size());
+  }
+  if (cols == 0) return "face has no cells";
+  if (cols > kMaxFaceCols) return "face is too wide";
+  for (auto& row : grid) row.resize(cols, ".");
+
+  struct Area { int minR, minC, maxR, maxC; int count; Resolved what; };
+  std::map<std::string, Area> areas;
+  for (int r = 0; r < static_cast<int>(grid.size()); ++r) {
+    for (int c = 0; c < static_cast<int>(cols); ++c) {
+      const std::string& token = grid[static_cast<size_t>(r)][static_cast<size_t>(c)];
+      Resolved what;
+      if (auto err = resolveToken(d, token, what)) return *err;
+      if (what.cell == Cell::Empty) continue;
+      auto it = areas.find(token);
+      if (it == areas.end()) areas.emplace(token, Area{r, c, r, c, 1, what});
+      else {
+        Area& a = it->second;
+        a.minR = std::min(a.minR, r); a.minC = std::min(a.minC, c);
+        a.maxR = std::max(a.maxR, r); a.maxC = std::max(a.maxC, c);
+        ++a.count;
+      }
+    }
+  }
+
+  // Two spellings of one thing (`out` and `out:out`) would be two blocks for one port.
+  std::set<std::pair<Cell, int32_t>> seen;
+  for (const auto& [token, a] : areas) {
+    const int h = a.maxR - a.minR + 1, w = a.maxC - a.minC + 1;
+    if (a.count != h * w) return "face block `" + token + "` is not a rectangle";
+    if (!seen.insert({a.what.cell, a.what.index}).second) return "face names `" + token + "` twice";
+    if (a.what.cell == Cell::Param) {
+      const ParamDesc& p = d.params[a.what.index];
+      if (p.flags & kParamHidden) return "face shows hidden param `" + token + "`";
+      if (p.flags & kParamEnum) return "face shows enum param `" + token + "`, which has no block yet";
+      if (h < 2 || w < 2) return "face gives `" + token + "` less than two cells by two";
+    }
+    if (a.what.cell == Cell::Wave && (h < 2 || w < 2)) return "face gives `wave` less than two cells by two";
+  }
+  for (uint32_t i = 0; i < d.numInputs; ++i)
+    if (!seen.contains({Cell::Input, static_cast<int32_t>(i)})) return std::string("face leaves out input `") + d.inputs[i].id + "`";
+  for (uint32_t i = 0; i < d.numOutputs; ++i)
+    if (!seen.contains({Cell::Output, static_cast<int32_t>(i)})) return std::string("face leaves out output `") + d.outputs[i].id + "`";
+  return std::nullopt;
 }
 }  // namespace
 
@@ -64,6 +204,7 @@ std::optional<std::string> Registry::add(const ModuleDescriptor& d) {
 
   auto rm = std::make_unique<RegisteredModule>();
   rm->desc = &d;
+  if (auto err = validateFace(d, rm->face)) return id + ": " + *err;
   for (uint32_t i = 0; i < d.numInputs; ++i) { rm->inputs.push_back(d.inputs[i]); rm->inputParam.push_back(-1); }
   for (uint32_t i = 0; i < d.numParams; ++i) {
     const ParamDesc& p = d.params[i];

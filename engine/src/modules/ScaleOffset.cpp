@@ -32,6 +32,6 @@ extern const ModuleDescriptor kScaleOffset{kModuleAbiVersion, "math.scaleOffset"
   "Affine map of one signal: out = in * Scale + Offset, lane by lane. The usual way to turn a unipolar "
   "envelope or LFO into the bipolar range a pitch or pan input wants, and back.",
   kIn, countOf(kIn), kOut, countOf(kOut), kParams, countOf(kParams), 0, 0,
-  [] () -> Module* { return new ScaleOffset(); }};
+  [] () -> Module* { return new ScaleOffset(); }, nullptr, 0};
 
 }  // namespace pg::modules

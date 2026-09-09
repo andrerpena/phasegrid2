@@ -126,9 +126,10 @@ export default {
       JSON.stringify(knob),
     );
     check(
-      "an output sits on the node's right edge",
+      "an output sits in the node's right column",
       port !== null &&
-        Math.abs(port.x - (node.rect.x + node.rect.width)) < 2 &&
+        port.x < node.rect.x + node.rect.width &&
+        port.x > node.rect.x + node.rect.width * 0.75 &&
         port.side === "output",
       JSON.stringify(port),
     );

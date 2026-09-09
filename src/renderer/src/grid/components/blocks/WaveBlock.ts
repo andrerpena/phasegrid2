@@ -1,31 +1,15 @@
 import { Container, Graphics } from "pixi.js";
+import type { WaveBlock as WaveGeometry } from "../../face";
+import { type Block, type BlockStyle, drawTile, type WaveStyle } from "./Block";
 
 /**
- * A small panel that draws one cycle of a wave.
+ * A panel that draws one cycle of a wave.
  *
- * It is what tells you at a glance which of four near-identical modules you are looking at. A module
- * face has room for a title, two knobs and this, and the title is the thing people stop reading first,
- * so the picture carries the identity. It is a picture and nothing more: it never plays, never reads the
- * engine, and takes its curve as plain numbers, so it draws the same in a story as in a patch.
- *
- * Built once and updated in place, like `Knob`: a patch redraws whenever a parameter moves, and
- * rebuilding geometry on every change is how a canvas starts dropping frames.
+ * It is what tells you at a glance which of four near-identical modules you are looking at. The
+ * title is the thing people stop reading first, so the picture carries the identity. It is a picture
+ * and nothing more: it never plays, never reads the engine, and takes its curve as plain numbers, so
+ * it draws the same in a story as in a patch.
  */
-
-export interface SimpleWaveStyle {
-  /** The curve. Usually the module's accent, so a node reads as one thing. */
-  curve: number;
-  /** The faint ruling behind it. */
-  grid: number;
-  background: number;
-  border: number;
-}
-
-export interface SimpleWaveOptions {
-  /** Cells of ruling behind the curve. Zero on either axis leaves that direction unruled. */
-  gridDivisions?: { x: number; y: number };
-  lineWidth?: number;
-}
 
 /**
  * The curve, resampled to one point per column.
@@ -57,46 +41,59 @@ export function resampleWave(
 
 /** Roughly one point per pixel: finer buys nothing on screen and costs geometry on every redraw. */
 const COLUMNS_PER_PIXEL = 1;
+const LINE_WIDTH = 1.5;
+/** Cells of ruling behind the curve. */
+const DIVISIONS = { x: 4, y: 2 };
 
-export class SimpleWave {
+export class WaveBlock implements Block {
   readonly view = new Container();
-  private readonly panel = new Graphics();
+  private readonly tile = new Graphics();
   private readonly rules = new Graphics();
   private readonly curve = new Graphics();
+  private style: BlockStyle;
   private samples: ArrayLike<number> = [];
 
   constructor(
-    private readonly width: number,
-    private readonly height: number,
-    private style: SimpleWaveStyle,
-    private readonly options: SimpleWaveOptions = {},
+    readonly geometry: WaveGeometry,
+    style: BlockStyle,
   ) {
-    this.view.addChild(this.panel, this.rules, this.curve);
+    this.style = style;
+    this.view.position.set(geometry.x, geometry.y);
+    for (const g of [this.rules, this.curve])
+      g.position.set(
+        geometry.panel.x - geometry.x,
+        geometry.panel.y - geometry.y,
+      );
+    this.view.addChild(this.tile, this.rules, this.curve);
     this.drawStatic();
   }
 
-  /** Panel and ruling, which only change with the style. */
-  private drawStatic(): void {
-    const { width: w, height: h } = this;
-    this.panel
-      .clear()
-      .rect(0, 0, w, h)
-      .fill({ color: this.style.background })
-      .stroke({ width: 1, color: this.style.border, alpha: 0.8 });
+  private get waveStyle(): WaveStyle {
+    return this.style.wave;
+  }
 
-    const divisions = this.options.gridDivisions ?? { x: 4, y: 2 };
+  /** The screen and its ruling, which only change with the style. */
+  private drawStatic(): void {
+    // The tile is the screen: drawn like every other key, in the screen's colour, so it has one
+    // border like its neighbours and not a bezel around a second frame.
+    drawTile(this.tile, this.geometry, {
+      fill: this.waveStyle.background,
+      stroke: this.style.tile.stroke,
+    });
+    const { width: w, height: h } = this.geometry.panel;
+
     this.rules.clear();
-    for (let i = 1; i < divisions.x; i++) {
-      const x = Math.round((i * w) / divisions.x) + 0.5;
+    for (let i = 1; i < DIVISIONS.x; i++) {
+      const x = Math.round((i * w) / DIVISIONS.x) + 0.5;
       this.rules.moveTo(x, 1).lineTo(x, h - 1);
     }
-    for (let i = 1; i < divisions.y; i++) {
-      const y = Math.round((i * h) / divisions.y) + 0.5;
+    for (let i = 1; i < DIVISIONS.y; i++) {
+      const y = Math.round((i * h) / DIVISIONS.y) + 0.5;
       this.rules.moveTo(1, y).lineTo(w - 1, y);
     }
     // One stroke for every rule: each `stroke()` is its own draw instruction, and a panel ruled into
     // sixteen cells would otherwise cost sixteen of them per redraw.
-    this.rules.stroke({ width: 1, color: this.style.grid, alpha: 0.5 });
+    this.rules.stroke({ width: 1, color: this.waveStyle.grid, alpha: 0.5 });
   }
 
   /**
@@ -106,7 +103,7 @@ export class SimpleWave {
    * wave past 1 on purpose, and rescaling would redraw it as though nothing had happened, hiding the
    * exact thing the control was turned to do.
    */
-  setSamples(samples: ArrayLike<number>): void {
+  setWave(samples: ArrayLike<number>): void {
     this.samples = samples;
     this.drawCurve();
   }
@@ -114,33 +111,33 @@ export class SimpleWave {
   private drawCurve(): void {
     this.curve.clear();
     if (this.samples.length === 0) return;
+    const { width, height } = this.geometry.panel;
 
     // Inset by the line's own half-width so a wave sitting at full scale is not clipped in half by the
     // panel edge, which is exactly where a square wave lives.
-    const lineWidth = this.options.lineWidth ?? 1.5;
-    const inset = lineWidth / 2 + 1;
+    const inset = LINE_WIDTH / 2 + 1;
     const top = inset;
-    const bottom = this.height - inset;
+    const bottom = height - inset;
     const mid = (top + bottom) / 2;
     const amplitude = (bottom - top) / 2;
 
-    const columns = Math.max(2, Math.round(this.width * COLUMNS_PER_PIXEL));
+    const columns = Math.max(2, Math.round(width * COLUMNS_PER_PIXEL));
     const points = resampleWave(this.samples, columns);
     for (let i = 0; i < points.length; i++) {
-      const x = inset + ((this.width - inset * 2) * i) / (points.length - 1);
+      const x = inset + ((width - inset * 2) * i) / (points.length - 1);
       const y = mid - Math.max(-1, Math.min(1, points[i])) * amplitude;
       if (i === 0) this.curve.moveTo(x, y);
       else this.curve.lineTo(x, y);
     }
     this.curve.stroke({
-      width: lineWidth,
-      color: this.style.curve,
+      width: LINE_WIDTH,
+      color: this.waveStyle.curve,
       cap: "round",
       join: "round",
     });
   }
 
-  setStyle(style: SimpleWaveStyle): void {
+  setStyle(style: BlockStyle): void {
     this.style = style;
     this.drawStatic();
     this.drawCurve();

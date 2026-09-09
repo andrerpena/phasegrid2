@@ -25,6 +25,13 @@ struct PulseShape {
 
 const ParamDesc kParams[] = {osc::kSyncParam};
 
+/// The face: the three inputs down the left, the wave beside them, sync on its right, the output last.
+const char* const kFace[] = {
+  "reset wave wave wave sync sync out",
+  "phase wave wave wave sync sync .  ",
+  "pitch .    .    .    .    .    .  ",
+};
+
 class OscPulse final : public VoicedModule<osc::OscillatorState> {
   void process(ProcessContext& c) override {
     const ParamView sync = c.param(0);
@@ -49,6 +56,6 @@ extern const ModuleDescriptor kOscPulse{kModuleAbiVersion, "osc.pulse", "Pulse",
   "it every cycle, which keeps the pitch and packs more pulses into it. The face shows the resulting shape.",
   osc::kOscInputs, countOf(osc::kOscInputs), osc::kOscOutputs, countOf(osc::kOscOutputs),
   kParams, countOf(kParams), kModulePreviewsWave, 0,
-  [] () -> Module* { return new OscPulse(); }};
+  [] () -> Module* { return new OscPulse(); }, kFace, countOf(kFace)};
 
 }  // namespace pg::modules

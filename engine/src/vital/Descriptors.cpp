@@ -22,6 +22,7 @@ struct Built {
   std::list<std::vector<const char*>> enumTables;
   std::vector<PortDesc> inputs, outputs;
   std::vector<ParamDesc> params;
+  std::vector<const char*> faceRows;
   ModuleDescriptor desc{};
 };
 
@@ -177,6 +178,9 @@ const ModuleDescriptor& buildDescriptor(const ModuleSpec& specIn) {
   m.flags = b->spec.moduleFlags;
   m.telemetrySlots = 0;
   m.create = &WrappedModule::createFromRegistry;   // finds its spec through g_creatingDescriptor + specFor()
+  for (const std::string& row : b->spec.faceRows) b->faceRows.push_back(keep(*b, row));
+  m.face = b->faceRows.empty() ? nullptr : b->faceRows.data();
+  m.faceRows = static_cast<uint32_t>(b->faceRows.size());
   builtRegistry()[&m] = b;
   return m;
 }

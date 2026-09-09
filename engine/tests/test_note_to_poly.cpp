@@ -25,7 +25,7 @@ struct NoteGen : pg::VoicedModule<int> {
 };
 const pg::PortDesc kNoteGenOut[] = {{"notes", "Notes", pg::PortKind::Event, 0, pg::SignalRole::Note, ""}};
 const pg::ModuleDescriptor kNoteGen{pg::kModuleAbiVersion, "test.noteGen", "NoteGen", "test", "",
-  nullptr, 0, kNoteGenOut, 1, nullptr, 0, 0, 0, [] () -> pg::Module* { return new NoteGen(); }};
+  nullptr, 0, kNoteGenOut, 1, nullptr, 0, 0, 0, [] () -> pg::Module* { return new NoteGen(); }, nullptr, 0};
 
 /// Records pitch, gate and velocity per VOICE. Every pair writes the same shared buffers, so only the last
 /// pair's values are still there once a block has run -- the only way to see what pair 0 produced is to look
@@ -49,7 +49,7 @@ const pg::PortDesc kProbeIn[] = {
   {"velocity", "Velocity", pg::PortKind::Continuous, 1, pg::SignalRole::Cv, ""},
 };
 const pg::ModuleDescriptor kProbe{pg::kModuleAbiVersion, "test.voiceProbe", "VoiceProbe", "test", "",
-  kProbeIn, 3, nullptr, 0, nullptr, 0, 0, 0, [] () -> pg::Module* { return new Probe(); }};
+  kProbeIn, 3, nullptr, 0, nullptr, 0, 0, 0, [] () -> pg::Module* { return new Probe(); }, nullptr, 0};
 
 pg::Event noteOn(uint32_t frame, float note, float velocity) {
   pg::Event e; e.frame = frame; e.type = pg::EventType::NoteOn; e.a = note; e.b = velocity;

@@ -42,7 +42,7 @@ struct PairGate : pg::VoicedModule<int> {
 };
 const pg::PortDesc kPairGateOut[] = {{"out", "Out", pg::PortKind::Continuous, 1, pg::SignalRole::Gate, ""}};
 const pg::ModuleDescriptor kPairGate{pg::kModuleAbiVersion, "test.pairGate", "PairGate", "test", "",
-  nullptr, 0, kPairGateOut, 1, nullptr, 0, 0, 0, [] () -> pg::Module* { return new PairGate(); }};
+  nullptr, 0, kPairGateOut, 1, nullptr, 0, 0, 0, [] () -> pg::Module* { return new PairGate(); }, nullptr, 0};
 
 /// Captures the last frame of one input per voice pair, WHILE that pair runs: the buffers are shared, so
 /// once a block is over only the last pair's values are still in them.
@@ -54,7 +54,7 @@ struct PairProbe : pg::VoicedModule<int> {
 };
 const pg::PortDesc kPairProbeIn[] = {{"in", "In", pg::PortKind::Continuous, 1, pg::SignalRole::Cv, ""}};
 const pg::ModuleDescriptor kPairProbe{pg::kModuleAbiVersion, "test.pairProbe", "PairProbe", "test", "",
-  kPairProbeIn, 1, nullptr, 0, nullptr, 0, 0, 0, [] () -> pg::Module* { return new PairProbe(); }};
+  kPairProbeIn, 1, nullptr, 0, nullptr, 0, 0, 0, [] () -> pg::Module* { return new PairProbe(); }, nullptr, 0};
 
 const std::map<std::string, float> kInstant = {
   {"delay", 0.f}, {"attack", 0.f}, {"hold", 0.f}, {"decay", 0.f}, {"sustain", 1.f}, {"release", 0.f}};

@@ -1,5 +1,5 @@
 {
-  "catalogHash": "a5751307b48d3e53",
+  "catalogHash": "33ea7367f4ea4f4d",
   "conventions": {
     "blockSize": 128,
     "gateThreshold": 0,
@@ -16,6 +16,7 @@
     {
       "category": "amp",
       "doc": "Voltage-controlled amplifier: multiplies its input by the Gain knob plus the gain input, clamped at zero. Plug an envelope into gain and turn the knob down to shape a note.",
+      "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
@@ -111,6 +112,7 @@
     {
       "category": "display",
       "doc": "Publishes peak, RMS and clip count for the interface to draw. Produces no audio and changes nothing.",
+      "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
@@ -135,6 +137,7 @@
     {
       "category": "display",
       "doc": "Publishes the waveform for the interface to draw. Produces no audio and changes nothing.",
+      "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
@@ -159,6 +162,7 @@
     {
       "category": "mod",
       "doc": "Delay/attack/hold/decay/sustain/release envelope. The gate holds it at the sustain level; a falling edge starts the release. Times are in seconds after the stage curve is applied.",
+      "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
@@ -435,6 +439,7 @@
     {
       "category": "filter",
       "doc": "Multi-model filter: analog, dirty, ladder, digital, diode, formant, comb, phaser. Cutoff is a MIDI note number, so a semitone of modulation is a semitone of cutoff.",
+      "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
@@ -891,6 +896,7 @@
     {
       "category": "fx",
       "doc": "Chorus built from up to four modulated delay pairs sharing one rate. Frequency is a power of two in hertz; Delay 1 and Delay 2 set the range the pairs are spread across.",
+      "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
@@ -1236,6 +1242,7 @@
     {
       "category": "fx",
       "doc": "Multiband compressor. Each band has an upper threshold that compresses above it and a lower threshold that expands below it; Enabled Bands chooses how many bands run. Thresholds and gains are in decibels.",
+      "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
@@ -1758,6 +1765,7 @@
     {
       "category": "fx",
       "doc": "Stereo / ping-pong delay with a filtered feedback path. Frequency is a power of two in hertz and is the inverse of the delay time (3 = 8 Hz = 125 ms); Sync switches it to tempo divisions instead.",
+      "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
@@ -2106,6 +2114,7 @@
     {
       "category": "fx",
       "doc": "Waveshaper -- soft clip, hard clip, folding, bit crush or downsampling -- with a filter that can run before it, after it, or not at all. Drive is in decibels, Filter Cutoff a MIDI note number.",
+      "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
@@ -2338,6 +2347,7 @@
     {
       "category": "fx",
       "doc": "Three-band equaliser. Each band's Mode picks between a shelf and a cut (low: shelf or high-pass, band: shelf or notch, high: shelf or low-pass). Cutoffs are MIDI note numbers, gains are decibels.",
+      "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
@@ -2705,6 +2715,7 @@
     {
       "category": "fx",
       "doc": "Flanger: a short feedback delay swept by a triangle around Center. Center is a MIDI note number, Frequency a power of two in hertz.",
+      "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
@@ -2980,6 +2991,7 @@
     {
       "category": "fx",
       "doc": "Phaser: all-pass stages swept around Center by their own oscillator. Center and Mod Depth are in semitones, Frequency is a power of two in hertz.",
+      "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
@@ -3284,6 +3296,7 @@
     {
       "category": "fx",
       "doc": "Reverb with pre-filtering, low/high shelving and a chorused tail. Decay Time is a power of two in seconds; the cutoffs are MIDI note numbers.",
+      "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
@@ -3666,6 +3679,18 @@
     {
       "category": "io",
       "doc": "Sends stereo audio to the engine output. Voices are summed.",
+      "face": [
+        [
+          "inL",
+          "gain",
+          "gain"
+        ],
+        [
+          "inR",
+          "gain",
+          "gain"
+        ]
+      ],
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
@@ -3728,6 +3753,7 @@
     {
       "category": "math",
       "doc": "Affine map of one signal: out = in * Scale + Offset, lane by lane. The usual way to turn a unipolar envelope or LFO into the bipolar range a pitch or pan input wants, and back.",
+      "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
@@ -3820,6 +3846,7 @@
     {
       "category": "mix",
       "doc": "Adds four signals, each through its own level. Unconnected channels are silent.",
+      "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
@@ -3994,6 +4021,34 @@
     {
       "category": "mod",
       "doc": "A low-frequency oscillator for driving knobs. Rate is in hertz; Shape morphs sine, triangle, saw and square; Depth sets the swing. The output is bipolar, so the knob it feeds stays the centre of the movement. A rising edge on Reset restarts the cycle. The face shows the wave.",
+      "face": [
+        [
+          "reset",
+          "wave",
+          "wave",
+          "wave",
+          "rate",
+          "rate",
+          "shape",
+          "shape",
+          "depth",
+          "depth",
+          "out"
+        ],
+        [
+          ".",
+          "wave",
+          "wave",
+          "wave",
+          "rate",
+          "rate",
+          "shape",
+          "shape",
+          "depth",
+          "depth",
+          "."
+        ]
+      ],
       "flags": {
         "needsTransport": false,
         "previewsWave": true,
@@ -4115,6 +4170,7 @@
     {
       "category": "mod",
       "doc": "Random modulator: perlin, sample & hold, sine interpolation or a Lorenz attractor. Output is 0..1. Frequency is a power of two in hertz (2 = 4 Hz) while Sync is Seconds.",
+      "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
@@ -4371,6 +4427,7 @@
     {
       "category": "note",
       "doc": "Turns note events into pitch, gate and velocity signals. Monophonic: one note sounds at a time, chosen by the priority mode, and the gate stays high while any note is held.",
+      "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
@@ -4475,6 +4532,7 @@
     {
       "category": "note",
       "doc": "Spreads note events across the program's voices: each output carries a different value per voice lane. A note takes a free voice, or steals the one that has been sounding longest, and releases its voice on the matching note off.",
+      "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
@@ -4524,6 +4582,7 @@
     {
       "category": "note",
       "doc": "Plays a list of notes against the transport and emits them as a note stream. The notes live in the node's data as \"notes\": an array of {start, length, pitch, velocity} objects, start and length in beats from the clip's start, pitch a MIDI note number and velocity 0..1. Anything else in that array is rejected as a whole and the clip plays nothing. The playhead is derived from the transport, so it follows the host when it plays, free-runs at the transport tempo when it does not, and survives an edit to the notes.",
+      "face": null,
       "flags": {
         "needsTransport": true,
         "previewsWave": false,
@@ -4626,6 +4685,35 @@
     {
       "category": "osc",
       "doc": "A band-limited pulse with hard sync. Sync, in semitones, runs the wave faster than the pitch and restarts it every cycle, which keeps the pitch and packs more pulses into it. The face shows the resulting shape.",
+      "face": [
+        [
+          "reset",
+          "wave",
+          "wave",
+          "wave",
+          "sync",
+          "sync",
+          "out"
+        ],
+        [
+          "phase",
+          "wave",
+          "wave",
+          "wave",
+          "sync",
+          "sync",
+          "."
+        ],
+        [
+          "pitch",
+          ".",
+          ".",
+          ".",
+          ".",
+          ".",
+          "."
+        ]
+      ],
       "flags": {
         "needsTransport": false,
         "previewsWave": true,
@@ -4705,6 +4793,35 @@
     {
       "category": "osc",
       "doc": "A band-limited sawtooth with hard sync. Sync, in semitones, runs a second ramp faster than the pitch and restarts it every cycle, which keeps the pitch and adds the classic sync harmonics. The face shows the resulting shape.",
+      "face": [
+        [
+          "reset",
+          "wave",
+          "wave",
+          "wave",
+          "sync",
+          "sync",
+          "out"
+        ],
+        [
+          "phase",
+          "wave",
+          "wave",
+          "wave",
+          "sync",
+          "sync",
+          "."
+        ],
+        [
+          "pitch",
+          ".",
+          ".",
+          ".",
+          ".",
+          ".",
+          "."
+        ]
+      ],
       "flags": {
         "needsTransport": false,
         "previewsWave": true,
@@ -4784,6 +4901,35 @@
     {
       "category": "osc",
       "doc": "A sine with a wavefolder. Turning Fold up drives the wave through a sine curve, which folds it back on itself in round lobes and fills the spectrum with odd harmonics. Fold is in semitones, so every twelve doubles the drive: at twelve, two lobes meet at the centre. The face shows the resulting shape.",
+      "face": [
+        [
+          "reset",
+          "wave",
+          "wave",
+          "wave",
+          "fold",
+          "fold",
+          "out"
+        ],
+        [
+          "phase",
+          "wave",
+          "wave",
+          "wave",
+          "fold",
+          "fold",
+          "."
+        ],
+        [
+          "pitch",
+          ".",
+          ".",
+          ".",
+          ".",
+          ".",
+          "."
+        ]
+      ],
       "flags": {
         "needsTransport": false,
         "previewsWave": true,
@@ -4863,6 +5009,7 @@
     {
       "category": "osc",
       "doc": "Wavetable oscillator with unison, phase distortion and spectral morphing. Pitch is 0.1 per octave from middle C; the oscillator tracks it while Midi Track is on.",
+      "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": true,
@@ -5685,6 +5832,7 @@
     {
       "category": "time",
       "doc": "A phase ramp locked to the transport, plus a one-frame trigger at the start of each cycle. Drives sequencers and ramp-fed oscillators. While the transport is stopped it free-runs at its tempo.",
+      "face": null,
       "flags": {
         "needsTransport": true,
         "previewsWave": false,
@@ -5777,6 +5925,7 @@
     {
       "category": "osc",
       "doc": "Plays a sample. A rising gate restarts it; Loop and Bounce decide what happens at the end. Pitch only moves it while Keytrack is on. With no asset loaded it plays white noise.",
+      "face": null,
       "flags": {
         "needsTransport": false,
         "previewsWave": false,

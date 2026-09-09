@@ -34,19 +34,19 @@ void PreviewPublisher::tick() {
         values[i] = it == model.end() ? d.params[i].def : it->second;
       }
     }
-    auto last = lastValues_.find(inst.serial);
-    if (last != lastValues_.end() && last->second == values) return;
+    auto last = lastDrawn_.find(inst.serial);
+    if (last != lastDrawn_.end() && last->second.slot == slot && last->second.values == values) return;
 
     ParamValues named;
     for (uint32_t i = 0; i < d.numParams; ++i) named[d.params[i].id] = values[i];
     if (!inst.module->preview(named, samples_.data(), kPreviewFrames)) return;
     writer_.writePreview(slot, samples_.data(), kPreviewFrames, ++index_);
-    lastValues_[inst.serial] = std::move(values);
+    lastDrawn_[inst.serial] = Drawn{slot, std::move(values)};
   });
   // A module that left the patch, or lost its slot, is forgotten so a later instance with the same
   // serial (there is none, serials only grow) or a resubscribed one is drawn afresh.
-  for (auto it = lastValues_.begin(); it != lastValues_.end();)
-    it = seen.contains(it->first) ? std::next(it) : lastValues_.erase(it);
+  for (auto it = lastDrawn_.begin(); it != lastDrawn_.end();)
+    it = seen.contains(it->first) ? std::next(it) : lastDrawn_.erase(it);
 }
 
 }  // namespace pg

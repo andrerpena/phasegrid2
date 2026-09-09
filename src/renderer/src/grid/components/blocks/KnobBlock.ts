@@ -1,24 +1,29 @@
 import { Container, Graphics, Text } from "pixi.js";
+import type { KnobBlock as KnobGeometry } from "../../face";
+import { PORT_RADIUS } from "../../layout";
+import {
+  type Block,
+  type BlockStyle,
+  drawSocket,
+  drawTile,
+  type KnobStyle,
+  type SocketState,
+} from "./Block";
 
 /**
- * A knob with a value arc and a label, drawn the way a hardware panel draws one.
+ * A knob with a value arc, a label under it, and, when the parameter can be modulated, the socket
+ * for its modulation at its foot.
  *
- * The arc is the point: it says where the value sits in its range at a glance, from across the window,
- * without reading a number. The pointer is the fine detail you look at once you are already there.
+ * The arc is the point: it says where the value sits in its range at a glance, from across the
+ * window, without reading a number. The pointer is the fine detail you look at once you are already
+ * there.
  *
- * A class with an `update` rather than a function returning a display object, because a patch redraws
- * on every parameter change and rebuilding graphics sixty times a second is how a canvas starts
- * dropping frames. Built once, updated in place, destroyed when its node goes.
+ * Two values, kept apart on purpose. `setValue` is the document's number, the one a drag edits;
+ * `setLive` is where modulation has put it this frame, or null when nothing is plugged in. The
+ * document redraws the first when it changes; telemetry drives the second at frame rate. Both only
+ * redraw on a change: a slow LFO holds still for many frames, and redrawing geometry for them costs
+ * the canvas frames for nothing.
  */
-
-export interface KnobStyle {
-  /** Where the arc is drawn: the module's accent, so a node reads as one thing. */
-  arc: number;
-  track: number;
-  body: number;
-  pointer: number;
-  label: number;
-}
 
 /** Three quarters of a turn, the gap at the bottom, as every physical knob has. */
 const START_ANGLE = Math.PI * 0.75;
@@ -35,14 +40,19 @@ function trimToWidth(text: string, width: number, probe: Text): string {
   return candidate;
 }
 
-export class Knob {
+export class KnobBlock implements Block {
   readonly view = new Container();
+  private readonly tile = new Graphics();
   private readonly track = new Graphics();
   private readonly arc = new Graphics();
   private readonly notch = new Graphics();
   private readonly body = new Graphics();
   private readonly pointer = new Graphics();
   private readonly label: Text;
+  /** The modulation socket, or null when the parameter cannot be modulated. */
+  private readonly socket: Graphics | null;
+  private socketState: SocketState = { connected: false, hovered: false };
+  private style: BlockStyle;
   /** The value the document holds: what a drag edits and, with nothing modulating, what is drawn. */
   private fraction = -1;
   /**
@@ -52,27 +62,41 @@ export class Knob {
   private live: number | null = null;
 
   constructor(
-    private readonly radius: number,
-    labelText: string,
-    private style: KnobStyle,
-    /** Room the label has. Past it the text is trimmed rather than colliding with its neighbour. */
-    labelWidth = radius * 2.8,
+    readonly geometry: KnobGeometry,
+    style: BlockStyle,
   ) {
+    this.style = style;
+    this.view.position.set(geometry.x, geometry.y);
+    const centre = {
+      x: geometry.centre.x - geometry.x,
+      y: geometry.centre.y - geometry.y,
+    };
+    for (const g of [this.track, this.arc, this.notch, this.body, this.pointer])
+      g.position.set(centre.x, centre.y);
+
     this.label = new Text({
-      text: labelText,
+      text: geometry.param.name,
       style: {
-        fontSize: 9,
-        fill: style.label,
+        fontSize: 8,
+        fill: style.knob.label,
         fontFamily: "system-ui, sans-serif",
       },
     });
     // Labels come from the engine's descriptors and some are long ("Comb Blend Offset"). Left alone
     // they run into the label beside them and a row of knobs becomes one unreadable string.
+    // Centred on the knob, which sits left of the tile's middle; the socket has the corner on the right.
+    const labelWidth = (geometry.centre.x - geometry.x) * 2 - 4;
     if (this.label.width > labelWidth)
-      this.label.text = trimToWidth(labelText, labelWidth, this.label);
-    this.label.anchor.set(0.5, 0);
-    this.label.position.set(0, radius + 5);
+      this.label.text = trimToWidth(
+        geometry.param.name,
+        labelWidth,
+        this.label,
+      );
+    this.label.anchor.set(0.5, 1);
+    this.label.position.set(centre.x, geometry.labelY - geometry.y);
+
     this.view.addChild(
+      this.tile,
       this.track,
       this.arc,
       this.notch,
@@ -80,44 +104,63 @@ export class Knob {
       this.pointer,
       this.label,
     );
+
+    if (geometry.socket === null) {
+      this.socket = null;
+    } else {
+      this.socket = new Graphics();
+      this.socket.position.set(
+        geometry.socket.x - geometry.x,
+        geometry.socket.y - geometry.y,
+      );
+      this.view.addChild(this.socket);
+    }
     this.drawStatic();
+    this.drawSocket();
+  }
+
+  private get knobStyle(): KnobStyle {
+    return this.style.knob;
   }
 
   /** The unchanging parts, drawn once. */
   private drawStatic(): void {
-    const r = this.radius;
+    const r = this.geometry.radius;
+    drawTile(this.tile, this.geometry, this.style.tile);
     this.track
       .clear()
       .arc(0, 0, r + 3, START_ANGLE, START_ANGLE + SWEEP)
       .stroke({
         width: 2.5,
-        color: this.style.track,
+        color: this.knobStyle.track,
         alpha: 0.9,
         cap: "round",
       });
     this.body
       .clear()
       .circle(0, 0, r)
-      .fill({ color: this.style.body })
+      .fill({ color: this.knobStyle.body })
       // A rim rather than a flat disc: it separates the knob from the arc behind it at small sizes,
       // where a circle and the arc around it otherwise merge into one blob.
       .stroke({ width: 1, color: 0x000000, alpha: 0.45 });
   }
 
+  private drawSocket(): void {
+    if (this.socket === null || this.geometry.socket === null) return;
+    const color =
+      this.style.signal[this.geometry.socket.port.role] ??
+      this.style.signal.any;
+    drawSocket(this.socket, PORT_RADIUS, color, this.socketState);
+  }
+
   /** `fraction` is 0 to 1 across the parameter's range: the document's value. */
-  update(fraction: number): void {
+  setValue(fraction: number): void {
     if (Math.abs(fraction - this.fraction) < 0.001) return;
     this.fraction = fraction;
     this.draw();
   }
 
-  /**
-   * The value modulation has produced this frame, 0 to 1, or null once nothing is plugged in.
-   *
-   * Called at frame rate while a cable feeds the knob, so it does the same "only redraw on a change"
-   * as `update`: a slow LFO holds still for many frames, and redrawing geometry for them costs the
-   * canvas frames for nothing.
-   */
+  /** The value modulation has produced this frame, 0 to 1, or null once nothing is plugged in. */
   setLive(fraction: number | null): void {
     if (
       fraction === null
@@ -129,8 +172,20 @@ export class Knob {
     this.draw();
   }
 
+  /** The modulation socket's state. Ignored on a knob that has none. */
+  update(next: Partial<SocketState>): void {
+    const merged = { ...this.socketState, ...next };
+    if (
+      merged.connected === this.socketState.connected &&
+      merged.hovered === this.socketState.hovered
+    )
+      return;
+    this.socketState = merged;
+    this.drawSocket();
+  }
+
   private draw(): void {
-    const r = this.radius;
+    const r = this.geometry.radius;
     const base = Math.max(0, this.fraction);
     const shown = this.live ?? base;
     const angle = START_ANGLE + SWEEP * shown;
@@ -140,7 +195,7 @@ export class Knob {
     if (shown > 0.001) {
       this.arc
         .arc(0, 0, r + 3, START_ANGLE, angle)
-        .stroke({ width: 2.5, color: this.style.arc, cap: "round" });
+        .stroke({ width: 2.5, color: this.knobStyle.arc, cap: "round" });
     }
 
     // With modulation moving the pointer, the value the knob is set to still has to be readable: it
@@ -151,20 +206,21 @@ export class Knob {
       this.notch
         .moveTo(Math.cos(at) * (r + 0.5), Math.sin(at) * (r + 0.5))
         .lineTo(Math.cos(at) * (r + 5.5), Math.sin(at) * (r + 5.5))
-        .stroke({ width: 2, color: this.style.label, cap: "butt" });
+        .stroke({ width: 2, color: this.knobStyle.label, cap: "butt" });
     }
 
     this.pointer
       .clear()
       .moveTo(Math.cos(angle) * (r * 0.35), Math.sin(angle) * (r * 0.35))
       .lineTo(Math.cos(angle) * (r * 0.85), Math.sin(angle) * (r * 0.85))
-      .stroke({ width: 2, color: this.style.pointer, cap: "round" });
+      .stroke({ width: 2, color: this.knobStyle.pointer, cap: "round" });
   }
 
-  setStyle(style: KnobStyle): void {
+  setStyle(style: BlockStyle): void {
     this.style = style;
-    this.label.style.fill = style.label;
+    this.label.style.fill = style.knob.label;
     this.drawStatic();
+    this.drawSocket();
     this.draw();
   }
 

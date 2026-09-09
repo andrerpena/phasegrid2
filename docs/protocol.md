@@ -31,7 +31,8 @@ Grouped by what they touch. `shared/protocol/commands.ts` is authoritative for t
 shapes; this is the map, not the territory.
 
 - **Session:** `hello`, `engine.ping`, `engine.shutdown`.
-- **Catalog:** `catalog.get`, which returns every module descriptor including each port's signal role.
+- **Catalog:** `catalog.get`, which returns every module descriptor including each port's signal role and
+  the module's `face` (rows of tokens naming its blocks, or null; docs/adding-a-module.md).
 - **Pictures:** `module.preview`, one cycle of a module's waveform at its current values, for the module's
   face to draw. Only modules whose descriptor has `previewsWave` answer; the rest return `E_UNSUPPORTED`.
   The picture is computed by the module from the same parameters the sound is, on the message thread.

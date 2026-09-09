@@ -397,7 +397,9 @@ Modules are sorted by id and params keep their descriptor order, so the document
 The registry's input list is the declared ports followed by one implicit `param:<id>` port per modulatable param, in
 the order the compiler assigns buffers; each port carries `implicit` and, when implicit, the `param` it feeds, so the
 editor can draw it on the knob instead of in the port list. Every port carries its `role`, and every param its
-`unit`, `curve`, `uiWidget`, `enumLabels` and the six `flags`.
+`unit`, `curve`, `uiWidget`, `enumLabels` and the six `flags`. Every module carries its `face`: the rows of tokens the
+descriptor declared, padded to a rectangle, or `null` for a module that left its face to the interface (see
+docs/adding-a-module.md, "The face"; the registry has validated it, so the interface only has to place the blocks).
 
 The catalog is the one place the vendored DSP's own parameter table reaches strings the user interface displays, and
 `scripts/check-trademark.mjs` reads sources rather than generated documents — so `test_catalog.cpp` scans the

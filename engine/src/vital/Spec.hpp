@@ -160,6 +160,9 @@ struct ModuleSpec {
   /// Control suffixes that belong on the module's face: the handful an interface shows without being
   /// asked. Everything else stays reachable through the inspector. See `kParamPrimary`.
   std::vector<std::string> face;
+  /// The declared face, in the language of `ModuleDescriptor::face`, naming controls by suffix and ports
+  /// by id. Empty leaves the face to the interface.
+  std::vector<std::string> faceRows;
   std::vector<ControlOverride> overrides;
   /// Optional: one cycle of the module's waveform at `values`, for `Module::preview`. Runs on the message
   /// thread against the first voice pair's vendored module, which has been through `onConfigure` and `init`.

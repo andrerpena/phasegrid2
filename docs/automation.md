@@ -42,8 +42,10 @@ is. `pg.help()` lists them.
   param, value)`**, **`patch.remove(ids)`**, **`patch.select(ids)`**, **`patch.apply(ops, label?)`** —
   edits by the path the catalogue and the canvas take: undoable, and sent to the engine.
 - **`grid.canvas()`**, **`grid.viewport()`**, **`grid.node(id)`** (rect and a title point),
-  **`grid.nodes()`**, **`grid.port(module, port, side?)`**, **`grid.knob(module, param)`** — where
-  things are, in window CSS pixels, ready for a real pointer event. Null when there is no such thing.
+  **`grid.nodes()`**, **`grid.port(module, port, side?)`** (a socket's centre and which way it faces),
+  **`grid.knob(module, param)`**, **`grid.face(module)`** (every block on the module, in reading
+  order: kind, the name the engine gave it, its rect, its socket, a knob's centre) — where things
+  are, in window CSS pixels, ready for a real pointer event. Null when there is no such thing.
 - **`workspace.openAt(root)`**, **`openProject(slug)`**, **`save()`**, **`saveAs(name)`**,
   **`closeProject(id?)`**, **`openExample(moduleId)`**.
 - **`dialogs.answer(kind, answer)`** — the next native dialog of that kind returns this instead of

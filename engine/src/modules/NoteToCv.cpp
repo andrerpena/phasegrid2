@@ -112,6 +112,6 @@ extern const ModuleDescriptor kNoteToCv{kModuleAbiVersion, "note.toCv", "Note to
   "Turns note events into pitch, gate and velocity signals. Monophonic: one note sounds at a time, chosen by "
   "the priority mode, and the gate stays high while any note is held.",
   kIn, countOf(kIn), kOut, countOf(kOut), kParams, countOf(kParams), 0, 0,
-  [] () -> Module* { return new NoteToCv(); }};
+  [] () -> Module* { return new NoteToCv(); }, nullptr, 0};
 
 }  // namespace pg::modules

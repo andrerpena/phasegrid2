@@ -35,15 +35,29 @@ describe("cable shape", () => {
     expect(c2.x).toBeLessThan(100);
   });
 
-  it("enters a socket on a module's bottom border from below", () => {
-    // A knob's modulation socket sits under the knob, on the bottom border. A cable that came in
-    // sideways would cross the module it is plugging into; it drops in from underneath instead.
+  it("enters a socket at a knob's foot from below", () => {
+    // A knob's modulation socket faces down. A cable that came in sideways would cross the module it
+    // is plugging into; it drops in from underneath instead.
     const [, c2] = cableControlPoints(
       { x: 0, y: 0 },
       { x: 300, y: 100 },
-      "bottom",
+      "down",
     );
     expect(c2.x).toBe(300);
     expect(c2.y).toBeGreaterThan(100);
+  });
+
+  it("sets off from each socket the way it faces", () => {
+    // A jack placed mid-panel faces up or down as the face decided; the cable follows.
+    const [c1, c2] = cableControlPoints(
+      { x: 0, y: 0 },
+      { x: 300, y: 100 },
+      "up",
+      "down",
+    );
+    expect(c1.x).toBe(0);
+    expect(c1.y).toBeGreaterThan(0);
+    expect(c2.x).toBe(300);
+    expect(c2.y).toBeLessThan(100);
   });
 });

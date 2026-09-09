@@ -21,7 +21,7 @@ struct NoteGen : pg::VoicedModule<int> {
 };
 const pg::PortDesc kNoteGenOut[] = {{"notes", "Notes", pg::PortKind::Event, 0, pg::SignalRole::Note, ""}};
 const pg::ModuleDescriptor kNoteGen{pg::kModuleAbiVersion, "test.noteGen", "NoteGen", "test", "",
-  nullptr, 0, kNoteGenOut, 1, nullptr, 0, 0, 0, [] () -> pg::Module* { return new NoteGen(); }};
+  nullptr, 0, kNoteGenOut, 1, nullptr, 0, 0, 0, [] () -> pg::Module* { return new NoteGen(); }, nullptr, 0};
 
 pg::Event noteOn(uint32_t frame, float note, float velocity) {
   pg::Event e;

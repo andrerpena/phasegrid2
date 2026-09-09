@@ -7,8 +7,10 @@ import {
   CatalogSchema,
   findModule,
   implicitPortId,
+  ModuleDescriptorSchema,
   ParamDescSchema,
   PortDescSchema,
+  resolveFaceToken,
 } from "./catalog";
 
 /**
@@ -177,5 +179,65 @@ describe("catalog schema rejections", () => {
     expect(() =>
       CatalogSchema.parse({ ...catalog, catalogHash: "not-a-hash" }),
     ).toThrow();
+  });
+});
+
+describe("a module's face", () => {
+  it("carries the rows the engine declared, and null for a module that declared none", () => {
+    const catalog = CatalogSchema.parse(golden);
+    const sine = findModule(catalog, "osc.sine");
+    expect(sine?.face?.[0]).toEqual([
+      "reset",
+      "wave",
+      "wave",
+      "wave",
+      "fold",
+      "fold",
+      "out",
+    ]);
+    expect(findModule(catalog, "filter.multi")?.face).toBeNull();
+  });
+
+  it("resolves a token to what it names, and refuses one that names nothing or two things", () => {
+    const module = {
+      inputs: [
+        { id: "in" },
+        { id: "gain" },
+        { id: "param:gain", implicit: true },
+      ],
+      outputs: [{ id: "out" }],
+      params: [{ id: "gain" }],
+    };
+    expect(resolveFaceToken(module, ".")).toEqual({ kind: "empty" });
+    expect(resolveFaceToken(module, "wave")).toEqual({ kind: "wave" });
+    expect(resolveFaceToken(module, "in")).toEqual({ kind: "input", id: "in" });
+    expect(resolveFaceToken(module, "out")).toEqual({
+      kind: "output",
+      id: "out",
+    });
+    // `gain` is both a port and a param: the token has to say which.
+    expect(resolveFaceToken(module, "gain")).toBeNull();
+    expect(resolveFaceToken(module, "in:gain")).toEqual({
+      kind: "input",
+      id: "gain",
+    });
+    expect(resolveFaceToken(module, "param:gain")).toEqual({
+      kind: "param",
+      id: "gain",
+    });
+    expect(resolveFaceToken(module, "nope")).toBeNull();
+    // An implicit modulation port is not a thing a face places: it rides on its knob.
+    expect(resolveFaceToken(module, "in:param:gain")).toBeNull();
+  });
+
+  it("rejects a face naming something the module does not have", () => {
+    const catalog = CatalogSchema.parse(golden);
+    const sine = findModule(catalog, "osc.sine");
+    expect(sine).toBeDefined();
+    if (sine === undefined) return;
+    const bad = { ...sine, face: [["reset", "nope"]] };
+    expect(ModuleDescriptorSchema.safeParse(bad).success).toBe(false);
+    const ragged = { ...sine, face: [["reset", "out"], ["phase"]] };
+    expect(ModuleDescriptorSchema.safeParse(ragged).success).toBe(false);
   });
 });

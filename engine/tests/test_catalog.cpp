@@ -141,3 +141,14 @@ TEST_CASE("golden/catalog.json is what --catalog prints today", "[catalog]") {
   REQUIRE(golden["catalogHash"] == builtinCatalog()["catalogHash"]);
   REQUIRE(golden == builtinCatalog());
 }
+
+TEST_CASE("the catalog publishes a module's face, and null for a module without one", "[catalog]") {
+  const nlohmann::json catalog = builtinCatalog();
+  const nlohmann::json& sine = moduleById(catalog, "osc.sine");
+  REQUIRE(sine["face"].is_array());
+  REQUIRE(sine["face"].size() == 3);
+  REQUIRE(sine["face"][0] == nlohmann::json({"reset", "wave", "wave", "wave", "fold", "fold", "out"}));
+  // Padded: every row is as long as the longest.
+  for (const auto& row : sine["face"]) REQUIRE(row.size() == 7);
+  REQUIRE(moduleById(catalog, "filter.multi")["face"].is_null());
+}

@@ -45,6 +45,6 @@ extern const ModuleDescriptor kVca{kModuleAbiVersion, "amp.vca", "VCA", "amp",
   "Voltage-controlled amplifier: multiplies its input by the Gain knob plus the gain input, clamped at "
   "zero. Plug an envelope into gain and turn the knob down to shape a note.",
   kIn, countOf(kIn), kOut, countOf(kOut), kParams, countOf(kParams), 0, 0,
-  [] () -> Module* { return new Vca(); }};
+  [] () -> Module* { return new Vca(); }, nullptr, 0};
 
 }  // namespace pg::modules

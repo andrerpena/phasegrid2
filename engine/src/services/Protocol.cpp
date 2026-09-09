@@ -370,6 +370,10 @@ json dispatchCommand(const std::string& cmd, const json& id, const json& args, P
       ctx.engine.setPreviewSlot(moduleId, next);
       previewSlots[moduleId] = next++;
     }
+    // The pictures are drawn into their slots before the answer goes out, so a slot the answer names
+    // holds its module's picture rather than whatever the previous numbering left there. Without this
+    // a face read its neighbour's wave for the frames between the answer and the publisher's next tick.
+    if (ctx.previews != nullptr) ctx.previews->tick();
     return okResponse(id, json{{"slots", std::move(slots)}, {"previewSlots", std::move(previewSlots)}});
   }
   /// One cycle of a module's waveform at its current values, for the face to draw. Read from the model

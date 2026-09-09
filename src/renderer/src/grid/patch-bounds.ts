@@ -1,6 +1,7 @@
 import type { ModuleDescriptor } from "@shared/protocol/catalog";
 import type { PatchDoc } from "@shared/protocol/patch";
-import { CELL, measureNode } from "./layout";
+import { composeFace } from "./face";
+import { CELL } from "./layout";
 
 /**
  * The rectangle a patch occupies, in grid cells.
@@ -68,7 +69,7 @@ export function patchBounds(
     const size =
       descriptor === undefined
         ? { width: CELL, height: CELL }
-        : measureNode(descriptor);
+        : composeFace(descriptor);
     // Position is optional in the document; the renderer draws such a module at the origin, so the
     // bounds must agree or the minimap would leave it out.
     const x = module.x ?? 0;

@@ -782,3 +782,24 @@ TEST_CASE("patch.render writes a WAV when given a path, and refuses a bad durati
   REQUIRE(f.call("patch.render", json{{"seconds", 31}})["error"]["code"] == "E_SCHEMA");
   REQUIRE(f.call("patch.render", json{{"seconds", "long"}})["error"]["code"] == "E_SCHEMA");
 }
+
+TEST_CASE("a subscription's answer names slots that already hold their pictures", "[protocol][telemetry]") {
+  // Resubscribing renumbers the slots -- a knob gaining a cable puts a params slot in front of every
+  // picture -- and the interface draws whatever a named slot holds the moment the answer arrives. So the
+  // pictures are refreshed before the answer, not on the publisher's next tick: a face that read its
+  // neighbour's wave for a frame was how this was found.
+  TelemetryFixture f;
+  pg::PreviewPublisher publisher{f.engine, f.writer};
+  f.ctx.previews = &publisher;
+  const json first = dispatch(
+      {{"id", 1}, {"cmd", "telemetry.subscribe"}, {"args", {{"modules", json::array()}, {"previews", {"osc"}}}}},
+      f.ctx);
+  REQUIRE(first["result"]["previewSlots"]["osc"] == 0);
+  REQUIRE(f.writer.slot(0)->seq.load() > 0);
+  REQUIRE(f.writer.slot(1)->seq.load() == 0);
+
+  const json moved = dispatch(
+      {{"id", 2}, {"cmd", "telemetry.subscribe"}, {"args", {{"modules", {"m1"}}, {"previews", {"osc"}}}}}, f.ctx);
+  REQUIRE(moved["result"]["previewSlots"]["osc"] == 1);
+  REQUIRE(f.writer.slot(1)->seq.load() > 0);
+}

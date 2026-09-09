@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resampleWave } from "./SimpleWave";
+import { resampleWave } from "./WaveBlock";
 
 /** One cycle of a square of the given width, as the engine would send it. */
 const pulse = (width: number, count = 512) =>

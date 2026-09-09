@@ -15,6 +15,9 @@ struct RegisteredModule {
   std::vector<PortDesc> inputs;        // declared inputs, then one implicit port per modulatable param
   std::vector<int32_t> inputParam;     // per input: param index for implicit ports, else -1
   std::list<std::string> implicitIds;  // stable storage for "param:<id>" strings
+  /// The declared face, tokenised and padded to a rectangle (every row the same length), or empty
+  /// for a module that declares none. Validated by `Registry::add`; the catalog publishes it as is.
+  std::vector<std::vector<std::string>> face;
 
   uint32_t numDeclaredInputs() const { return desc->numInputs; }
   int32_t findInput(std::string_view id) const;

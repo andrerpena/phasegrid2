@@ -5,8 +5,9 @@ import {
   type PatchModule,
 } from "@shared/protocol/patch";
 import { describe, expect, it } from "vitest";
+import { composeFace } from "./face";
 import { DESCRIPTORS, moduleNode } from "./fixtures";
-import { CELL, measureNode } from "./layout";
+import { CELL } from "./layout";
 import {
   EMPTY_SIZE,
   PADDING_CELLS,
@@ -21,7 +22,7 @@ import {
 const catalog: Map<string, ModuleDescriptor> = DESCRIPTORS;
 const VCA = "amp.vca";
 const vcaCells = Math.ceil(
-  measureNode(catalog.get(VCA) as ModuleDescriptor).width / CELL,
+  composeFace(catalog.get(VCA) as ModuleDescriptor).width / CELL,
 );
 
 function patchWith(modules: PatchModule[]): PatchDoc {

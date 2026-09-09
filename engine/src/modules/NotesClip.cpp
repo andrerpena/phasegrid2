@@ -257,6 +257,6 @@ extern const ModuleDescriptor kNotesClip{kModuleAbiVersion, "notes.clip", "Clip"
   "follows the host when it plays, free-runs at the transport tempo when it does not, and survives an edit "
   "to the notes.",
   kIn, countOf(kIn), kOut, countOf(kOut), kParams, countOf(kParams), kModuleNeedsTransport, 0,
-  [] () -> Module* { return new NotesClip(); }};
+  [] () -> Module* { return new NotesClip(); }, nullptr, 0};
 
 }  // namespace pg::modules

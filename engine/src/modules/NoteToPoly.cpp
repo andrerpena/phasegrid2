@@ -155,6 +155,6 @@ extern const ModuleDescriptor kNoteToPoly{kModuleAbiVersion, "note.toPoly", "Not
   "note takes a free voice, or steals the one that has been sounding longest, and releases its voice on the "
   "matching note off.",
   kIn, countOf(kIn), kOut, countOf(kOut), nullptr, 0, 0, 0,
-  [] () -> Module* { return new NoteToPoly(); }};
+  [] () -> Module* { return new NoteToPoly(); }, nullptr, 0};
 
 }  // namespace pg::modules

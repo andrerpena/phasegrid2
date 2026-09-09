@@ -5,7 +5,7 @@ import { useWidgetLayoutStore } from "@renderer/components/widgets/widget-layout
 import { useConfigStore } from "@renderer/config/config-store";
 import { useEngineStore } from "@renderer/engine/engine-store";
 import { exampleFor, projectForExample } from "@renderer/examples/registry";
-import { measureNode } from "@renderer/grid/layout";
+import { composeFace } from "@renderer/grid/face";
 import { useHistoryStore } from "@renderer/history/history-store";
 import { useLayoutStore } from "@renderer/layout/layout-store";
 import { useLogStore } from "@renderer/log/log-store";
@@ -47,8 +47,8 @@ const UNKNOWN_SIZE = { width: 144, height: 96 };
 function sizeOf(type: string): { width: number; height: number } {
   const descriptor = useCatalogStore.getState().get(type);
   if (descriptor === undefined) return UNKNOWN_SIZE;
-  const layout = measureNode(descriptor);
-  return { width: layout.width, height: layout.height };
+  const face = composeFace(descriptor);
+  return { width: face.width, height: face.height };
 }
 
 export function createAutomationApi() {

@@ -18,6 +18,13 @@ struct SawShape {
 
 const ParamDesc kParams[] = {osc::kSyncParam};
 
+/// The face: the three inputs down the left, the wave beside them, sync on its right, the output last.
+const char* const kFace[] = {
+  "reset wave wave wave sync sync out",
+  "phase wave wave wave sync sync .  ",
+  "pitch .    .    .    .    .    .  ",
+};
+
 class OscSawtooth final : public VoicedModule<osc::OscillatorState> {
   void process(ProcessContext& c) override {
     const ParamView sync = c.param(0);
@@ -43,6 +50,6 @@ extern const ModuleDescriptor kOscSawtooth{kModuleAbiVersion, "osc.sawtooth", "S
   "resulting shape.",
   osc::kOscInputs, countOf(osc::kOscInputs), osc::kOscOutputs, countOf(osc::kOscOutputs),
   kParams, countOf(kParams), kModulePreviewsWave, 0,
-  [] () -> Module* { return new OscSawtooth(); }};
+  [] () -> Module* { return new OscSawtooth(); }, kFace, countOf(kFace)};
 
 }  // namespace pg::modules

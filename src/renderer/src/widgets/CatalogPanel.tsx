@@ -1,6 +1,6 @@
 import { useCatalogStore } from "@renderer/catalog/catalog-store";
 import { SearchableTreeNavigator } from "@renderer/components/command-palette";
-import { measureNode } from "@renderer/grid/layout";
+import { composeFace } from "@renderer/grid/face";
 import type { MenuItem } from "@renderer/menu/types";
 import { addModuleOp } from "@renderer/patch/add-module";
 import { usePatchStore } from "@renderer/patch/patch-store";
@@ -24,8 +24,8 @@ function addModule(descriptor: ModuleDescriptor): void {
   const sizeOf = (type: string) => {
     const found = useCatalogStore.getState().get(type);
     if (found === undefined) return UNKNOWN_SIZE;
-    const layout = measureNode(found);
-    return { width: layout.width, height: layout.height };
+    const face = composeFace(found);
+    return { width: face.width, height: face.height };
   };
   const doc = usePatchStore.getState().doc;
   usePatchStore

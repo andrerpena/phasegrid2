@@ -127,6 +127,57 @@ export const ModuleFlagsSchema = z
   })
   .strict();
 
+/**
+ * A module's face: rows of tokens, one per grid cell, as the engine padded them (every row the same
+ * length). Equal neighbouring tokens form one rectangular block, as CSS `grid-template-areas`. `.` is
+ * an empty cell, `wave` the wave panel, anything else names a port (`in:`/`out:` when the two sides
+ * share an id) or a param (`param:` when it collides with a port). The engine's registry has already
+ * checked the geometry; the check here is only that every token still names something on the
+ * module, which is what `composeFace` needs to be true.
+ */
+export const FaceSchema = z.array(z.array(z.string().min(1)).min(1)).min(1);
+
+/** What a face token names on a module, or null for one that names nothing. `.` is `empty`. */
+export function resolveFaceToken(
+  module: {
+    inputs: { id: string }[];
+    outputs: { id: string }[];
+    params: { id: string }[];
+  },
+  token: string,
+):
+  | { kind: "empty" }
+  | { kind: "wave" }
+  | { kind: "input" | "output" | "param"; id: string }
+  | null {
+  if (token === ".") return { kind: "empty" };
+  if (token === "wave") return { kind: "wave" };
+  // Implicit modulation ports never sit on a face; they ride on their param's control, so only a
+  // declared input is a jack.
+  const declared = module.inputs.filter(
+    (p) => !("implicit" in p && p.implicit === true),
+  );
+  const has = (list: { id: string }[], id: string) =>
+    list.some((p) => p.id === id);
+  for (const [prefix, kind, list] of [
+    ["in:", "input", declared],
+    ["out:", "output", module.outputs],
+    ["param:", "param", module.params],
+  ] as const) {
+    if (!token.startsWith(prefix)) continue;
+    const id = token.slice(prefix.length);
+    return has(list, id) ? { kind, id } : null;
+  }
+  const input = has(declared, token);
+  const output = has(module.outputs, token);
+  const param = has(module.params, token);
+  const matches = Number(input) + Number(output) + Number(param);
+  if (matches !== 1) return null;
+  if (input) return { kind: "input", id: token };
+  if (output) return { kind: "output", id: token };
+  return { kind: "param", id: token };
+}
+
 export const ModuleDescriptorSchema = z
   .object({
     id: z.string().min(1),
@@ -137,8 +188,22 @@ export const ModuleDescriptorSchema = z
     inputs: z.array(PortDescSchema),
     outputs: z.array(PortDescSchema),
     params: z.array(ParamDescSchema),
+    /** The declared face, or null for a module that leaves its face to the interface. */
+    face: FaceSchema.nullable(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (m) =>
+      m.face === null ||
+      m.face.every((row) => row.every((t) => resolveFaceToken(m, t) !== null)),
+    { message: "every face token names a port or a param of the module" },
+  )
+  .refine(
+    (m) =>
+      m.face === null ||
+      m.face.every((row) => row.length === m.face?.[0].length),
+    { message: "a face is a rectangle: every row the same length" },
+  );
 
 /** Engine-wide constants a patch is written against; the editor needs them to label pitch and time. */
 export const ConventionsSchema = z

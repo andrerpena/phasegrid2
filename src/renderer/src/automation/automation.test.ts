@@ -103,19 +103,52 @@ describe("waitFor", () => {
 describe("grid geometry", () => {
   /** A renderer with one node at (48, 48), 144 by 96, one output and one knob, seen at 2x. */
   function fake(zoom = 2): LiveGrid {
+    const pitch = {
+      port: { id: "pitch" },
+      side: "input",
+      facing: "left",
+      x: 0,
+      y: 36,
+    };
+    const out = {
+      port: { id: "out" },
+      side: "output",
+      facing: "right",
+      x: 144,
+      y: 36,
+    };
+    const fold = {
+      kind: "knob",
+      name: "fold",
+      param: { id: "fold" },
+      x: 48,
+      y: 24,
+      width: 48,
+      height: 48,
+      centre: { x: 72, y: 60 },
+      radius: 16,
+      socket: null,
+    };
     const node = {
       view: { position: { x: 48, y: 48 } },
       descriptor: { id: "osc.sine" },
-      layout: {
+      face: {
         width: 144,
         height: 96,
-        inputs: [
-          { port: { id: "pitch" }, x: 0, y: 36, side: "input", edge: "left" },
+        sockets: [pitch, out],
+        knobs: [fold],
+        blocks: [
+          {
+            kind: "jack",
+            name: "pitch",
+            x: 0,
+            y: 24,
+            width: 24,
+            height: 24,
+            socket: pitch,
+          },
+          fold,
         ],
-        outputs: [
-          { port: { id: "out" }, x: 144, y: 36, side: "output", edge: "right" },
-        ],
-        controls: [{ param: { id: "fold" }, x: 72, y: 60, radius: 16 }],
       },
     };
     const viewport = {
@@ -166,13 +199,13 @@ describe("grid geometry", () => {
       x: 406 + 288,
       y: 216 + 72,
       side: "output",
-      edge: "right",
+      facing: "right",
     });
     expect(api.port("osc", "pitch")).toEqual({
       x: 406,
       y: 216 + 72,
       side: "input",
-      edge: "left",
+      facing: "left",
     });
     expect(api.port("osc", "pitch", "output")).toBeNull();
     expect(api.knob("osc", "fold")).toEqual({
@@ -181,5 +214,31 @@ describe("grid geometry", () => {
       radius: 32,
     });
     expect(api.knob("osc", "level")).toBeNull();
+  });
+
+  it("lists every block on a face by name, with its box and what it holds", () => {
+    const api = createGridApi({ live: () => fake() });
+    const blocks = api.face("osc");
+    expect(blocks?.map((b) => `${b.kind}:${b.name}`)).toEqual([
+      "jack:pitch",
+      "knob:fold",
+    ]);
+    // The jack at (0, 24) in a node at (48, 48), seen at 2x from (10, 20) on a canvas at (300, 100).
+    expect(blocks?.[0].rect).toEqual({
+      x: 406,
+      y: 216 + 48,
+      width: 48,
+      height: 48,
+    });
+    expect(blocks?.[0].socket).toEqual({
+      x: 406,
+      y: 216 + 72,
+      port: "pitch",
+      side: "input",
+      facing: "left",
+    });
+    expect(blocks?.[1].centre).toEqual({ x: 406 + 144, y: 216 + 120 });
+    expect(blocks?.[1].socket).toBeUndefined();
+    expect(createGridApi({ live: () => null }).face("osc")).toBeNull();
   });
 });

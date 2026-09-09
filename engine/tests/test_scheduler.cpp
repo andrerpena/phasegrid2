@@ -77,7 +77,7 @@ struct MaskProbe : pg::VoicedModule<int> {
 };
 const pg::PortDesc kProbeOut[] = {{"out", "Out", pg::PortKind::Continuous, 1, pg::SignalRole::Any, ""}};
 const pg::ModuleDescriptor kProbe{pg::kModuleAbiVersion, "test.maskProbe", "P", "test", "", nullptr, 0,
-                                  kProbeOut, 1, nullptr, 0, 0, 0, []() -> pg::Module* { return new MaskProbe(); }};
+                                  kProbeOut, 1, nullptr, 0, 0, 0, []() -> pg::Module* { return new MaskProbe(); }, nullptr, 0};
 }  // namespace
 
 TEST_CASE("Scheduler passes the pair's voice mask", "[scheduler]") {

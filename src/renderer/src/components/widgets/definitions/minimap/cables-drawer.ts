@@ -1,4 +1,5 @@
-import { CELL, measureNode } from "@renderer/grid/layout";
+import { composeFace } from "@renderer/grid/face";
+import { CELL } from "@renderer/grid/layout";
 import { hexToRgb } from "@renderer/lib/color";
 import type { ModuleDescriptor } from "@shared/protocol/catalog";
 import type { PatchDoc, PortRef } from "@shared/protocol/patch";
@@ -27,7 +28,7 @@ function centreOf(
   const size =
     descriptor === undefined
       ? { width: CELL, height: CELL }
-      : measureNode(descriptor);
+      : composeFace(descriptor);
   return {
     x: ((module.x ?? 0) + size.width / 2) / CELL,
     y: ((module.y ?? 0) + size.height / 2) / CELL,

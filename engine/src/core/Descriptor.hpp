@@ -4,7 +4,7 @@
 
 namespace pg {
 
-inline constexpr uint32_t kModuleAbiVersion = 1;
+inline constexpr uint32_t kModuleAbiVersion = 2;
 
 enum class PortKind : uint8_t { Continuous = 0, Event = 1 };
 /// UI coloring hint only; the compiler accepts any output into any input.
@@ -69,6 +69,10 @@ struct ParamDesc {
 
 class Module;
 
+/// Widest a face may be, in cells, and the most rows it may have.
+inline constexpr uint32_t kMaxFaceCols = 32;
+inline constexpr uint32_t kMaxFaceRows = 32;
+
 struct ModuleDescriptor {
   uint32_t abiVersion;
   const char* id;          // "osc.wavetable"
@@ -81,6 +85,37 @@ struct ModuleDescriptor {
   uint32_t flags;
   uint32_t telemetrySlots;
   Module* (*create)();
+  /**
+   * The module's face: what an interface draws on it, as a grid of cells.
+   *
+   * A module is not a title with a list of ports. On the canvas it is a rectangle of uniform cells,
+   * and its face is a composition of blocks -- a jack, a knob, a wave panel -- each covering a whole
+   * number of them, the way a hardware panel is a grid of tiles. Which blocks and where is the
+   * module's own knowledge, so it is declared here, next to the ports and params it draws, and
+   * published with them; the interface composes the face from these rows and adds nothing but a
+   * title bar above it.
+   *
+   * One string per row, whitespace-separated tokens, one token per cell. Equal neighbouring tokens
+   * form one rectangular block, exactly as CSS `grid-template-areas`:
+   *
+   *   "reset wave wave wave fold fold out"
+   *   "phase wave wave wave fold fold .  "
+   *   "pitch .    .    .    .    .    .  "
+   *
+   * Tokens: `.` is an empty cell; a port id is a jack for that input or output (`in:<id>` or
+   * `out:<id>` when the two sides share a name); a param id is a control for that param (`param:<id>`
+   * when it collides with a port id), at least two cells by two; `wave` is the wave panel, at least
+   * two by two, on a module that `kModulePreviewsWave`. Every declared port appears exactly once.
+   * Implicit modulation ports never appear: they ride on their param's control. A short row is
+   * padded with `.`. `Registry::add` rejects anything else, so a face that is wrong is a module
+   * that does not register rather than a node drawn wrong.
+   *
+   * Null, with `faceRows` 0, is a module with no declared face; the interface composes one by rule
+   * from the ports and the `kParamPrimary` params. Appended after `create` so a descriptor written
+   * against the previous layout still initialises: the trailing members are value-initialised.
+   */
+  const char* const* face;
+  uint32_t faceRows;
 };
 
 template <class T, size_t N>

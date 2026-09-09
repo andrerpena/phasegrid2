@@ -2,9 +2,10 @@
 
 1. Create `engine/src/modules/<Name>.cpp`: static C-layout port/param arrays, a class deriving `VoicedModule<State>` with all
    mutable state in `State`, and `const ModuleDescriptor k<Name>` in namespace `pg::modules`.
-2. Add `&modules::k<Name>` to the list in `engine/src/modules/builtin.cpp` (plus an `extern` line).
-3. `npm run engine:test`. Add a null test (silence in → silence out) and, for oscillators, a spectral test.
-4. No TypeScript changes: the catalog is generated from the descriptor.
+2. Declare its face (below), or pass `nullptr, 0` to get one composed from its ports and primary params.
+3. Add `&modules::k<Name>` to the list in `engine/src/modules/builtin.cpp` (plus an `extern` line).
+4. `npm run engine:test`. Add a null test (silence in → silence out) and, for oscillators, a spectral test.
+5. No TypeScript changes: the catalog is generated from the descriptor, and the canvas draws the face from the catalog.
 
 Signals are `Sample` (poly_float) frames: write the same value to all lanes for mono, use `lanes::left()/right()` masks for stereo.
 
@@ -17,6 +18,7 @@ namespace {
 const PortDesc kIn[]  = {{"in", "In", PortKind::Continuous, 1, SignalRole::Any, ""}};
 const PortDesc kOut[] = {{"out", "Out", PortKind::Continuous, 1, SignalRole::Any, ""}};
 const ParamDesc kParams[] = {{"amount", "Amount", 0.f, 1.f, 0.5f, ParamUnit::None, ParamCurve::Linear, kParamModulatable, nullptr, 0, "slider", nullptr, ""}};
+const char* const kFace[] = {"in amount amount out", ". amount amount ."};
 struct State { Sample z = Sample(0.f); };
 class Example final : public VoicedModule<State> {
   void process(ProcessContext& c) override {
@@ -28,12 +30,48 @@ class Example final : public VoicedModule<State> {
 };
 }  // namespace
 extern const ModuleDescriptor kExample{kModuleAbiVersion, "fx.example", "Example", "fx", "One-pole smoother.",
-  kIn, countOf(kIn), kOut, countOf(kOut), kParams, countOf(kParams), 0, 0, [] () -> Module* { return new Example(); }};
+  kIn, countOf(kIn), kOut, countOf(kOut), kParams, countOf(kParams), 0, 0, [] () -> Module* { return new Example(); },
+  kFace, countOf(kFace)};
 }  // namespace pg::modules
 ```
 
 Rules: no statics for state, no allocation in `process`, params are numeric only, `numFrames` can be 1 (feedback clusters).
 Unconnected continuous inputs are empty `SignalView`s; read through `readOr()`.
+
+## The face
+
+On the canvas a module is a rectangle of cells (24 px each) and its face is a composition of **blocks** -- a jack, a
+knob, a wave panel -- each covering a whole number of them, the way a hardware panel is a grid of tiles. Which blocks
+and where is the module's own knowledge, so the descriptor says, in rows of tokens in the manner of CSS
+`grid-template-areas`: one token per cell, equal neighbours forming one rectangular block. The interface adds a title
+row above and draws each block; there is no per-module code anywhere in the interface.
+
+```cpp
+// osc.sine: three jacks down the left, the wave, the Fold knob, the output.
+const char* const kFace[] = {
+  "reset wave wave wave fold fold out",
+  "phase wave wave wave fold fold .  ",
+  "pitch .    .    .    .    .    .  ",
+};
+```
+
+| Token | Block |
+| --- | --- |
+| `.` | an empty cell |
+| a port id (`in:<id>` / `out:<id>` when the two sides share a name) | a jack, one cell; every declared port must appear once |
+| a param id (`param:<id>` when it collides with a port id) | a knob, at least two cells by two; a larger block scales it up |
+| `wave` | the wave panel, at least two by two, on a module that `kModulePreviewsWave` |
+
+Implicit modulation ports (`param:<id>`) never appear: the socket for one sits at its knob's foot, and a cable dropped
+on the knob connects to it. A jack in the leftmost or rightmost column sits its socket on the module's border; one on
+the bottom row sits it on the bottom border; anywhere else the socket is the cell's centre. Short rows are padded
+with `.`. Hidden and enum params have no block yet.
+
+`Registry::add` rejects a face that names nothing, leaves a port out, names something twice, gives a knob or the wave
+too little room, or has a non-rectangular block -- so a wrong face is a module that does not register rather than a
+node drawn wrong. `face = nullptr, faceRows = 0` is a module with no declared face: the interface composes one from
+its ports (down the sides) and its `kParamPrimary` params (knobs between them, the wave first). A vendored module
+declares its rows in `ModuleSpec::faceRows`, naming controls by suffix.
 
 ## Wrapping a vendored module
 

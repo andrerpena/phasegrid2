@@ -1,19 +1,11 @@
-import type {
-  ModuleDescriptor,
-  ParamDesc,
-  PortDesc,
-} from "@shared/protocol/catalog";
+import type { ModuleDescriptor, ParamDesc } from "@shared/protocol/catalog";
 
 /**
- * Where everything on a node is, in patch coordinates.
+ * The grid's units and the arithmetic everything on it shares.
  *
- * A node is not a title with a list of ports. It carries its performance controls on its face — knobs
- * with a value arc, a readout, a small display — the way a hardware module does, so a patch can be read
- * and played without opening anything. Ports run down the sides; controls sit between them.
- *
- * Pure geometry, deliberately separate from anything that draws. The renderer needs these numbers, the
- * hit test needs the same numbers, and a test needs them with no graphics context. Two implementations
- * of "where is that knob" is how a click lands next to the control it appears to be on.
+ * What a node is made of and where each part sits is `face.ts`; this is the cell, the sizes a block
+ * is measured in, snapping, and the small rectangle helpers the interaction needs. Pure, with no
+ * graphics context, so a test can check it and so the renderer and the hit test cannot disagree.
  */
 
 /**
@@ -30,92 +22,40 @@ export const CELL = 24;
 export const HEADER_ROWS = 1;
 export const HEADER_HEIGHT = HEADER_ROWS * CELL;
 
-/** One port per cell, sitting at the cell's centre so a cable meets it on a grid line. */
-export const PORT_ROWS_PER_PORT = 1;
+/** A socket's ring. */
 export const PORT_RADIUS = 4;
+
+/** The gutter a tile leaves around itself in its cells, so two neighbours show a seam between them. */
+export const TILE_GUTTER = 1.5;
 /** How far from a socket a click still counts, in patch units at 100% zoom. */
 export const PORT_HIT_RADIUS = 9;
 
-/** A knob with its label: two cells by two cells. */
+/** A knob with its label, as a composed face places one: two cells by two cells. */
 export const KNOB_COLS = 2;
 export const KNOB_ROWS = 2;
 export const KNOB_CELL_WIDTH = KNOB_COLS * CELL;
 export const KNOB_CELL_HEIGHT = KNOB_ROWS * CELL;
-export const KNOB_RADIUS = 16;
+/** The knob in a two-by-two block, sized to sit inside its tile with its arc, its label and its socket; a larger block scales it up. */
+export const KNOB_RADIUS = 9;
 export const KNOB_HIT_RADIUS = KNOB_RADIUS + 4;
 
-/** Narrowest a module gets: enough for a title and a port column either side. */
+/** Narrowest a composed face gets: enough for a title and a port column either side. */
 export const MIN_COLS = 3;
 
 /**
- * How many controls a node shows on its face.
+ * How many controls a composed face shows.
  *
  * A wavetable oscillator has twenty-odd parameters and a face the size of a business card, so it can
  * only show a few. Which few the engine declares with the `primary` flag; this is the ceiling on how
- * many of them fit.
+ * many of them fit on a face the module did not lay out itself.
  */
 export const MAX_FACE_CONTROLS = 4;
 
-/** Which border of the module a socket sits on, and so which way a cable meets it. */
-export type PortEdge = "left" | "right" | "bottom";
-
-export interface PortLayout {
-  port: PortDesc;
-  x: number;
-  y: number;
-  side: "input" | "output";
-  edge: PortEdge;
-}
-
-export interface ControlLayout {
-  param: ParamDesc;
-  /**
-   * The implicit port a cable dropped on this knob connects to, or null when the parameter cannot be
-   * modulated. This is how modulation is patched: onto the control it modulates, not onto a separate
-   * socket beside it.
-   */
-  modulationPort: string | null;
-  /** Centre of the knob. */
-  x: number;
-  y: number;
-  radius: number;
-  /** Baseline of the label under it. */
-  labelY: number;
-}
-
 /**
- * A wave picture on the face, for a module that can draw itself (`flags.previewsWave`).
+ * The parameters a composed face puts on a node: the ones meant to be moved while it runs.
  *
- * It takes one of the face's control slots rather than being added beside them, so a module that gains
- * a display does not get wider; it shows one fewer knob. A node's width is how a patch stays legible,
- * and a picture earns its place against a knob rather than for free.
+ * Only for a module that declared no face of its own; a declared face names its knobs outright.
  */
-export interface DisplayLayout {
-  /** Top-left of the panel. */
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-export interface NodeLayout {
-  /** Size in grid cells. The pixel size is these times `CELL`, and never anything else. */
-  cols: number;
-  rows: number;
-  width: number;
-  height: number;
-  inputs: PortLayout[];
-  outputs: PortLayout[];
-  controls: ControlLayout[];
-  /** The wave panel, or null for the modules that have no waveform to show, which is most of them. */
-  display: DisplayLayout | null;
-}
-
-export interface NodeLayoutOptions {
-  maxControls?: number;
-}
-
-/** The parameters a node puts on its face: the ones meant to be moved while it runs. */
 export function faceParams(
   descriptor: ModuleDescriptor,
   max = MAX_FACE_CONTROLS,
@@ -132,167 +72,9 @@ export function faceParams(
   return chosen.slice(0, max);
 }
 
-/** The panel's own size inside its 2x2 slot: shorter than a knob, leaving the label row clear. */
-export const DISPLAY_WIDTH = KNOB_CELL_WIDTH - 6;
-export const DISPLAY_HEIGHT = 32;
-
-/**
- * Lays out one node.
- *
- * Implicit modulation ports never appear in the port columns. There is one per modulatable parameter,
- * and a wavetable oscillator has twenty-odd, so giving each a socket down the side makes the node
- * taller than the patch it belongs to and unreadable at any zoom. The ones whose knob is on the face
- * get a socket on the bottom border directly under that knob, which says what it is for without a
- * label and adds no height; the rest are reached by dropping a cable on the knob.
- */
-export function measureNode(
-  descriptor: ModuleDescriptor,
-  options: NodeLayoutOptions = {},
-): NodeLayout {
-  const inputs = descriptor.inputs.filter((p) => !p.implicit);
-  const outputs = descriptor.outputs;
-  const wave = descriptor.flags.previewsWave;
-  const slots = options.maxControls ?? MAX_FACE_CONTROLS;
-  const controls = faceParams(descriptor, wave ? slots - 1 : slots);
-
-  // Rows: the header, then whichever column needs more. A module with six ports and one knob is six
-  // rows of ports tall; one with two ports and four knobs is a knob tall.
-  const portRows = Math.max(inputs.length, outputs.length) * PORT_ROWS_PER_PORT;
-  const controlRows = controls.length > 0 || wave ? KNOB_ROWS : 0;
-  const bodyRows = Math.max(portRows, controlRows, 1);
-  const rows = HEADER_ROWS + bodyRows;
-
-  // Columns: the face slots, plus a cell of margin either side so a knob never touches a port.
-  const faceSlots = controls.length + (wave ? 1 : 0);
-  const controlCols = faceSlots * KNOB_COLS;
-  const cols = Math.max(MIN_COLS, controlCols + 2);
-
-  const width = cols * CELL;
-  const height = rows * CELL;
-
-  const place = (ports: PortDesc[], side: "input" | "output"): PortLayout[] =>
-    ports.map((port, i) => ({
-      port,
-      x: side === "input" ? 0 : width,
-      // The centre of its cell, so every socket sits on a half-cell line and a cable between two
-      // modules an integer number of cells apart runs exactly horizontally.
-      y: HEADER_HEIGHT + (i + 0.5) * CELL,
-      side,
-      edge: side === "input" ? "left" : "right",
-    }));
-
-  // Centred as a group so a node with one knob has it in the middle rather than pinned left.
-  const controlsLeft = ((cols - controlCols) / 2) * CELL;
-  const controlsTop = HEADER_HEIGHT + ((bodyRows - controlRows) / 2) * CELL;
-  const controlX = (i: number): number =>
-    // Shifted one slot right when a display holds the first one.
-    controlsLeft + (i + (wave ? 1 : 0) + 0.5) * KNOB_CELL_WIDTH;
-
-  // The socket under each knob: the descriptor's own implicit port for that param, on the border.
-  const underKnobs: PortLayout[] = [];
-  controls.forEach((param, i) => {
-    const port = descriptor.inputs.find(
-      (p) => p.implicit && p.param === param.id,
-    );
-    if (port === undefined) return;
-    underKnobs.push({
-      port,
-      x: controlX(i),
-      y: height,
-      side: "input",
-      edge: "bottom",
-    });
-  });
-
-  return {
-    cols,
-    rows,
-    width,
-    height,
-    inputs: [...place(inputs, "input"), ...underKnobs],
-    outputs: place(outputs, "output"),
-    display: !wave
-      ? null
-      : {
-          x: controlsLeft + (KNOB_CELL_WIDTH - DISPLAY_WIDTH) / 2,
-          // Centred on the same line as the knob faces beside it, so the row reads as one row.
-          y: controlsTop + CELL * 0.5 + 2 - DISPLAY_HEIGHT / 2,
-          width: DISPLAY_WIDTH,
-          height: DISPLAY_HEIGHT,
-        },
-    controls: controls.map((param, i) => ({
-      param,
-      modulationPort: param.flags.modulatable ? `param:${param.id}` : null,
-      x: controlX(i),
-      // In the upper of its two cells, leaving the lower one for the label.
-      y: controlsTop + CELL * 0.5 + 2,
-      radius: KNOB_RADIUS,
-      labelY: controlsTop + KNOB_CELL_HEIGHT - 8,
-    })),
-  };
-}
-
 export interface Point {
   x: number;
   y: number;
-}
-
-export function hitNode(
-  point: Point,
-  origin: Point,
-  layout: NodeLayout,
-): boolean {
-  return (
-    point.x >= origin.x &&
-    point.x <= origin.x + layout.width &&
-    point.y >= origin.y &&
-    point.y <= origin.y + layout.height
-  );
-}
-
-/**
- * The port nearest a point, within the grab radius, or null.
- *
- * Nearest rather than first: sockets sit close together and a generous grab radius makes several
- * overlap, so taking the first match would sometimes connect the neighbour of the one aimed at.
- */
-export function hitPort(
-  point: Point,
-  origin: Point,
-  layout: NodeLayout,
-  radius = PORT_HIT_RADIUS,
-): PortLayout | null {
-  let best: PortLayout | null = null;
-  let bestDistance = radius * radius;
-  for (const port of [...layout.inputs, ...layout.outputs]) {
-    const dx = point.x - (origin.x + port.x);
-    const dy = point.y - (origin.y + port.y);
-    const distance = dx * dx + dy * dy;
-    if (distance <= bestDistance) {
-      best = port;
-      bestDistance = distance;
-    }
-  }
-  return best;
-}
-
-/**
- * The knob under a point, or null.
- *
- * Checked before the node body, so dragging a knob beats dragging the node, and checked when a cable is
- * released, so dropping one on a control patches its modulation.
- */
-export function hitControl(
-  point: Point,
-  origin: Point,
-  layout: NodeLayout,
-): ControlLayout | null {
-  for (const control of layout.controls) {
-    const dx = point.x - (origin.x + control.x);
-    const dy = point.y - (origin.y + control.y);
-    if (dx * dx + dy * dy <= KNOB_HIT_RADIUS * KNOB_HIT_RADIUS) return control;
-  }
-  return null;
 }
 
 /** Snaps to the grid. A module always sits on cell boundaries, so this is how it is placed. */

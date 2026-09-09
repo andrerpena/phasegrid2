@@ -13,7 +13,7 @@ import { paramValue } from "./params";
  * Nothing about a particular module appears here. Every field, its label, its range, its unit and
  * whether it is a dropdown or a number all come from `ModuleDescriptor`, which is what the engine
  * prints — so adding a module to the engine gives it a working inspector with no change to the
- * interface, which is the same promise `measureNode` makes for the canvas.
+ * interface, which is the same promise `composeFace` makes for the canvas.
  *
  * Hidden parameters are left out, and structural ones are shown but not editable: the engine rebuilds
  * a node to change one, which is not something to offer through a form field that looks like every

@@ -42,6 +42,6 @@ class Mixer final : public VoicedModule<int> {
 extern const ModuleDescriptor kMixer{kModuleAbiVersion, "mix.mixer", "Mixer", "mix",
   "Adds four signals, each through its own level. Unconnected channels are silent.",
   kIn, countOf(kIn), kOut, countOf(kOut), kParams, countOf(kParams), 0, 0,
-  [] () -> Module* { return new Mixer(); }};
+  [] () -> Module* { return new Mixer(); }, nullptr, 0};
 
 }  // namespace pg::modules

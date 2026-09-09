@@ -65,6 +65,13 @@ const ParamDesc kParams[] = {
 
 double driveFor(double semitones) { return (M_PI / 2.0) * std::exp2(std::clamp(semitones, 0.0, 48.0) / 12.0); }
 
+/// The face: the three inputs down the left, the wave beside them, fold on its right, the output last.
+const char* const kFace[] = {
+  "reset wave wave wave fold fold out",
+  "phase wave wave wave fold fold .  ",
+  "pitch .    .    .    .    .    .  ",
+};
+
 class OscSine final : public VoicedModule<osc::OscillatorState> {
   void process(ProcessContext& c) override {
     const ParamView fold = c.param(0);
@@ -95,6 +102,6 @@ extern const ModuleDescriptor kOscSine{kModuleAbiVersion, "osc.sine", "Sine", "o
   "drive: at twelve, two lobes meet at the centre. The face shows the resulting shape.",
   osc::kOscInputs, countOf(osc::kOscInputs), osc::kOscOutputs, countOf(osc::kOscOutputs),
   kParams, countOf(kParams), kModulePreviewsWave, 0,
-  [] () -> Module* { return new OscSine(); }};
+  [] () -> Module* { return new OscSine(); }, kFace, countOf(kFace)};
 
 }  // namespace pg::modules

@@ -1,9 +1,10 @@
+import type { Block, Facing } from "@renderer/grid/face";
 import { gridRegistry, type LiveGrid } from "@renderer/grid/grid-registry";
 
 /**
  * Where things on the canvas are, in window pixels.
  *
- * The canvas has no DOM: a module, a port or a knob is a shape Pixi drew, and the only way to point
+ * The canvas has no DOM: a module, a socket or a knob is a shape Pixi drew, and the only way to point
  * a real mouse at one was to redo the layout arithmetic by hand and hope the viewport had not moved.
  * These answer in the coordinates `Input.dispatchMouseEvent` takes -- CSS pixels from the window's
  * top left -- by asking the renderer where it drew the thing and where the canvas sits on the page.
@@ -37,6 +38,34 @@ function toWindow(grid: LiveGrid, point: Point): Point {
   return { x: box.left + screen.x, y: box.top + screen.y };
 }
 
+/** A rectangle at a node's origin, scaled and placed on the page. */
+function rectOf(
+  grid: LiveGrid,
+  origin: Point,
+  box: { x: number; y: number; width: number; height: number },
+): Rect {
+  const zoom = grid.renderer.viewport.zoom;
+  const topLeft = toWindow(grid, { x: origin.x + box.x, y: origin.y + box.y });
+  return {
+    x: topLeft.x,
+    y: topLeft.y,
+    width: box.width * zoom,
+    height: box.height * zoom,
+  };
+}
+
+/** One block of a face, as a script sees it: what it is, what it is for, and where. */
+export interface FaceBlock {
+  kind: Block["kind"];
+  /** The face token: the port id, the param id, or `wave`. */
+  name: string;
+  rect: Rect;
+  /** A jack's socket, or a knob's modulation socket; absent on a wave and an unmodulatable knob. */
+  socket?: Point & { port: string; side: "input" | "output"; facing: Facing };
+  /** A knob's centre. */
+  centre?: Point;
+}
+
 export function createGridApi(source: GridSource = fromRegistry) {
   return {
     /** The canvas's box, or null when no grid is on screen. */
@@ -65,18 +94,11 @@ export function createGridApi(source: GridSource = fromRegistry) {
       if (grid === null || grid === undefined || node === undefined)
         return null;
       const origin = { x: node.view.position.x, y: node.view.position.y };
-      const zoom = grid.renderer.viewport.zoom;
-      const topLeft = toWindow(grid, origin);
       return {
-        rect: {
-          x: topLeft.x,
-          y: topLeft.y,
-          width: node.layout.width * zoom,
-          height: node.layout.height * zoom,
-        },
+        rect: rectOf(grid, origin, { x: 0, y: 0, ...node.face }),
         // The title bar is the first cell; its middle is clear of every control.
         title: toWindow(grid, {
-          x: origin.x + node.layout.width / 2,
+          x: origin.x + node.face.width / 2,
           y: origin.y + 12,
         }),
       };
@@ -86,23 +108,15 @@ export function createGridApi(source: GridSource = fromRegistry) {
     nodes(): { id: string; type: string; rect: Rect }[] {
       const grid = source.live();
       if (grid === null) return [];
-      return [...grid.renderer.allNodes()].map(([id, node]) => {
-        const topLeft = toWindow(grid, {
-          x: node.view.position.x,
-          y: node.view.position.y,
-        });
-        const zoom = grid.renderer.viewport.zoom;
-        return {
-          id,
-          type: node.descriptor.id,
-          rect: {
-            x: topLeft.x,
-            y: topLeft.y,
-            width: node.layout.width * zoom,
-            height: node.layout.height * zoom,
-          },
-        };
-      });
+      return [...grid.renderer.allNodes()].map(([id, node]) => ({
+        id,
+        type: node.descriptor.id,
+        rect: rectOf(
+          grid,
+          { x: node.view.position.x, y: node.view.position.y },
+          { x: 0, y: 0, ...node.face },
+        ),
+      }));
     },
 
     /**
@@ -113,7 +127,7 @@ export function createGridApi(source: GridSource = fromRegistry) {
       module: string,
       port: string,
       side?: "input" | "output",
-    ): (Point & { side: "input" | "output"; edge: string }) | null {
+    ): (Point & { side: "input" | "output"; facing: Facing }) | null {
       const grid = source.live();
       const node = grid?.renderer.allNodes().get(module);
       if (grid === null || grid === undefined || node === undefined)
@@ -121,14 +135,15 @@ export function createGridApi(source: GridSource = fromRegistry) {
       const sides =
         side === undefined ? (["output", "input"] as const) : ([side] as const);
       for (const s of sides) {
-        const list = s === "output" ? node.layout.outputs : node.layout.inputs;
-        const found = list.find((p) => p.port.id === port);
+        const found = node.face.sockets.find(
+          (socket) => socket.port.id === port && socket.side === s,
+        );
         if (found === undefined) continue;
         const at = toWindow(grid, {
           x: node.view.position.x + found.x,
           y: node.view.position.y + found.y,
         });
-        return { ...at, side: s, edge: found.edge };
+        return { ...at, side: s, facing: found.facing };
       }
       return null;
     },
@@ -139,13 +154,49 @@ export function createGridApi(source: GridSource = fromRegistry) {
       const node = grid?.renderer.allNodes().get(module);
       if (grid === null || grid === undefined || node === undefined)
         return null;
-      const control = node.layout.controls.find((c) => c.param.id === param);
-      if (control === undefined) return null;
+      const knob = node.face.knobs.find((k) => k.param.id === param);
+      if (knob === undefined) return null;
       const at = toWindow(grid, {
-        x: node.view.position.x + control.x,
-        y: node.view.position.y + control.y,
+        x: node.view.position.x + knob.centre.x,
+        y: node.view.position.y + knob.centre.y,
       });
-      return { ...at, radius: control.radius * grid.renderer.viewport.zoom };
+      return { ...at, radius: knob.radius * grid.renderer.viewport.zoom };
+    },
+
+    /**
+     * Every block on a module's face, in reading order, with its box on screen: the whole of what
+     * the module is made of, so a script can reach any of it by the name the engine gave it.
+     */
+    face(module: string): FaceBlock[] | null {
+      const grid = source.live();
+      const node = grid?.renderer.allNodes().get(module);
+      if (grid === null || grid === undefined || node === undefined)
+        return null;
+      const origin = { x: node.view.position.x, y: node.view.position.y };
+      return node.face.blocks.map((block): FaceBlock => {
+        const out: FaceBlock = {
+          kind: block.kind,
+          name: block.name,
+          rect: rectOf(grid, origin, block),
+        };
+        const socket = block.kind === "wave" ? null : block.socket;
+        if (socket !== null)
+          out.socket = {
+            ...toWindow(grid, {
+              x: origin.x + socket.x,
+              y: origin.y + socket.y,
+            }),
+            port: socket.port.id,
+            side: socket.side,
+            facing: socket.facing,
+          };
+        if (block.kind === "knob")
+          out.centre = toWindow(grid, {
+            x: origin.x + block.centre.x,
+            y: origin.y + block.centre.y,
+          });
+        return out;
+      });
     },
   };
 }

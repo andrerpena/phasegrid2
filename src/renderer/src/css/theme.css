@@ -72,6 +72,8 @@
   --color-knob-body: var(--knob-body);
   --color-knob-pointer: var(--knob-pointer);
   --color-knob-label: var(--knob-label);
+  --color-tile-fill: var(--tile-fill);
+  --color-tile-stroke: var(--tile-stroke);
   --color-marquee: var(--marquee);
   --color-playhead: var(--playhead);
 

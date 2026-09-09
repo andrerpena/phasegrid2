@@ -1,4 +1,5 @@
 import type { PortRef } from "@shared/protocol/patch";
+import { hitKnob, type Socket } from "./face";
 import type { GridRenderer } from "./GridRenderer";
 import {
   beginDragCable,
@@ -15,14 +16,7 @@ import {
   pointerMove,
   pointerUp,
 } from "./interaction";
-import {
-  CELL,
-  hitControl,
-  type Point,
-  type PortLayout,
-  paramFraction,
-  snap,
-} from "./layout";
+import { CELL, type Point, paramFraction, snap } from "./layout";
 import { classifyWheel } from "./wheel";
 
 /** How far apart two fingers are. */
@@ -216,16 +210,15 @@ export class GridInteraction {
     const hit = this.renderer.nodeAt(point);
     if (hit === null) return;
     const origin = { x: hit.node.view.position.x, y: hit.node.view.position.y };
-    const control = hitControl(point, origin, hit.node.layout);
-    if (control === null) return;
+    const knob = hitKnob(point, origin, hit.node.face);
+    if (knob === null) return;
     const previous =
-      this.callbacks.readParam?.(hit.id, control.param.id) ??
-      control.param.default;
-    if (previous === control.param.default) return; // already there: nothing to record
+      this.callbacks.readParam?.(hit.id, knob.param.id) ?? knob.param.default;
+    if (previous === knob.param.default) return; // already there: nothing to record
     this.callbacks.onParamChange?.({
       module: hit.id,
-      param: control.param.id,
-      value: control.param.default,
+      param: knob.param.id,
+      value: knob.param.default,
       done: true,
       previous,
     });
@@ -252,9 +245,9 @@ export class GridInteraction {
     // A socket before anything else: they sit on the borders, where a module's own hit box and the
     // gap beside it meet, and grabbing one has to work from either side of that line.
     if (!this.parametersOnly) {
-      const socket = this.renderer.portAt(point);
-      if (socket !== null) {
-        this.state = this.pickUpCable(socket.module, socket.port, point);
+      const hit = this.renderer.portAt(point);
+      if (hit !== null) {
+        this.state = this.pickUpCable(hit.module, hit.socket, point);
         return;
       }
     }
@@ -266,16 +259,16 @@ export class GridInteraction {
         y: hit.node.view.position.y,
       };
       // A knob before the body, so grabbing a control does not drag the module it sits on.
-      const control = hitControl(point, origin, hit.node.layout);
-      if (control !== null) {
+      const knob = hitKnob(point, origin, hit.node.face);
+      if (knob !== null) {
         const value =
-          this.callbacks.readParam?.(hit.id, control.param.id) ??
-          control.param.default;
+          this.callbacks.readParam?.(hit.id, knob.param.id) ??
+          knob.param.default;
         this.state = beginDragParam(
           hit.id,
-          control.param.id,
+          knob.param.id,
           event.clientY,
-          paramFraction(control.param, value),
+          paramFraction(knob.param, value),
         );
         return;
       }
@@ -313,20 +306,16 @@ export class GridInteraction {
    * and the edge it was travels with it so the drop can move or remove it. With several cables in
    * one input the most recent one comes off, which is the one still under the hand, as it were.
    */
-  private pickUpCable(
-    module: string,
-    port: PortLayout,
-    at: Point,
-  ): Interaction {
-    const ref: PortRef = { module, port: port.port.id };
-    if (port.side === "input") {
+  private pickUpCable(module: string, socket: Socket, at: Point): Interaction {
+    const ref: PortRef = { module, port: socket.port.id };
+    if (socket.side === "input") {
       const existing =
-        this.callbacks.readEdgesInto?.(module, port.port.id) ?? [];
+        this.callbacks.readEdgesInto?.(module, socket.port.id) ?? [];
       const last = existing.at(-1);
       if (last !== undefined)
         return beginDragCable(last.from, "output", at, last.id);
     }
-    return beginDragCable(ref, port.side, at);
+    return beginDragCable(ref, socket.side, at);
   }
 
   /**
@@ -345,9 +334,17 @@ export class GridInteraction {
     if (anchor === null) return;
     const over = this.renderer.portAt(state.current, { knobs: true });
     const loose =
-      over !== null && over.port.side !== state.fromSide
-        ? { x: over.x, y: over.y, edge: over.port.edge }
-        : { x: state.current.x, y: state.current.y, edge: "left" as const };
+      over !== null && over.socket.side !== state.fromSide
+        ? { x: over.x, y: over.y, facing: over.socket.facing }
+        : {
+            x: state.current.x,
+            y: state.current.y,
+            // A loose end faces the way the socket it is looking for would.
+            facing:
+              state.fromSide === "output"
+                ? ("left" as const)
+                : ("right" as const),
+          };
     const color = this.renderer.portColor(
       state.from.module,
       state.from.port,
@@ -359,7 +356,8 @@ export class GridInteraction {
       from,
       to,
       color,
-      toEdge: to.edge,
+      toFacing: to.facing,
+      fromFacing: from.facing,
     });
   }
 
@@ -376,8 +374,11 @@ export class GridInteraction {
   }): void {
     const target = this.renderer.portAt(drop.at, { knobs: true });
     if (target !== null) {
-      const to: PortRef = { module: target.module, port: target.port.port.id };
-      if (canConnect(drop.fromSide, target.port.side, drop.from, to)) {
+      const to: PortRef = {
+        module: target.module,
+        port: target.socket.port.id,
+      };
+      if (canConnect(drop.fromSide, target.socket.side, drop.from, to)) {
         const edge = orientEdge(drop.from, drop.fromSide, to);
         const existing = (
           this.callbacks.readEdgesInto?.(edge.to.module, edge.to.port) ?? []
@@ -516,9 +517,9 @@ export class GridInteraction {
         const y = node.view.position.y;
         if (
           x < rect.x + rect.width &&
-          x + node.layout.width > rect.x &&
+          x + node.face.width > rect.x &&
           y < rect.y + rect.height &&
-          y + node.layout.height > rect.y
+          y + node.face.height > rect.y
         )
           inside.push(id);
       }

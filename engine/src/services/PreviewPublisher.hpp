@@ -35,8 +35,14 @@ private:
   Engine& engine_;
   TelemetryWriter& writer_;
   std::vector<float> samples_;
-  /// What each instance (by serial) was last drawn with, so an unchanged module is not redrawn.
-  std::map<uint64_t, std::vector<float>> lastValues_;
+  /// What each instance (by serial) was last drawn with, and into which slot, so an unchanged module
+  /// is not redrawn -- unless a resubscription has moved it, and the slot it now owns holds someone
+  /// else's picture until it is drawn again.
+  struct Drawn {
+    uint32_t slot;
+    std::vector<float> values;
+  };
+  std::map<uint64_t, Drawn> lastDrawn_;
   uint64_t index_ = 0;
 };
 

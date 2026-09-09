@@ -5,7 +5,7 @@ import type { PatchDoc } from "@shared/protocol/patch";
 import { type Application, Container, Graphics } from "pixi.js";
 import { Cable, cableControlPoints } from "./components/Cable";
 import { NodeView } from "./components/NodeView";
-import { hitControl, hitPort, type PortEdge, type PortLayout } from "./layout";
+import { type Facing, hitKnob, hitSocket, type Socket, socketOf } from "./face";
 import { Viewport } from "./viewport";
 
 /**
@@ -44,6 +44,18 @@ const CATEGORY_ACCENT: Record<string, keyof PhasegridTheme["grid"]["signal"]> =
 const SELECTION_RADIUS = 6;
 const SELECTION_WIDTH = 2;
 
+/**
+ * What is drawn over what, bottom to top. The one place the order is decided.
+ *
+ * The rules of the ground are drawn in screen space under everything. In the world, which pans and
+ * zooms as one: the modules; the selection rings, which trace a module's edge and so belong with it;
+ * then the cables, over both, because every socket is inside a tile and a cable has to be seen
+ * reaching it the way a patch cable lies over a rack. The marquee and a cable being dragged are
+ * transient and go in the screen-space overlay above all of it.
+ */
+const WORLD_LAYERS = ["nodes", "selection", "cables"] as const;
+type WorldLayer = (typeof WORLD_LAYERS)[number];
+
 export class GridRenderer {
   readonly viewport: Viewport;
   private readonly world = new Container();
@@ -65,10 +77,12 @@ export class GridRenderer {
     private theme: PhasegridTheme,
     private catalog: Map<string, ModuleDescriptor>,
   ) {
-    // Cables under nodes, so a cable passing behind a module looks like it goes behind it. The
-    // selection outlines go above both, and inside `world` rather than in the screen-space overlay,
-    // so panning and zooming carry them without a redraw.
-    this.world.addChild(this.cableLayer, this.nodeLayer, this.selectionLayer);
+    const layers: Record<WorldLayer, Container> = {
+      nodes: this.nodeLayer,
+      selection: this.selectionLayer,
+      cables: this.cableLayer,
+    };
+    this.world.addChild(...WORLD_LAYERS.map((name) => layers[name]));
     app.stage.addChild(this.background, this.world, this.overlay);
     this.viewport = new Viewport(this.world);
     this.drawBackground();
@@ -160,7 +174,7 @@ export class GridRenderer {
         this.cableLayer.addChild(cable.view);
       }
       cable.setColor(this.cableColor(edge.from.module, edge.from.port));
-      cable.update(from, to, { toEdge: to.edge });
+      cable.update(from, to, { toFacing: to.facing, fromFacing: from.facing });
     }
     for (const [id, cable] of this.cables) {
       if (seenEdges.has(id)) continue;
@@ -191,7 +205,7 @@ export class GridRenderer {
       );
       const to = this.portPosition(edge.to.module, edge.to.port, "input");
       if (cable === undefined || from === null || to === null) continue;
-      cable.update(from, to, { toEdge: to.edge });
+      cable.update(from, to, { toFacing: to.facing, fromFacing: from.facing });
     }
   }
 
@@ -216,8 +230,9 @@ export class GridRenderer {
     side: "input" | "output",
   ): number {
     const node = this.nodes.get(moduleId);
-    const list = side === "output" ? node?.layout.outputs : node?.layout.inputs;
-    const role = list?.find((p) => p.port.id === portId)?.port.role ?? "any";
+    const role =
+      (node === undefined ? null : socketOf(node.face, portId, side))?.port
+        .role ?? "any";
     return hexToNumber(
       this.theme.grid.signal[role] ?? this.theme.grid.signal.any,
     );
@@ -235,50 +250,43 @@ export class GridRenderer {
   portAt(
     point: { x: number; y: number },
     options: { knobs?: boolean } = {},
-  ): { module: string; port: PortLayout; x: number; y: number } | null {
+  ): { module: string; socket: Socket; x: number; y: number } | null {
     const entries = [...this.nodes.entries()].reverse();
     for (const [id, node] of entries) {
       const origin = { x: node.view.position.x, y: node.view.position.y };
-      const port =
-        hitPort(point, origin, node.layout) ??
+      const socket =
+        hitSocket(point, origin, node.face) ??
         (options.knobs === true
-          ? this.socketOfKnob(node, hitControl(point, origin, node.layout))
+          ? (hitKnob(point, origin, node.face)?.socket ?? null)
           : null);
-      if (port !== null)
-        return { module: id, port, x: origin.x + port.x, y: origin.y + port.y };
+      if (socket !== null)
+        return {
+          module: id,
+          socket,
+          x: origin.x + socket.x,
+          y: origin.y + socket.y,
+        };
     }
     return null;
   }
 
-  private socketOfKnob(
-    node: NodeView,
-    control: { modulationPort: string | null } | null,
-  ): PortLayout | null {
-    if (control === null || control.modulationPort === null) return null;
-    return (
-      node.layout.inputs.find((p) => p.port.id === control.modulationPort) ??
-      null
-    );
-  }
-
   /**
-   * Where a port sits in patch coordinates, and which border it is on, or null when the module is not
-   * drawn.
+   * Where a port's socket sits in patch coordinates, and which way it faces, or null when the module
+   * is not drawn.
    */
   portPosition(
     moduleId: string,
     portId: string,
     side: "input" | "output",
-  ): { x: number; y: number; edge: PortEdge } | null {
+  ): { x: number; y: number; facing: Facing } | null {
     const node = this.nodes.get(moduleId);
     if (node === undefined) return null;
-    const list = side === "output" ? node.layout.outputs : node.layout.inputs;
-    const port = list.find((p) => p.port.id === portId);
-    if (port === undefined) return null;
+    const socket = socketOf(node.face, portId, side);
+    if (socket === null) return null;
     return {
-      x: node.view.position.x + port.x,
-      y: node.view.position.y + port.y,
-      edge: port.edge,
+      x: node.view.position.x + socket.x,
+      y: node.view.position.y + socket.y,
+      facing: socket.facing,
     };
   }
 
@@ -304,7 +312,7 @@ export class GridRenderer {
       const node = this.nodes.get(id);
       if (node === undefined) continue;
       const { x, y } = node.view.position;
-      const { width, height } = node.layout;
+      const { width, height } = node.face;
       this.selectionLayer
         .roundRect(x, y, width, height, SELECTION_RADIUS)
         .stroke({ width: SELECTION_WIDTH, color, alignment: 0.5 });
@@ -318,8 +326,9 @@ export class GridRenderer {
       from: { x: number; y: number };
       to: { x: number; y: number };
       color: number;
-      /** The border the cable is heading for, once it is over a socket. */
-      toEdge?: PortEdge;
+      /** The ways the two sockets face, once the loose end is over one. */
+      toFacing?: Facing;
+      fromFacing?: Facing;
     } | null,
   ): void {
     this.overlay.clear();
@@ -340,7 +349,8 @@ export class GridRenderer {
       const [c1, c2] = cableControlPoints(
         pendingCable.from,
         pendingCable.to,
-        pendingCable.toEdge,
+        pendingCable.toFacing,
+        pendingCable.fromFacing,
       );
       const from = this.viewport.toScreen(pendingCable.from);
       const to = this.viewport.toScreen(pendingCable.to);
@@ -384,8 +394,8 @@ export class GridRenderer {
     for (const node of this.nodes.values()) {
       minX = Math.min(minX, node.view.position.x);
       minY = Math.min(minY, node.view.position.y);
-      maxX = Math.max(maxX, node.view.position.x + node.layout.width);
-      maxY = Math.max(maxY, node.view.position.y + node.layout.height);
+      maxX = Math.max(maxX, node.view.position.x + node.face.width);
+      maxY = Math.max(maxY, node.view.position.y + node.face.height);
     }
     return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
   }
@@ -400,9 +410,9 @@ export class GridRenderer {
       const origin = { x: node.view.position.x, y: node.view.position.y };
       if (
         point.x >= origin.x &&
-        point.x <= origin.x + node.layout.width &&
+        point.x <= origin.x + node.face.width &&
         point.y >= origin.y &&
-        point.y <= origin.y + node.layout.height
+        point.y <= origin.y + node.face.height
       )
         return { id, node };
     }

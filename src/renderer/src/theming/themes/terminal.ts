@@ -44,6 +44,8 @@ export const terminal: PhasegridTheme = {
     knobBody: "#0f3d0f",
     knobPointer: "#00ff00",
     knobLabel: "#00cc00",
+    tileFill: "#0b260b",
+    tileStroke: "#1a5c1a",
     marquee: "#00ff00",
     playhead: "#33ff33",
     signal: {

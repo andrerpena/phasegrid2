@@ -38,7 +38,7 @@ struct Recorder : pg::VoicedModule<int> {
 };
 const pg::PortDesc kRecIn[] = {{"notes", "Notes", pg::PortKind::Event, 0, pg::SignalRole::Note, ""}};
 const pg::ModuleDescriptor kRecorder{pg::kModuleAbiVersion, "test.noteRecorder", "NoteRecorder", "test", "",
-  kRecIn, 1, nullptr, 0, nullptr, 0, 0, 0, [] () -> pg::Module* { return new Recorder(); }};
+  kRecIn, 1, nullptr, 0, nullptr, 0, 0, 0, [] () -> pg::Module* { return new Recorder(); }, nullptr, 0};
 
 /// A gate that starts high and flips at each absolute sample position in `toggles`, so a test can stop and
 /// restart the clip at an exact frame in the middle of a block.
@@ -56,7 +56,7 @@ struct PlayGate : pg::VoicedModule<int> {
 };
 const pg::PortDesc kGateOut[] = {{"out", "Out", pg::PortKind::Continuous, 1, pg::SignalRole::Gate, ""}};
 const pg::ModuleDescriptor kPlayGate{pg::kModuleAbiVersion, "test.playGate", "PlayGate", "test", "",
-  nullptr, 0, kGateOut, 1, nullptr, 0, 0, 0, [] () -> pg::Module* { return new PlayGate(); }};
+  nullptr, 0, kGateOut, 1, nullptr, 0, 0, 0, [] () -> pg::Module* { return new PlayGate(); }, nullptr, 0};
 
 /// One recorded event, tagged with the absolute frame of the whole run rather than the frame within a block.
 struct Timed {

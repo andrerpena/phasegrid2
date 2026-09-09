@@ -41,7 +41,7 @@ private:
 };
 const ModuleDescriptor kStructuralDesc{kModuleAbiVersion, "test.structural", "S", "test", "", nullptr, 0,
                                        kStructuralOut, 1, kStructuralParams, 2, 0, 0,
-                                       []() -> Module* { return new Structural(); }};
+                                       []() -> Module* { return new Structural(); }, nullptr, 0};
 }  // namespace
 
 TEST_CASE("InstanceTable rebuilds only when a structural param changes", "[instance_table]") {

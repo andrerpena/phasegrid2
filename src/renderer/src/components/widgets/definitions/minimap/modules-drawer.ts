@@ -1,4 +1,5 @@
-import { CELL, measureNode } from "@renderer/grid/layout";
+import { composeFace } from "@renderer/grid/face";
+import { CELL } from "@renderer/grid/layout";
 import { hexToRgb } from "@renderer/lib/color";
 import type { MinimapDrawer } from "./types";
 
@@ -23,7 +24,7 @@ export const modulesDrawer: MinimapDrawer = {
       const size =
         descriptor === undefined
           ? { width: CELL, height: CELL }
-          : measureNode(descriptor);
+          : composeFace(descriptor);
       const role = descriptor?.outputs?.[0]?.role;
       const hex =
         role !== undefined && role in colors.signal

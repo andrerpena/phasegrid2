@@ -164,3 +164,21 @@ TEST_CASE("recording live values for a watched module allocates nothing", "[prev
   rig.publisher.tick();
   REQUIRE(rig.writer.slot(0)->seq.load() > 0);
 }
+
+TEST_CASE("a module moved to another slot is drawn again there, unchanged or not", "[preview]") {
+  // A resubscription numbers the slots afresh -- a knob gaining a cable puts a params slot in front of
+  // every picture -- so a module whose values have not moved still owes its new slot a picture. Before
+  // this was checked, each face showed whatever its neighbour had last drawn into that slot.
+  Rig rig{"moved", /*modulated=*/false};
+  REQUIRE(rig.engine.setPreviewSlot("osc", 0));
+  rig.publisher.tick();
+  const uint32_t drawnInto0 = rig.writer.slot(0)->seq.load();
+  REQUIRE(drawnInto0 > 0);
+  REQUIRE(rig.writer.slot(1)->seq.load() == 0);
+
+  rig.engine.clearTelemetrySlots();
+  REQUIRE(rig.engine.setPreviewSlot("osc", 1));
+  rig.publisher.tick();
+  REQUIRE(rig.writer.slot(1)->seq.load() > 0);
+  REQUIRE(rig.slotSamples(1) == rig.slotSamples(0));
+}

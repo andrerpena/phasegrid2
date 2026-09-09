@@ -62,6 +62,12 @@ const ParamDesc kParams[] = {
    "knob", nullptr, "How far the output swings either side of zero"},
 };
 
+/// The face: Reset, the wave, then Rate, Shape and Depth in a row, and the output.
+const char* const kFace[] = {
+  "reset wave wave wave rate rate shape shape depth depth out",
+  ".     wave wave wave rate rate shape shape depth depth .  ",
+};
+
 /// One phase per lane, so a rate modulated per voice keeps a cycle per voice.
 struct Lane {
   double phase = 0.0;
@@ -115,6 +121,6 @@ extern const ModuleDescriptor kModLfo{kModuleAbiVersion, "mod.lfo", "LFO", "mod"
   "square; Depth sets the swing. The output is bipolar, so the knob it feeds stays the centre of the "
   "movement. A rising edge on Reset restarts the cycle. The face shows the wave.",
   kIn, countOf(kIn), kOut, countOf(kOut), kParams, countOf(kParams), kModulePreviewsWave, 0,
-  [] () -> Module* { return new ModLfo(); }};
+  [] () -> Module* { return new ModLfo(); }, kFace, countOf(kFace)};
 
 }  // namespace pg::modules

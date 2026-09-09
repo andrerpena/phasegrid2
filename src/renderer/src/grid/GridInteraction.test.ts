@@ -1,10 +1,11 @@
 import type { ModuleDescriptor } from "@shared/protocol/catalog";
 import type { PortRef } from "@shared/protocol/patch";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { composeFace, hitKnob, hitSocket, socketOf } from "./face";
 import { descriptor } from "./fixtures";
 import { GridInteraction } from "./GridInteraction";
 import type { GridRenderer } from "./GridRenderer";
-import { CELL, hitControl, hitPort, measureNode } from "./layout";
+import { CELL } from "./layout";
 
 /**
  * The interaction controller against a fake renderer.
@@ -18,7 +19,7 @@ interface FakeNode {
   view: {
     position: { x: number; y: number; set: (x: number, y: number) => void };
   };
-  layout: ReturnType<typeof measureNode>;
+  face: ReturnType<typeof composeFace>;
   descriptor: ModuleDescriptor;
   setPosition: (x: number, y: number) => void;
 }
@@ -35,7 +36,7 @@ function fakeNode(type: string, x: number, y: number): FakeNode {
   };
   return {
     view: { position },
-    layout: measureNode(desc),
+    face: composeFace(desc),
     descriptor: desc,
     setPosition: (nx, ny) => position.set(nx, ny),
   };
@@ -57,9 +58,9 @@ function rig(nodes: Map<string, FakeNode>) {
         const o = node.view.position;
         if (
           point.x >= o.x &&
-          point.x <= o.x + node.layout.width &&
+          point.x <= o.x + node.face.width &&
           point.y >= o.y &&
-          point.y <= o.y + node.layout.height
+          point.y <= o.y + node.face.height
         )
           return { id, node };
       }
@@ -73,22 +74,17 @@ function rig(nodes: Map<string, FakeNode>) {
       options: { knobs?: boolean } = {},
     ) => {
       for (const [id, node] of nodes) {
-        const knob =
-          options.knobs === true
-            ? hitControl(point, node.view.position, node.layout)
-            : null;
-        const port =
-          hitPort(point, node.view.position, node.layout) ??
-          node.layout.inputs.find(
-            (p) => knob !== null && p.port.id === knob.modulationPort,
-          ) ??
-          null;
-        if (port !== null)
+        const socket =
+          hitSocket(point, node.view.position, node.face) ??
+          (options.knobs === true
+            ? (hitKnob(point, node.view.position, node.face)?.socket ?? null)
+            : null);
+        if (socket !== null)
           return {
             module: id,
-            port,
-            x: node.view.position.x + port.x,
-            y: node.view.position.y + port.y,
+            socket,
+            x: node.view.position.x + socket.x,
+            y: node.view.position.y + socket.y,
           };
       }
       return null;
@@ -99,14 +95,13 @@ function rig(nodes: Map<string, FakeNode>) {
       side: "input" | "output",
     ) => {
       const node = nodes.get(moduleId);
-      const list =
-        side === "output" ? node?.layout.outputs : node?.layout.inputs;
-      const port = list?.find((p) => p.port.id === portId);
-      if (node === undefined || port === undefined) return null;
+      const socket =
+        node === undefined ? null : socketOf(node.face, portId, side);
+      if (node === undefined || socket === null) return null;
       return {
-        x: node.view.position.x + port.x,
-        y: node.view.position.y + port.y,
-        edge: port.edge,
+        x: node.view.position.x + socket.x,
+        y: node.view.position.y + socket.y,
+        facing: socket.facing,
       };
     },
     portColor: () => 0,
@@ -247,10 +242,10 @@ describe("dragging a knob", () => {
   function knobAt(id: string) {
     const node = nodes.get(id);
     if (node === undefined) throw new Error(id);
-    const control = node.layout.controls[0];
+    const knob = node.face.knobs[0];
     return {
-      x: node.view.position.x + control.x,
-      y: node.view.position.y + control.y,
+      x: node.view.position.x + knob.centre.x,
+      y: node.view.position.y + knob.centre.y,
     };
   }
 
@@ -284,7 +279,7 @@ describe("dragging a knob", () => {
     const { renderer, canvas } = rig(nodes);
     const node = nodes.get("env");
     if (node === undefined) throw new Error("env");
-    const param = node.layout.controls[0].param;
+    const param = node.face.knobs[0].param;
     const moved = param.min + (param.max - param.min) * 0.8;
     setDocumentValue("env", param.id, moved);
 
@@ -305,7 +300,7 @@ describe("dragging a knob", () => {
     const { renderer, canvas } = rig(nodes);
     const node = nodes.get("env");
     if (node === undefined) throw new Error("env");
-    const param = node.layout.controls[0].param;
+    const param = node.face.knobs[0].param;
     setDocumentValue("env", param.id, param.min);
 
     const d = driver(
@@ -331,7 +326,7 @@ describe("dragging a knob", () => {
     const knob = knobAt("env");
     const start = readParam(
       "env",
-      nodes.get("env")?.layout.controls[0].param.id ?? "",
+      nodes.get("env")?.face.knobs[0].param.id ?? "",
     );
 
     d.down(knob.x, knob.y);
@@ -369,7 +364,7 @@ describe("dragging a knob", () => {
     });
     const node = nodes.get("env");
     if (node === undefined) throw new Error("env");
-    const param = node.layout.controls[0].param;
+    const param = node.face.knobs[0].param;
     setDocumentValue("env", param.id, param.max);
     const knob = knobAt("env");
     (
@@ -493,10 +488,10 @@ describe("an example project, where only the parameters may change", () => {
     );
     const node = nodes.get("env");
     if (node === undefined) throw new Error("env");
-    const control = node.layout.controls[0];
+    const first = node.face.knobs[0];
     const knob = {
-      x: node.view.position.x + control.x,
-      y: node.view.position.y + control.y,
+      x: node.view.position.x + first.centre.x,
+      y: node.view.position.y + first.centre.y,
     };
     d.down(knob.x, knob.y);
     d.move(knob.x, knob.y - 50);
@@ -545,12 +540,11 @@ describe("patching a cable", () => {
   function socket(id: string, portId: string, side: "input" | "output") {
     const node = nodes.get(id);
     if (node === undefined) throw new Error(id);
-    const list = side === "output" ? node.layout.outputs : node.layout.inputs;
-    const port = list.find((p) => p.port.id === portId);
-    if (port === undefined) throw new Error(`${id}.${portId}`);
+    const found = socketOf(node.face, portId, side);
+    if (found === null) throw new Error(`${id}.${portId}`);
     return {
-      x: node.view.position.x + port.x,
-      y: node.view.position.y + port.y,
+      x: node.view.position.x + found.x,
+      y: node.view.position.y + found.y,
     };
   }
 
@@ -628,9 +622,12 @@ describe("patching a cable", () => {
     const out = socket("env", "out", "output");
     const node = nodes.get("vca");
     if (node === undefined) throw new Error("vca");
-    const knob = node.layout.controls[0];
+    const knob = node.face.knobs[0];
     d.down(out.x, out.y);
-    d.up(node.view.position.x + knob.x, node.view.position.y + knob.y);
+    d.up(
+      node.view.position.x + knob.centre.x,
+      node.view.position.y + knob.centre.y,
+    );
     expect(onConnect).toHaveBeenCalledWith(
       { module: "env", port: "out" },
       { module: "vca", port: "param:gain" },

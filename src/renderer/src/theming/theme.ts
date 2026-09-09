@@ -83,6 +83,15 @@ export interface GridColors {
   knobBody: string;
   knobPointer: string;
   knobLabel: string;
+  /**
+   * A block's tile: the filled key each block of a face sits on, and its hairline.
+   *
+   * A step lighter than the node, so the gutters between tiles show in the node's own colour and a
+   * face reads as a panel of keys, the way a hardware surface does, rather than a frame with
+   * controls floating in it.
+   */
+  tileFill: string;
+  tileStroke: string;
   marquee: string;
   playhead: string;
   signal: SignalColors;
@@ -112,6 +121,8 @@ export const GRID_VAR_NAMES: Record<keyof Omit<GridColors, "signal">, string> =
     knobBody: "--knob-body",
     knobPointer: "--knob-pointer",
     knobLabel: "--knob-label",
+    tileFill: "--tile-fill",
+    tileStroke: "--tile-stroke",
     marquee: "--marquee",
     playhead: "--playhead",
   };
