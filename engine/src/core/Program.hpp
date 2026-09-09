@@ -25,17 +25,27 @@ static_assert(std::atomic<float>::is_always_lock_free, "the audio thread stores 
 
 struct ModuleInstance {
   std::string id;
-  /// Which telemetry slot this module publishes into, or `kNoTelemetrySlot`. Written by the message
-  /// thread on subscribe, read by the audio thread every block, so it is atomic; it lives here rather
-  /// than in `Program` because a subscription must outlive a recompile and must not cause one.
-  std::atomic<uint32_t> telemetrySlot{0xFFFFFFFFu};
-  /// Where this module's picture goes (`Module::preview`, published by `PreviewPublisher` on the
-  /// message thread), or `kNoTelemetrySlot`. Same lifetime and threading as `telemetrySlot`.
-  std::atomic<uint32_t> previewSlot{0xFFFFFFFFu};
+  /// Which telemetry slot this module publishes into on each channel, or `kNoTelemetrySlotCtx` for a
+  /// channel nobody watches. Written by the message thread on subscribe, read by the audio thread every
+  /// block, so they are atomic; they live here rather than in `Program` because a subscription must
+  /// outlive a recompile and must not cause one. One per channel and never shared: a module that draws
+  /// itself and has modulated knobs writes both, and one slot could only carry one of them.
+  std::array<std::atomic<uint32_t>, kTelemetryChannelCount> slots;
+  uint32_t slot(TelemetryChannel c) const {
+    return slots[channelIndex(c)].load(std::memory_order_relaxed);
+  }
+  void setSlot(TelemetryChannel c, uint32_t slot) {
+    slots[channelIndex(c)].store(slot, std::memory_order_relaxed);
+  }
+  /// Atomics do not aggregate-initialise, so the array is filled here rather than in its declaration.
+  /// Message thread, once, when the instance is built.
+  ModuleInstance() {
+    for (auto& s : slots) s.store(kNoTelemetrySlotCtx, std::memory_order_relaxed);
+  }
   /**
    * The effective value of every param at the last frame of the last block the module ran, voice 0,
    * in display units: what the module actually used, after modulation. Written by the scheduler
-   * whenever anyone is watching (either slot set), read by the message thread to draw a picture from
+   * whenever anyone is watching (any slot set), read by the message thread to draw a picture from
    * the values the sound is made with. Relaxed atomics: a picture torn across two blocks is a picture.
    * `liveBlock` is the block they came from, 0 until the module has run under a subscription.
    */

@@ -73,11 +73,11 @@ public:
 
   void setTelemetry(TelemetryWriter* t) { telemetry_ = t; }
   TelemetryWriter* telemetry() const { return telemetry_; }
-  /// Message thread. Points a module at a slot, or `kNoTelemetrySlot` to stop it publishing.
-  bool setTelemetrySlot(const std::string& node, uint32_t slot);
-  /// Message thread. Where a module's picture is published, or `kNoTelemetrySlot`.
-  bool setPreviewSlot(const std::string& node, uint32_t slot);
-  void clearTelemetrySlots() { instances_.clearTelemetrySlots(); }
+  /// Message thread. Points one channel of a module at a slot, or `kNoTelemetrySlotCtx` to stop it
+  /// publishing there. The channels are independent: a module may hold a slot on each.
+  bool setSlot(const std::string& node, TelemetryChannel channel, uint32_t slot);
+  /// Message thread. Every module off every channel: `telemetry.subscribe` replaces the whole set.
+  void clearSlots() { instances_.clearSlots(); }
   /// Every live instance, for the preview publisher. Message thread.
   template <class F>
   void forEachInstance(F&& f) { instances_.forEach(std::forward<F>(f)); }

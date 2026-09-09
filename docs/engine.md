@@ -249,9 +249,10 @@ grid param ids `level`, `loop`, `pan` rather than `sample_level` and friends.
 Modulatable params get an implicit input port `param:<id>`; effective value = `denormalize(clamp(knobNorm + signal))`, lane-wise.
 Modules read `ctx.param(i).at(frame)` as a `Sample`. `ParamView::knob` carries the *unmodulated* value for the block,
 so a module that has to hand the knob and the modulation to a downstream engine separately recovers the modulation
-as `at(i) - knob`. A module someone has subscribed to over `telemetry.subscribe` publishes the effective value of every
+as `at(i) - knob`. A module subscribed on the `params` channel of `telemetry.subscribe` publishes the effective value of every
 param after `process` (`TelemetryKind::Params`, written by the scheduler; see docs/telemetry.md), which is how the
-interface draws a knob where modulation put it. The same values are left on the instance
+interface draws a knob where modulation put it. That is a channel of its own, so a module that also draws
+something about itself does both rather than choosing. The same values are left on the instance
 (`ModuleInstance::liveValues`), where the message thread's `PreviewPublisher` reads them to redraw the
 module's picture (`Module::preview`) whenever they move, so a face follows the sound rather than the document.
 

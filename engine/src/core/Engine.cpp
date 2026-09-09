@@ -74,17 +74,10 @@ void Engine::reconcileParams() {
 }
 
 /// Subscribing must not recompile: the assignment lives on the instance, which outlives every program.
-bool Engine::setTelemetrySlot(const std::string& node, uint32_t slot) {
-  const ModuleInstance* inst = instances_.find(node);
+bool Engine::setSlot(const std::string& node, TelemetryChannel channel, uint32_t slot) {
+  ModuleInstance* inst = instances_.find(node);
   if (inst == nullptr) return false;
-  const_cast<ModuleInstance*>(inst)->telemetrySlot.store(slot, std::memory_order_relaxed);
-  return true;
-}
-
-bool Engine::setPreviewSlot(const std::string& node, uint32_t slot) {
-  const ModuleInstance* inst = instances_.find(node);
-  if (inst == nullptr) return false;
-  const_cast<ModuleInstance*>(inst)->previewSlot.store(slot, std::memory_order_relaxed);
+  inst->setSlot(channel, slot);
   return true;
 }
 

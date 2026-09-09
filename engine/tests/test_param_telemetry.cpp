@@ -18,8 +18,9 @@ using namespace pg;
  *
  * This is what lets a knob on the interface turn when something modulates it: the value the module
  * actually used this block, after the signal on its `param:` input was added, in display units. It is
- * written by the scheduler for any subscribed module, so no module has to know about it, and the
- * display modules keep publishing their own kind rather than being overridden.
+ * written by the scheduler for any module subscribed on the `params` channel, so no module has to know
+ * about it -- including one that publishes a picture of its own, which does that on another channel and
+ * into another slot.
  */
 namespace {
 
@@ -39,17 +40,20 @@ struct Rig {
   explicit Rig(const char* tag) {
     registerBuiltinModules(registry);
     std::string error;
-    REQUIRE(writer.create(uniqueName(tag), 4, 48000.0, 64, error));
+    REQUIRE(writer.create(uniqueName(tag), 8, 48000.0, 64, error));
     engine.setTelemetry(&writer);
     REQUIRE(engine.model().addNode(registry, {"src", "math.scaleOffset", {{"offset", 0.5f}}}));
     REQUIRE(engine.model().addNode(registry, {"lfo", "mod.lfo", {{"rate", 20.f}, {"depth", 0.25f}}}));
     REQUIRE(engine.model().addNode(registry, {"vca", "amp.vca", {{"gain", 1.f}}}));
     REQUIRE(engine.model().addNode(registry, {"meter", "display.meter", {}}));
+    // A module that draws its own picture and has a knob something modulates: both channels at once.
+    REQUIRE(engine.model().addNode(registry, {"pattern", "notes.pattern", {{"legato", 0.5f}}}));
     REQUIRE(engine.model().addNode(registry, {"out", "io.audioOut", {}}));
     REQUIRE(engine.model().addEdge(registry, {"e1", "src", "out", "vca", "in"}));
     REQUIRE(engine.model().addEdge(registry, {"e2", "lfo", "out", "vca", "param:gain"}));
     REQUIRE(engine.model().addEdge(registry, {"e3", "vca", "out", "meter", "in"}));
     REQUIRE(engine.model().addEdge(registry, {"e4", "vca", "out", "out", "inL"}));
+    REQUIRE(engine.model().addEdge(registry, {"e5", "lfo", "out", "pattern", "param:legato"}));
     REQUIRE(engine.commit());
   }
 
@@ -64,7 +68,7 @@ struct Rig {
 
 TEST_CASE("a subscribed module publishes the parameter values it actually used", "[telemetry][params]") {
   Rig rig{"values"};
-  REQUIRE(rig.engine.setTelemetrySlot("vca", 0));
+  REQUIRE(rig.engine.setSlot("vca", TelemetryChannel::Params, 0));
   rig.render();
 
   const TelemetrySlotHeader* slot = rig.writer.slot(0);
@@ -96,19 +100,45 @@ TEST_CASE("a subscribed module publishes the parameter values it actually used",
 TEST_CASE("a module nobody subscribed publishes nothing", "[telemetry][params]") {
   Rig rig{"unsub"};
   rig.render(4);
-  for (uint32_t i = 0; i < 4; ++i) REQUIRE(rig.writer.slot(i)->seq.load() == 0);
+  for (uint32_t i = 0; i < 8; ++i) REQUIRE(rig.writer.slot(i)->seq.load() == 0);
 }
 
-TEST_CASE("a display module keeps publishing its own kind, not its parameters", "[telemetry][params]") {
+TEST_CASE("a module that draws itself publishes its own kind AND its parameters", "[telemetry][params]") {
   Rig rig{"display"};
-  REQUIRE(rig.engine.setTelemetrySlot("meter", 1));
+  // Two channels of one module, two slots. Sharing one would make the picture and the knobs exclusive,
+  // and the knobs would be the ones to lose: a pattern's Legato could never turn under modulation.
+  REQUIRE(rig.engine.setSlot("pattern", TelemetryChannel::Display, 1));
+  REQUIRE(rig.engine.setSlot("pattern", TelemetryChannel::Params, 2));
   rig.render();
-  REQUIRE(rig.writer.slot(1)->kind == static_cast<uint32_t>(TelemetryKind::Meter));
+
+  REQUIRE(rig.writer.slot(1)->kind == static_cast<uint32_t>(TelemetryKind::Notes));
+  REQUIRE(rig.writer.slot(2)->kind == static_cast<uint32_t>(TelemetryKind::Params));
+
+  // Legato is the knob (0.5) plus the LFO, and moves; the pattern's other params sit at their defaults.
+  const uint32_t legato = 1;   // notes.pattern's params: cycle, legato, transpose, gain
+  std::vector<float> seen;
+  for (int b = 0; b < 8; ++b) {
+    rig.render();
+    seen.push_back(rig.writer.payload(2)[legato]);
+  }
+  bool moved = false;
+  for (float v : seen) moved = moved || v != seen[0];
+  REQUIRE(moved);
+  // And the picture kept coming while the knobs did: one channel does not cost the other.
+  REQUIRE(rig.writer.slot(1)->blockIndex > 0);
+}
+
+TEST_CASE("a module publishes nothing on a channel nobody asked for", "[telemetry][params]") {
+  Rig rig{"onechannel"};
+  REQUIRE(rig.engine.setSlot("pattern", TelemetryChannel::Display, 1));
+  rig.render(2);
+  REQUIRE(rig.writer.slot(1)->kind == static_cast<uint32_t>(TelemetryKind::Notes));
+  REQUIRE(rig.writer.slot(2)->seq.load() == 0);
 }
 
 TEST_CASE("the block index in a params slot advances with the render", "[telemetry][params]") {
   Rig rig{"block"};
-  REQUIRE(rig.engine.setTelemetrySlot("vca", 2));
+  REQUIRE(rig.engine.setSlot("vca", TelemetryChannel::Params, 2));
   rig.render();
   const uint64_t first = rig.writer.slot(2)->blockIndex;
   rig.render(3);
@@ -117,7 +147,7 @@ TEST_CASE("the block index in a params slot advances with the render", "[telemet
 
 TEST_CASE("publishing parameter values allocates nothing", "[telemetry][params][rt]") {
   Rig rig{"rt"};
-  REQUIRE(rig.engine.setTelemetrySlot("vca", 0));
+  REQUIRE(rig.engine.setSlot("vca", TelemetryChannel::Params, 0));
   rig.render();
   REQUIRE(rig.writer.slot(0)->seq.load() > 0);   // proven live before measuring
   {

@@ -36,9 +36,9 @@ public:
   void prune(const std::set<std::string>& liveNodeIds, const std::set<std::string>& liveEdgeIds);
   const ModuleInstance* find(const std::string& id) const;
   ModuleInstance* find(const std::string& id);
-  /// Stops every module publishing telemetry, pictures included. Message thread; the audio thread reads
-  /// these atomically.
-  void clearTelemetrySlots();
+  /// Stops every module publishing on every channel. Message thread; the audio thread reads these
+  /// atomically.
+  void clearSlots();
   /// Every live instance, for the message thread's own passes over them (the preview publisher).
   template <class F>
   void forEach(F&& f) {

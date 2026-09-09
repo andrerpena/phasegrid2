@@ -1,7 +1,5 @@
 #include "core/InstanceTable.hpp"
 
-#include "services/Telemetry.hpp"
-
 namespace pg {
 
 std::shared_ptr<ModuleInstance> InstanceTable::acquire(const std::string& id, const RegisteredModule& type,
@@ -32,15 +30,11 @@ std::shared_ptr<ModuleInstance> InstanceTable::acquire(const std::string& id, co
   auto inst = std::make_shared<ModuleInstance>();
   inst->id = id;
   // A telemetry subscription is about the NODE, not the instance that happens to be serving it, so
-  // it is carried across a rebuild. Without this, editing a module's structural data silently
-  // unsubscribes it: `telemetry.subscribe` only reassigns when the SET of watched modules changes,
-  // and an edit does not change that set -- so nothing would ever hand the new instance a slot.
-  if (it != byId_.end()) {
-    inst->telemetrySlot.store(it->second->telemetrySlot.load(std::memory_order_relaxed),
-                              std::memory_order_relaxed);
-    inst->previewSlot.store(it->second->previewSlot.load(std::memory_order_relaxed),
-                            std::memory_order_relaxed);
-  }
+  // every channel of it is carried across a rebuild. Without this, editing a module's structural data
+  // silently unsubscribes it: `telemetry.subscribe` only reassigns when the SET of watched pairs
+  // changes, and an edit does not change that set -- so nothing would hand the new instance a slot.
+  if (it != byId_.end())
+    for (TelemetryChannel c : kTelemetryChannels) inst->setSlot(c, it->second->slot(c));
   inst->serial = nextSerial_++;
   inst->type = &type;
   {
@@ -74,11 +68,9 @@ void InstanceTable::prune(const std::set<std::string>& liveNodeIds, const std::s
   for (auto it = feedbackById_.begin(); it != feedbackById_.end();) it = liveEdgeIds.contains(it->first) ? std::next(it) : feedbackById_.erase(it);
 }
 
-void InstanceTable::clearTelemetrySlots() {
-  for (auto& [id, inst] : byId_) {
-    inst->telemetrySlot.store(kNoTelemetrySlot, std::memory_order_relaxed);
-    inst->previewSlot.store(kNoTelemetrySlot, std::memory_order_relaxed);
-  }
+void InstanceTable::clearSlots() {
+  for (auto& [id, inst] : byId_)
+    for (TelemetryChannel c : kTelemetryChannels) inst->setSlot(c, kNoTelemetrySlotCtx);
 }
 
 const ModuleInstance* InstanceTable::find(const std::string& id) const {

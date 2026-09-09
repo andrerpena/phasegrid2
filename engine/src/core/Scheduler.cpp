@@ -102,7 +102,7 @@ void Scheduler::exec(Program& p, const Op& op, uint32_t offset, uint32_t n, uint
       ProcessContext ctx;
       ctx.numFrames = n; ctx.voice = pair; ctx.voicePairs = p.voicePairs; ctx.sampleRate = p.sampleRate; ctx.transport = &t;
       ctx.telemetry = telemetry;
-      ctx.telemetrySlot = slot.inst->telemetrySlot.load(std::memory_order_relaxed);
+      ctx.displaySlot = slot.inst->slot(TelemetryChannel::Display);
       ctx.voiceMask = pair < p.activeVoiceMask.size() ? p.activeVoiceMask[pair] : Mask(static_cast<uint32_t>(-1));
       ctx.outputBus = bus ? &busSlice : nullptr;
       ctx.inputs = in_.data(); ctx.outputs = out_.data(); ctx.eventInputs = evIn_.data(); ctx.eventOutputs = evOut_.data();
@@ -114,18 +114,20 @@ void Scheduler::exec(Program& p, const Op& op, uint32_t offset, uint32_t n, uint
       // module, rather than in each one: the views are already built and no module has to know it is
       // being watched. Voice 0 is what the face shows, and the last frame is where the block left it;
       // inside a sample-level cluster this runs once per sample, which is correct and merely busier.
-      // The values land on the instance for the message thread's preview, and in the Params slot for
-      // the knobs; a module that publishes a kind of its own (the displays) keeps its slot for that.
+      // The values land on the instance for the message thread's preview, and in the module's Params
+      // slot for the knobs. That is a different slot from the one a module writes its own picture
+      // into, so a module that draws itself has both: the picture never costs it its live knobs.
       if (telemetry == nullptr || pair != 0 || d.numParams == 0) return;
-      const bool previewed = slot.inst->previewSlot.load(std::memory_order_relaxed) != kNoTelemetrySlotCtx;
-      const bool watched = ctx.telemetrySlot != kNoTelemetrySlotCtx && (d.flags & kModuleWritesTelemetry) == 0;
+      const bool previewed = slot.inst->slot(TelemetryChannel::Preview) != kNoTelemetrySlotCtx;
+      const uint32_t paramSlot = slot.inst->slot(TelemetryChannel::Params);
+      const bool watched = paramSlot != kNoTelemetrySlotCtx;
       if (previewed || watched) {
         for (uint32_t i = 0; i < d.numParams; ++i) {
           paramValues_[i] = lanes::lane(params_[i].at(n - 1), 0);
           slot.inst->liveValues[i].store(paramValues_[i], std::memory_order_relaxed);
         }
         slot.inst->liveBlock.store(blockIndex_, std::memory_order_relaxed);
-        if (watched) telemetry->writeParams(ctx.telemetrySlot, paramValues_.data(), d.numParams, blockIndex_);
+        if (watched) telemetry->writeParams(paramSlot, paramValues_.data(), d.numParams, blockIndex_);
       }
       return;
     }

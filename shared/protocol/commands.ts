@@ -8,6 +8,7 @@ import {
   PatchOpSchema,
   PortRefSchema,
 } from "./patch";
+import { TELEMETRY_CHANNELS } from "./telemetry";
 
 /**
  * The command table: every request the engine answers, with the schema for its arguments and the schema
@@ -106,22 +107,26 @@ export const COMMANDS = {
   "catalog.get": { args: NoArgs, result: CatalogSchema },
 
   /**
-   * Watch these modules and no others. The request is the whole set rather than an addition, so a
-   * module left out stops publishing; the reply carries the module-to-slot map, which is the only place
-   * that mapping exists. The segment itself holds no module names, deliberately: a reader parsing bytes
-   * from another process should not also be trusted to identify them.
+   * Watch these modules on these channels and nothing else. `watch` is a module id to the channels
+   * wanted of it: `params` is what the scheduler publishes about its knobs after modulation, `display`
+   * what the module draws about itself (a meter's level, a scope's window, a pattern's notes),
+   * `preview` its wave panel's picture. A module may name several and gets a slot for each -- one slot
+   * could only carry one of them, and a module that drew itself would lose its live knobs.
+   *
+   * The request is the whole set rather than an addition, so a pair left out stops publishing; the
+   * reply carries the module-and-channel-to-slot map, which is the only place that mapping exists. The
+   * segment itself holds no module names, deliberately: a reader parsing bytes from another process
+   * should not also be trusted to identify them. A channel a module cannot serve is refused rather than
+   * answered with a slot nothing writes into.
    *
    * Subscribing does not recompile the graph and cannot interrupt the audio.
    */
   "telemetry.subscribe": {
-    args: z.object({
-      modules: z.array(z.string().min(1)),
-      /** Modules whose picture is wanted too (`previewsWave` only); a slot each from the same pool. */
-      previews: z.array(z.string().min(1)).optional(),
-    }),
+    args: z.object({ watch: z.record(z.array(z.enum(TELEMETRY_CHANNELS))) }),
     result: z.object({
-      slots: z.record(z.number().int().nonnegative()),
-      previewSlots: z.record(z.number().int().nonnegative()),
+      slots: z.record(
+        z.record(z.enum(TELEMETRY_CHANNELS), z.number().int().nonnegative()),
+      ),
     }),
   },
   "telemetry.unsubscribe": { args: NoArgs, result: z.object({}) },

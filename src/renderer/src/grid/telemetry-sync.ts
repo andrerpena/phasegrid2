@@ -4,7 +4,11 @@ import { afterSync } from "@renderer/patch/engine-sync";
 import { usePatchStore } from "@renderer/patch/patch-store";
 import type { ModuleDescriptor, ParamDesc } from "@shared/protocol/catalog";
 import type { PatchDoc } from "@shared/protocol/patch";
-import { type NotesReading, TelemetryKind } from "@shared/protocol/telemetry";
+import {
+  type NotesReading,
+  type TelemetryChannel,
+  TelemetryKind,
+} from "@shared/protocol/telemetry";
 import { paramFraction } from "./layout";
 
 /**
@@ -21,9 +25,11 @@ import { paramFraction } from "./layout";
  * under modulation exactly as a knob does. The request-per-edit path (`preview-sync.ts`) is only for
  * an engine with no segment.
  *
- * And the display modules: one that publishes a scope or a readout writes that itself, into the slot
- * the engine gives any watched module, so it is asked for by name in the same list as the modulated
- * ones and its slot is read by the kind it carries rather than as knob values.
+ * And the display modules: one that publishes a scope, a readout or a piano roll writes that itself,
+ * on the `display` channel. That is a different channel, and so a different slot, from the `params`
+ * one the scheduler writes -- which is what lets a module draw itself AND have its knobs turn under
+ * modulation. The three sets are computed here, one pure function each, and named together in the
+ * one request.
  *
  * This is the one owner of the engine's subscription set. `telemetry.subscribe` replaces the whole
  * set on every call, so a second subscriber elsewhere would silently cancel this one; when meters
@@ -139,12 +145,11 @@ export function startTelemetrySync(
   let opened = false;
   /** Whether the patch is advancing. Held, there is nothing live and the knobs show what they are set to. */
   let running = useEngineStore.getState().running;
-  /** What the engine has been asked to watch, and the slot it answered with, per module. */
-  let slots = new Map<string, number>();
+  /** The slot the engine answered with, per module, one map per channel. */
+  let paramSlots = new Map<string, number>();
+  let displaySlots = new Map<string, number>();
   let previewSlots = new Map<string, number>();
   let live = new Map<string, LiveParam[]>();
-  /** The display modules among the watched: their slots carry a picture of their own, not knob values. */
-  let displays: string[] = [];
   /** The last picture drawn per module, by the engine's own count, so an unchanged one is not redrawn. */
   const drawn = new Map<string, bigint>();
   /** The same for what a display module publishes, kept apart so the two counts cannot cross. */
@@ -158,15 +163,15 @@ export function startTelemetrySync(
   };
 
   /**
-   * Refreshes which knobs to drive, and asks the engine for the modules that need watching when
-   * that set has changed.
+   * Refreshes which knobs to drive, and asks the engine for the module and channel pairs that need
+   * watching when that set has changed.
    *
    * Two different things. Which knobs are live is per parameter, pure over the document, and free,
    * so it is taken fresh on every structural edit: a second cable into a module already watched
    * changes nothing the engine needs to hear (it publishes every parameter of a watched module
-   * anyway) but adds a knob to turn. The engine's subscription is per module and costs a round trip,
-   * so that is only redone when the module list moves. Behind the document queue, so the engine has
-   * been told about every module and cable before being asked about them.
+   * anyway) but adds a knob to turn. The engine's subscription is per module and channel and costs a
+   * round trip, so that is only redone when the request moves. Behind the document queue, so the
+   * engine has been told about every module and cable before being asked about them.
    */
   const resubscribe = (force = false): void => {
     if (stopped) return;
@@ -181,21 +186,26 @@ export function startTelemetrySync(
         if (!wanted.get(moduleId)?.some((l) => l.param.id === param.id))
           target.setLive(moduleId, param.id, null);
     live = wanted;
-    displays = displayModules(
-      usePatchStore.getState().doc,
-      useCatalogStore.getState().byId,
-    );
-    const modules = [...new Set([...wanted.keys(), ...displays])].sort();
-    const previews = previewedModules(
-      usePatchStore.getState().doc,
-      useCatalogStore.getState().byId,
-    );
-    const request = `${modules.join("\n")}|${previews.join("\n")}`;
+    const doc = usePatchStore.getState().doc;
+    const catalog = useCatalogStore.getState().byId;
+    const watch: Record<string, TelemetryChannel[]> = {};
+    const ask = (moduleId: string, channel: TelemetryChannel): void => {
+      const channels = watch[moduleId] ?? [];
+      channels.push(channel);
+      watch[moduleId] = channels;
+    };
+    for (const moduleId of [...wanted.keys()].sort()) ask(moduleId, "params");
+    for (const moduleId of displayModules(doc, catalog))
+      ask(moduleId, "display");
+    for (const moduleId of previewedModules(doc, catalog))
+      ask(moduleId, "preview");
+    const request = JSON.stringify(watch);
     if (!force && request === lastRequest) return;
     lastRequest = request;
-    // The old slot maps are wrong from here: the engine numbers slots by the new lists' order, so a
+    // The old slot maps are wrong from here: the engine numbers slots by the new request's order, so a
     // module that kept its subscription may move. One empty frame beats a knob reading another's.
-    slots = new Map();
+    paramSlots = new Map();
+    displaySlots = new Map();
     previewSlots = new Map();
     drawn.clear();
     shown.clear();
@@ -204,14 +214,20 @@ export function startTelemetrySync(
       try {
         const answer = await useEngineStore
           .getState()
-          .call("telemetry.subscribe", { modules, previews });
-        slots = new Map(Object.entries(answer.slots));
-        // An engine from before pictures answers without this field. Its knobs still work.
-        previewSlots = new Map(Object.entries(answer.previewSlots ?? {}));
+          .call("telemetry.subscribe", { watch });
+        for (const [moduleId, channels] of Object.entries(answer.slots)) {
+          if (channels.params !== undefined)
+            paramSlots.set(moduleId, channels.params);
+          if (channels.display !== undefined)
+            displaySlots.set(moduleId, channels.display);
+          if (channels.preview !== undefined)
+            previewSlots.set(moduleId, channels.preview);
+        }
       } catch {
         // An engine with no segment, or a module gone between the ask and the answer. Nothing to
         // read either way; the knobs stay where the document has them.
-        slots = new Map();
+        paramSlots = new Map();
+        displaySlots = new Map();
         previewSlots = new Map();
       }
     });
@@ -228,7 +244,7 @@ export function startTelemetrySync(
     // A held patch publishes no new values, and the last ones are where the modulation happened to
     // stop rather than anything the knob means now. The pictures still arrive: the engine redraws
     // those from what the patch is set to, so a face follows a knob turned in the silence.
-    for (const [moduleId, slot] of running ? slots : []) {
+    for (const [moduleId, slot] of running ? paramSlots : []) {
       const reading = window.telemetry.read(slot);
       if (reading === null || reading.kind !== TelemetryKind.Params) continue;
       for (const { param, index } of live.get(moduleId) ?? []) {
@@ -247,9 +263,7 @@ export function startTelemetrySync(
       target.setWave(moduleId, reading.samples);
     }
     // Held or running alike: a held patch publishes nothing new, so the last picture simply stays.
-    for (const moduleId of displays) {
-      const slot = slots.get(moduleId);
-      if (slot === undefined) continue;
+    for (const [moduleId, slot] of displaySlots) {
       const reading = window.telemetry.read(slot);
       if (reading === null) continue;
       if (

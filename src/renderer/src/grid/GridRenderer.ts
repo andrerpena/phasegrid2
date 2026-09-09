@@ -191,11 +191,12 @@ export class GridRenderer {
   }
 
   /**
-   * Redraws the cables against where the nodes are now.
+   * Redraws the cables against where the nodes are now, in the colours the theme gives them now.
    *
    * Dragging moves nodes on the canvas without touching the document, so the cables have to be told.
    * Without this they stay pinned to where the modules used to be and the patch appears to come apart
-   * while a drag is in progress.
+   * while a drag is in progress. A theme change is the same shape of event: nothing in the document
+   * moved, but every cable is the wrong colour until it is drawn again.
    */
   refreshCables(): void {
     if (this.doc === null) return;
@@ -208,6 +209,7 @@ export class GridRenderer {
       );
       const to = this.portPosition(edge.to.module, edge.to.port, "input");
       if (cable === undefined || from === null || to === null) continue;
+      cable.setColor(this.cableColor(edge.from.module, edge.from.port));
       cable.update(from, to, { toFacing: to.facing, fromFacing: from.facing });
     }
   }
@@ -377,6 +379,8 @@ export class GridRenderer {
         accent: this.accentFor(node.descriptor),
       });
     }
+    // The cables too: each was coloured by the theme it was created in, and nothing else redraws them.
+    this.refreshCables();
   }
 
   setCatalog(catalog: Map<string, ModuleDescriptor>): void {

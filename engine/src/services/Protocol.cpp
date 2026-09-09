@@ -1,5 +1,6 @@
 #include "services/Protocol.hpp"
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <utility>
 #include "core/Version.hpp"
@@ -336,59 +337,57 @@ json dispatchCommand(const std::string& cmd, const json& id, const json& args, P
     if (ctx.telemetry == nullptr || !ctx.telemetry->valid())
       return errorResponse(id, "E_UNSUPPORTED", "this engine has no telemetry segment");
     ArgReader a(args);
-    const json& modules = a.arr("modules");
+    // `watch` is module id -> the channels wanted of it: what the scheduler publishes about its
+    // parameters, what the module draws about itself, its picture. A module may name several, and each
+    // gets a slot of its own -- one slot could only carry one of them, and a pattern that drew its
+    // notes would lose the knobs modulation turns.
+    const json& watch = a.obj("watch", true);
     if (!a) return errorResponse(id, a.result());
-    // `previews` names the modules whose picture is wanted, one slot each from the same pool. Optional,
-    // so a client that only wants meters says nothing about it.
-    static const json kNoPreviews = json::array();
-    const json* previewsArg = args.is_object() && args.contains("previews") ? &args["previews"] : &kNoPreviews;
-    if (!previewsArg->is_array()) return errorResponse(id, "E_SCHEMA", "previews must be an array");
 
-    // Assign against a copy and only publish it if every module resolves, so a request naming one bad
-    // module leaves every existing subscription exactly as it was.
-    std::vector<std::string> wanted, previews;
-    for (const json& m : modules) {
-      if (!m.is_string()) return errorResponse(id, "E_SCHEMA", "modules must be strings");
-      wanted.push_back(m.get<std::string>());
-    }
-    for (const json& m : *previewsArg) {
-      if (!m.is_string()) return errorResponse(id, "E_SCHEMA", "previews must be strings");
-      previews.push_back(m.get<std::string>());
-    }
-    if (wanted.size() + previews.size() > ctx.telemetry->slotCount())
-      return errorResponse(id, "E_NO_SLOTS",
-                           "asked for " + std::to_string(wanted.size() + previews.size()) + " slots, segment has " +
-                               std::to_string(ctx.telemetry->slotCount()));
-    for (const std::string& moduleId : wanted)
-      if (!ctx.engine.hasInstance(moduleId))
-        return errorResponse(id, "E_NODE_NOT_FOUND", "no module " + moduleId);
-    for (const std::string& moduleId : previews) {
-      if (!ctx.engine.hasInstance(moduleId))
-        return errorResponse(id, "E_NODE_NOT_FOUND", "no module " + moduleId);
+    // Resolved into a list and only published if every module and every channel is good, so a request
+    // naming one bad pair leaves every existing subscription exactly as it was. Modules come out in
+    // the object's key order and channels in the enum's, so two requests naming the same pairs are
+    // numbered the same however they were spelled.
+    std::vector<std::pair<std::string, TelemetryChannel>> wanted;
+    for (const auto& [moduleId, channels] : watch.items()) {
+      if (!channels.is_array())
+        return errorResponse(id, "E_SCHEMA", "watch." + moduleId + " must be an array of channels");
       const auto node = ctx.engine.model().nodes().find(moduleId);
-      const RegisteredModule* type = node == ctx.engine.model().nodes().end() ? nullptr : ctx.registry.find(node->second.type);
-      if (type == nullptr || (type->desc->flags & kModulePreviewsWave) == 0)
-        return errorResponse(id, "E_UNSUPPORTED", "module " + moduleId + " has no waveform to show");
+      if (node == ctx.engine.model().nodes().end() || !ctx.engine.hasInstance(moduleId))
+        return errorResponse(id, "E_NODE_NOT_FOUND", "no module " + moduleId);
+      const RegisteredModule* type = ctx.registry.find(node->second.type);
+      std::array<bool, kTelemetryChannelCount> asked{};
+      for (const json& c : channels) {
+        TelemetryChannel channel{};
+        if (!c.is_string() || !telemetryChannelFromName(c.get<std::string>(), channel))
+          return errorResponse(id, "E_SCHEMA", "watch." + moduleId + " names no channel: " + c.dump());
+        if (type == nullptr || !moduleServes(*type->desc, channel))
+          return errorResponse(id, "E_UNSUPPORTED",
+                               "module " + moduleId + " publishes no " + telemetryChannelName(channel));
+        asked[channelIndex(channel)] = true;
+      }
+      for (TelemetryChannel channel : kTelemetryChannels)
+        if (asked[channelIndex(channel)]) wanted.emplace_back(moduleId, channel);
     }
+    if (wanted.size() > ctx.telemetry->slotCount())
+      return errorResponse(id, "E_NO_SLOTS",
+                           "asked for " + std::to_string(wanted.size()) + " slots, segment has " +
+                               std::to_string(ctx.telemetry->slotCount()));
 
     // Every previous subscription is dropped first: the request is the whole set, not an addition, so a
     // module the interface stopped watching stops writing rather than lingering in a slot forever.
-    ctx.engine.clearTelemetrySlots();
-    json slots = json::object(), previewSlots = json::object();
+    ctx.engine.clearSlots();
+    json slots = json::object();
     uint32_t next = 0;
-    for (const std::string& moduleId : wanted) {
-      ctx.engine.setTelemetrySlot(moduleId, next);
-      slots[moduleId] = next++;
-    }
-    for (const std::string& moduleId : previews) {
-      ctx.engine.setPreviewSlot(moduleId, next);
-      previewSlots[moduleId] = next++;
+    for (const auto& [moduleId, channel] : wanted) {
+      ctx.engine.setSlot(moduleId, channel, next);
+      slots[moduleId][telemetryChannelName(channel)] = next++;
     }
     // The pictures are drawn into their slots before the answer goes out, so a slot the answer names
     // holds its module's picture rather than whatever the previous numbering left there. Without this
     // a face read its neighbour's wave for the frames between the answer and the publisher's next tick.
     if (ctx.previews != nullptr) ctx.previews->tick();
-    return okResponse(id, json{{"slots", std::move(slots)}, {"previewSlots", std::move(previewSlots)}});
+    return okResponse(id, json{{"slots", std::move(slots)}});
   }
   /// One cycle of a module's waveform at its current values, for the face to draw. Read from the model
   /// and the instance on this thread; the audio thread is not involved, so asking costs no glitch.
@@ -403,7 +402,7 @@ json dispatchCommand(const std::string& cmd, const json& id, const json& args, P
     return okResponse(id, json{{"samples", samples}});
   }
   if (cmd == "telemetry.unsubscribe") {
-    if (ctx.telemetry != nullptr) ctx.engine.clearTelemetrySlots();
+    if (ctx.telemetry != nullptr) ctx.engine.clearSlots();
     return okResponse(id, json::object());
   }
 

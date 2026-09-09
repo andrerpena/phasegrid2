@@ -68,7 +68,7 @@ struct Rig {
 
 TEST_CASE("a watched module's picture is published on the tick", "[preview]") {
   Rig rig{"publish"};
-  REQUIRE(rig.engine.setPreviewSlot("osc", 3));
+  REQUIRE(rig.engine.setSlot("osc", TelemetryChannel::Preview, 3));
   rig.publisher.tick();
 
   const TelemetrySlotHeader* slot = rig.writer.slot(3);
@@ -91,7 +91,7 @@ TEST_CASE("before the module has run, the picture is the document's", "[preview]
   // The engine's own answer to `module.preview` is the document's picture; the two must agree, or a
   // face would jump the moment a subscription started.
   Rig rig{"document", /*modulated=*/false};
-  REQUIRE(rig.engine.setPreviewSlot("osc", 0));
+  REQUIRE(rig.engine.setSlot("osc", TelemetryChannel::Preview, 0));
   rig.publisher.tick();
   std::vector<float> expected(kPreviewFrames);
   REQUIRE(rig.engine.preview("osc", expected.data(), kPreviewFrames));
@@ -100,7 +100,7 @@ TEST_CASE("before the module has run, the picture is the document's", "[preview]
 
 TEST_CASE("an unchanged module is not redrawn", "[preview]") {
   Rig rig{"still", /*modulated=*/false};
-  REQUIRE(rig.engine.setPreviewSlot("osc", 0));
+  REQUIRE(rig.engine.setSlot("osc", TelemetryChannel::Preview, 0));
   rig.publisher.tick();
   rig.render(8);
   rig.publisher.tick();
@@ -116,7 +116,7 @@ TEST_CASE("an unchanged module is not redrawn", "[preview]") {
 
 TEST_CASE("a modulated module's picture follows the values it runs with", "[preview]") {
   Rig rig{"follows"};
-  REQUIRE(rig.engine.setPreviewSlot("osc", 1));
+  REQUIRE(rig.engine.setSlot("osc", TelemetryChannel::Preview, 1));
   rig.render();
   rig.publisher.tick();
   const std::vector<float> first = rig.slotSamples(1);
@@ -134,7 +134,7 @@ TEST_CASE("a modulated module's picture follows the values it runs with", "[prev
 
 TEST_CASE("a display module has no picture to publish", "[preview]") {
   Rig rig{"display"};
-  REQUIRE(rig.engine.setPreviewSlot("meter", 2));
+  REQUIRE(rig.engine.setSlot("meter", TelemetryChannel::Preview, 2));
   rig.render();
   rig.publisher.tick();
   REQUIRE(rig.writer.slot(2)->seq.load() == 0);
@@ -142,11 +142,11 @@ TEST_CASE("a display module has no picture to publish", "[preview]") {
 
 TEST_CASE("clearing subscriptions stops the pictures too", "[preview]") {
   Rig rig{"clear"};
-  REQUIRE(rig.engine.setPreviewSlot("osc", 0));
+  REQUIRE(rig.engine.setSlot("osc", TelemetryChannel::Preview, 0));
   rig.publisher.tick();
   const uint32_t seq = rig.writer.slot(0)->seq.load();
   REQUIRE(seq > 0);
-  rig.engine.clearTelemetrySlots();
+  rig.engine.clearSlots();
   rig.render(8);
   rig.publisher.tick();
   REQUIRE(rig.writer.slot(0)->seq.load() == seq);
@@ -154,7 +154,7 @@ TEST_CASE("clearing subscriptions stops the pictures too", "[preview]") {
 
 TEST_CASE("recording live values for a watched module allocates nothing", "[preview][rt]") {
   Rig rig{"rt"};
-  REQUIRE(rig.engine.setPreviewSlot("osc", 0));
+  REQUIRE(rig.engine.setSlot("osc", TelemetryChannel::Preview, 0));
   rig.render();
   REQUIRE(rig.engine.hasInstance("osc"));
   {
@@ -170,14 +170,14 @@ TEST_CASE("a module moved to another slot is drawn again there, unchanged or not
   // every picture -- so a module whose values have not moved still owes its new slot a picture. Before
   // this was checked, each face showed whatever its neighbour had last drawn into that slot.
   Rig rig{"moved", /*modulated=*/false};
-  REQUIRE(rig.engine.setPreviewSlot("osc", 0));
+  REQUIRE(rig.engine.setSlot("osc", TelemetryChannel::Preview, 0));
   rig.publisher.tick();
   const uint32_t drawnInto0 = rig.writer.slot(0)->seq.load();
   REQUIRE(drawnInto0 > 0);
   REQUIRE(rig.writer.slot(1)->seq.load() == 0);
 
-  rig.engine.clearTelemetrySlots();
-  REQUIRE(rig.engine.setPreviewSlot("osc", 1));
+  rig.engine.clearSlots();
+  REQUIRE(rig.engine.setSlot("osc", TelemetryChannel::Preview, 1));
   rig.publisher.tick();
   REQUIRE(rig.writer.slot(1)->seq.load() > 0);
   REQUIRE(rig.slotSamples(1) == rig.slotSamples(0));

@@ -61,7 +61,7 @@ TEST_CASE("a meter publishes only once someone subscribes", "[display]") {
   REQUIRE(rig.writer.slot(0)->seq.load() == 0);
   REQUIRE(rig.writer.slot(0)->kind == static_cast<uint32_t>(TelemetryKind::None));
 
-  REQUIRE(rig.engine.setTelemetrySlot("meter", 0));
+  REQUIRE(rig.engine.setSlot("meter", TelemetryChannel::Display, 0));
   rig.render();
   REQUIRE(rig.writer.slot(0)->seq.load() > 0);
   REQUIRE(rig.writer.slot(0)->kind == static_cast<uint32_t>(TelemetryKind::Meter));
@@ -69,7 +69,7 @@ TEST_CASE("a meter publishes only once someone subscribes", "[display]") {
 
 TEST_CASE("a meter reports the level actually on the wire", "[display]") {
   Rig rig{"level", 0.5f};
-  REQUIRE(rig.engine.setTelemetrySlot("meter", 2));
+  REQUIRE(rig.engine.setSlot("meter", TelemetryChannel::Display, 2));
   rig.render();
 
   const float* p = rig.writer.payload(2);
@@ -85,7 +85,7 @@ TEST_CASE("a meter reads the same on the hundredth block as on the first", "[dis
   // clear a meter climbs forever, which no single-block test can see: the level is right the first time
   // and wrong from then on.
   Rig rig{"repeat", 0.5f};
-  REQUIRE(rig.engine.setTelemetrySlot("meter", 0));
+  REQUIRE(rig.engine.setSlot("meter", TelemetryChannel::Display, 0));
   rig.render();
   REQUIRE_THAT(rig.writer.payload(0)[0], WithinAbs(0.5f, 1e-6f));
 
@@ -97,7 +97,7 @@ TEST_CASE("a meter holds a peak so a reader at frame rate cannot miss it", "[dis
   // The reason the ballistics are in the module. A transient lasts a block; an interface reads one
   // block in six. A peak computed per block and thrown away is a peak nobody ever sees.
   Rig rig{"hold", 0.8f};
-  REQUIRE(rig.engine.setTelemetrySlot("meter", 0));
+  REQUIRE(rig.engine.setSlot("meter", TelemetryChannel::Display, 0));
   rig.render();
   REQUIRE_THAT(rig.writer.payload(0)[0], WithinAbs(0.8f, 1e-5f));
 
@@ -120,7 +120,7 @@ TEST_CASE("a meter latches a clip so a reader cannot miss it either", "[display]
   // Three voices, so the patch can be pushed past full scale: the offset alone tops out at 1.0, and
   // it is the sum at the output that clips, which is the thing being metered.
   Rig rig{"clip", 0.2f, 3};
-  REQUIRE(rig.engine.setTelemetrySlot("meter", 0));
+  REQUIRE(rig.engine.setSlot("meter", TelemetryChannel::Display, 0));
   rig.render();
   REQUIRE(rig.writer.payload(0)[2] == 0.f);
 
@@ -140,7 +140,7 @@ TEST_CASE("a meter sums every voice, not just the first pair", "[display]") {
   // Three voices of 0.5 each. A meter that published from pair 0 alone would report 1.0; the whole
   // patch is 1.5, and that difference is the entire point of accumulating across pairs.
   Rig rig{"poly", 0.5f, 3};
-  REQUIRE(rig.engine.setTelemetrySlot("meter", 0));
+  REQUIRE(rig.engine.setSlot("meter", TelemetryChannel::Display, 0));
   rig.render();
 
   const float* p = rig.writer.payload(0);
@@ -149,12 +149,12 @@ TEST_CASE("a meter sums every voice, not just the first pair", "[display]") {
 
 TEST_CASE("unsubscribing stops a meter publishing", "[display]") {
   Rig rig{"resub", 0.25f};
-  REQUIRE(rig.engine.setTelemetrySlot("meter", 1));
+  REQUIRE(rig.engine.setSlot("meter", TelemetryChannel::Display, 1));
   rig.render();
   const uint32_t after = rig.writer.slot(1)->seq.load();
   REQUIRE(after > 0);
 
-  REQUIRE(rig.engine.setTelemetrySlot("meter", kNoTelemetrySlot));
+  REQUIRE(rig.engine.setSlot("meter", TelemetryChannel::Display, kNoTelemetrySlot));
   rig.render(4);
   // The counter must be exactly where it was: a stopped subscription writes nothing at all.
   REQUIRE(rig.writer.slot(1)->seq.load() == after);
@@ -162,7 +162,7 @@ TEST_CASE("unsubscribing stops a meter publishing", "[display]") {
 
 TEST_CASE("subscribing a module that is not in the patch is refused", "[display]") {
   Rig rig{"missing", 0.25f};
-  REQUIRE_FALSE(rig.engine.setTelemetrySlot("nosuchmodule", 0));
+  REQUIRE_FALSE(rig.engine.setSlot("nosuchmodule", TelemetryChannel::Display, 0));
 }
 
 /// A scope on a source, with the scope's `time` set. Renders 64-frame blocks at 48 kHz.
@@ -181,7 +181,7 @@ struct ScopeRig {
     REQUIRE(engine.model().addNode(registry, {"scope", "display.scope", {{"time", timeMs}}}));
     REQUIRE(engine.model().addEdge(registry, {"e1", source.id, "out", "scope", "in"}));
     REQUIRE(engine.commit());
-    REQUIRE(engine.setTelemetrySlot("scope", 0));
+    REQUIRE(engine.setSlot("scope", TelemetryChannel::Display, 0));
   }
 
   void render(uint32_t blocks = 1) {
@@ -237,7 +237,7 @@ TEST_CASE("a scope's window is published oldest frame first", "[display]") {
   REQUIRE(rig.engine.model().addNode(rig.registry, {"out", "io.audioOut", {}}));
   REQUIRE(rig.engine.model().addEdge(rig.registry, {"e2", "src", "out", "out", "inL"}));
   REQUIRE(rig.engine.commit());
-  REQUIRE(rig.engine.setTelemetrySlot("scope", 0));
+  REQUIRE(rig.engine.setSlot("scope", TelemetryChannel::Display, 0));
 
   std::vector<float> heard;
   for (int i = 0; i < 40; ++i) {   // well past one full window, so the ring has wrapped
@@ -303,7 +303,7 @@ TEST_CASE("a readout publishes the signed value on the wire, not its magnitude",
   // Nobody watching: a readout is as inert as a meter.
   REQUIRE(writer.slot(0)->seq.load() == 0);
 
-  REQUIRE(engine.setTelemetrySlot("readout", 0));
+  REQUIRE(engine.setSlot("readout", TelemetryChannel::Display, 0));
   engine.renderBlock(planar, 2, 64, t);
   REQUIRE(writer.slot(0)->kind == static_cast<uint32_t>(TelemetryKind::Value));
   REQUIRE(writer.slot(0)->channels == 2);
@@ -327,7 +327,7 @@ TEST_CASE("a readout reads the end of the block, and every voice of it", "[displ
   REQUIRE(engine.model().addNode(registry, {"readout", "display.value", {}}));
   REQUIRE(engine.model().addEdge(registry, {"e1", "src", "out", "readout", "in"}));
   REQUIRE(engine.commit());
-  REQUIRE(engine.setTelemetrySlot("readout", 1));
+  REQUIRE(engine.setSlot("readout", TelemetryChannel::Display, 1));
 
   std::vector<float> l(64), r(64);
   float* planar[2] = {l.data(), r.data()};
@@ -348,7 +348,7 @@ TEST_CASE("a readout reads the end of the block, and every voice of it", "[displ
   REQUIRE(moving.model().addEdge(registry, {"e1", "tone", "out", "readout", "in"}));
   REQUIRE(moving.model().addEdge(registry, {"e2", "tone", "out", "out", "inL"}));
   REQUIRE(moving.commit());
-  REQUIRE(moving.setTelemetrySlot("readout", 0));
+  REQUIRE(moving.setSlot("readout", TelemetryChannel::Display, 0));
 
   float last = 0.f;
   for (int i = 0; i < 5; ++i) {
@@ -361,7 +361,7 @@ TEST_CASE("a readout reads the end of the block, and every voice of it", "[displ
 
 TEST_CASE("a subscribed display module allocates nothing while rendering", "[display][rt]") {
   Rig rig{"rt", 0.5f};
-  REQUIRE(rig.engine.setTelemetrySlot("meter", 0));
+  REQUIRE(rig.engine.setSlot("meter", TelemetryChannel::Display, 0));
   rig.render();
   // Prove there is something being published before measuring that publishing costs no allocation.
   REQUIRE(rig.writer.slot(0)->seq.load() > 0);

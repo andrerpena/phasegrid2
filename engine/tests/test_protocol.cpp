@@ -580,44 +580,84 @@ TEST_CASE("hello says when the engine publishes pictures, so a client can tell a
   REQUIRE(std::find(caps.begin(), caps.end(), "previews") != caps.end());
 }
 
-TEST_CASE("subscribing returns the module to slot map", "[protocol][telemetry]") {
-  TelemetryFixture f;
-  const json reply = dispatch(
-      {{"id", 2}, {"cmd", "telemetry.subscribe"}, {"args", {{"modules", {"m2", "m1"}}}}}, f.ctx);
-  REQUIRE(reply["ok"] == true);
-  // The order asked for is the order assigned, so a client can predict nothing and must read the map.
-  REQUIRE(reply["result"]["slots"]["m2"] == 0);
-  REQUIRE(reply["result"]["slots"]["m1"] == 1);
-}
-
-TEST_CASE("a subscription can ask for a module's picture too, from the same pool", "[protocol][telemetry]") {
+TEST_CASE("subscribing returns the module and channel to slot map", "[protocol][telemetry]") {
   TelemetryFixture f;
   const json reply = dispatch({{"id", 2},
                                {"cmd", "telemetry.subscribe"},
-                               {"args", {{"modules", {"m1"}}, {"previews", {"osc"}}}}},
+                               {"args", {{"watch", {{"m2", {"display", "params"}}, {"m1", {"display"}}}}}}},
                               f.ctx);
   REQUIRE(reply["ok"] == true);
-  REQUIRE(reply["result"]["slots"]["m1"] == 0);
-  REQUIRE(reply["result"]["previewSlots"]["osc"] == 1);
-  // A module with no picture cannot be asked for one, and the answer says why.
-  const json refused = dispatch(
-      {{"id", 3}, {"cmd", "telemetry.subscribe"}, {"args", {{"modules", json::array()}, {"previews", {"m1"}}}}},
+  // A module asking for two channels gets two slots. Which numbers is the engine's business -- a client
+  // reads the map and predicts nothing -- but the same request always answers the same way.
+  REQUIRE(reply["result"]["slots"]["m1"]["display"] == 0);
+  REQUIRE(reply["result"]["slots"]["m2"]["params"] == 1);
+  REQUIRE(reply["result"]["slots"]["m2"]["display"] == 2);
+  // And the spelling of the request does not change the numbering: the channels are canonically ordered.
+  const json same = dispatch({{"id", 3},
+                              {"cmd", "telemetry.subscribe"},
+                              {"args", {{"watch", {{"m1", {"display"}}, {"m2", {"params", "display"}}}}}}},
+                             f.ctx);
+  REQUIRE(same["result"]["slots"] == reply["result"]["slots"]);
+}
+
+TEST_CASE("a module can hold the params channel and its own at once", "[protocol][telemetry]") {
+  // The bug this shape exists for: a module that draws itself (a scope's window, a pattern's notes)
+  // used to spend its one slot on that, so the scheduler had nowhere to publish the values modulation
+  // was putting its knobs at, and they never turned. Two channels, two slots, both live.
+  TelemetryFixture f;
+  const json reply = dispatch(
+      {{"id", 1}, {"cmd", "telemetry.subscribe"}, {"args", {{"watch", {{"m2", {"params", "display"}}}}}}},
       f.ctx);
-  REQUIRE(refused["ok"] == false);
-  REQUIRE(refused["error"]["code"] == "E_UNSUPPORTED");
-  // Leaving `previews` out is the same as an empty list.
-  const json plain = dispatch({{"id", 4}, {"cmd", "telemetry.subscribe"}, {"args", {{"modules", {"m2"}}}}}, f.ctx);
-  REQUIRE(plain["ok"] == true);
-  REQUIRE(plain["result"]["previewSlots"].empty());
+  REQUIRE(reply["ok"] == true);
+  REQUIRE(reply["result"]["slots"]["m2"].size() == 2);
+  REQUIRE(reply["result"]["slots"]["m2"]["params"] != reply["result"]["slots"]["m2"]["display"]);
+}
+
+TEST_CASE("a channel a module cannot serve is refused and changes nothing", "[protocol][telemetry]") {
+  TelemetryFixture f;
+  REQUIRE(dispatch({{"id", 1}, {"cmd", "telemetry.subscribe"}, {"args", {{"watch", {{"m1", {"display"}}}}}}},
+                   f.ctx)["ok"] == true);
+  // A meter has no parameters to publish, a sine draws no picture of itself, and neither answers with an
+  // empty slot: a subscription that cannot be served is a mistake in the client, and says so.
+  for (const json& bad : {json{{"m1", {"params"}}}, json{{"osc", {"display"}}}, json{{"m1", {"preview"}}}}) {
+    const json refused =
+        dispatch({{"id", 2}, {"cmd", "telemetry.subscribe"}, {"args", {{"watch", bad}}}}, f.ctx);
+    REQUIRE(refused["ok"] == false);
+    REQUIRE(refused["error"]["code"] == "E_UNSUPPORTED");
+  }
+  // A name that is no channel at all is a schema error rather than a channel nobody serves.
+  const json nonsense = dispatch(
+      {{"id", 3}, {"cmd", "telemetry.subscribe"}, {"args", {{"watch", {{"m1", {"spectrum"}}}}}}}, f.ctx);
+  REQUIRE(nonsense["error"]["code"] == "E_SCHEMA");
+  // None of that tore down what was working.
+  REQUIRE(dispatch({{"id", 4}, {"cmd", "engine.ping"}, {"args", json::object()}}, f.ctx)["ok"] == true);
+}
+
+TEST_CASE("a picture is a channel like any other, from the same pool", "[protocol][telemetry]") {
+  TelemetryFixture f;
+  const json reply = dispatch({{"id", 2},
+                               {"cmd", "telemetry.subscribe"},
+                               {"args", {{"watch", {{"m1", {"display"}}, {"osc", {"preview"}}}}}}},
+                              f.ctx);
+  REQUIRE(reply["ok"] == true);
+  REQUIRE(reply["result"]["slots"]["m1"]["display"] == 0);
+  REQUIRE(reply["result"]["slots"]["osc"]["preview"] == 1);
+  // An empty request is a client watching nothing, not a malformed one.
+  const json none =
+      dispatch({{"id", 3}, {"cmd", "telemetry.subscribe"}, {"args", {{"watch", json::object()}}}}, f.ctx);
+  REQUIRE(none["ok"] == true);
+  REQUIRE(none["result"]["slots"].empty());
 }
 
 TEST_CASE("a subscription naming an unknown module changes nothing", "[protocol][telemetry]") {
   TelemetryFixture f;
-  REQUIRE(dispatch({{"id", 1}, {"cmd", "telemetry.subscribe"}, {"args", {{"modules", {"m1"}}}}},
+  REQUIRE(dispatch({{"id", 1}, {"cmd", "telemetry.subscribe"}, {"args", {{"watch", {{"m1", {"display"}}}}}}},
                    f.ctx)["ok"] == true);
 
-  const json reply = dispatch(
-      {{"id", 2}, {"cmd", "telemetry.subscribe"}, {"args", {{"modules", {"m2", "ghost"}}}}}, f.ctx);
+  const json reply = dispatch({{"id", 2},
+                               {"cmd", "telemetry.subscribe"},
+                               {"args", {{"watch", {{"m2", {"display"}}, {"ghost", {"display"}}}}}}},
+                              f.ctx);
   REQUIRE(reply["ok"] == false);
   REQUIRE(reply["error"]["code"] == "E_NODE_NOT_FOUND");
 
@@ -628,14 +668,16 @@ TEST_CASE("a subscription naming an unknown module changes nothing", "[protocol]
 
 TEST_CASE("subscribing replaces the previous set rather than adding to it", "[protocol][telemetry]") {
   TelemetryFixture f;
-  REQUIRE(dispatch({{"id", 1}, {"cmd", "telemetry.subscribe"}, {"args", {{"modules", {"m1", "m2"}}}}},
+  REQUIRE(dispatch({{"id", 1},
+                    {"cmd", "telemetry.subscribe"},
+                    {"args", {{"watch", {{"m1", {"display"}}, {"m2", {"display"}}}}}}},
                    f.ctx)["ok"] == true);
   const json reply = dispatch(
-      {{"id", 2}, {"cmd", "telemetry.subscribe"}, {"args", {{"modules", {"m2"}}}}}, f.ctx);
+      {{"id", 2}, {"cmd", "telemetry.subscribe"}, {"args", {{"watch", {{"m2", {"display"}}}}}}}, f.ctx);
   REQUIRE(reply["ok"] == true);
   REQUIRE(reply["result"]["slots"].size() == 1);
   // A module the interface stopped watching must stop writing, not linger in the slot it used to own.
-  REQUIRE(reply["result"]["slots"]["m2"] == 0);
+  REQUIRE(reply["result"]["slots"]["m2"]["display"] == 0);
 }
 
 TEST_CASE("telemetry commands are refused when there is no segment", "[protocol][telemetry]") {
@@ -646,7 +688,7 @@ TEST_CASE("telemetry commands are refused when there is no segment", "[protocol]
   pg::ProtocolContext ctx{.engine = engine, .registry = registry, .transport = transport};
 
   const json reply = dispatch(
-      {{"id", 1}, {"cmd", "telemetry.subscribe"}, {"args", {{"modules", json::array()}}}}, ctx);
+      {{"id", 1}, {"cmd", "telemetry.subscribe"}, {"args", {{"watch", json::object()}}}}, ctx);
   REQUIRE(reply["ok"] == false);
   REQUIRE(reply["error"]["code"] == "E_UNSUPPORTED");
 
@@ -792,14 +834,15 @@ TEST_CASE("a subscription's answer names slots that already hold their pictures"
   pg::PreviewPublisher publisher{f.engine, f.writer};
   f.ctx.previews = &publisher;
   const json first = dispatch(
-      {{"id", 1}, {"cmd", "telemetry.subscribe"}, {"args", {{"modules", json::array()}, {"previews", {"osc"}}}}},
-      f.ctx);
-  REQUIRE(first["result"]["previewSlots"]["osc"] == 0);
+      {{"id", 1}, {"cmd", "telemetry.subscribe"}, {"args", {{"watch", {{"osc", {"preview"}}}}}}}, f.ctx);
+  REQUIRE(first["result"]["slots"]["osc"]["preview"] == 0);
   REQUIRE(f.writer.slot(0)->seq.load() > 0);
   REQUIRE(f.writer.slot(1)->seq.load() == 0);
 
-  const json moved = dispatch(
-      {{"id", 2}, {"cmd", "telemetry.subscribe"}, {"args", {{"modules", {"m1"}}, {"previews", {"osc"}}}}}, f.ctx);
-  REQUIRE(moved["result"]["previewSlots"]["osc"] == 1);
+  const json moved = dispatch({{"id", 2},
+                               {"cmd", "telemetry.subscribe"},
+                               {"args", {{"watch", {{"m1", {"display"}}, {"osc", {"preview"}}}}}}},
+                              f.ctx);
+  REQUIRE(moved["result"]["slots"]["osc"]["preview"] == 1);
   REQUIRE(f.writer.slot(1)->seq.load() > 0);
 }

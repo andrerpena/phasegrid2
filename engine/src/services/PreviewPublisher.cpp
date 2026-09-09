@@ -13,8 +13,8 @@ PreviewPublisher::PreviewPublisher(Engine& engine, TelemetryWriter& writer)
 void PreviewPublisher::tick() {
   std::set<uint64_t> seen;
   engine_.forEachInstance([&](ModuleInstance& inst) {
-    const uint32_t slot = inst.previewSlot.load(std::memory_order_relaxed);
-    if (slot == kNoTelemetrySlot) return;
+    const uint32_t slot = inst.slot(TelemetryChannel::Preview);
+    if (slot == kNoTelemetrySlotCtx) return;
     const ModuleDescriptor& d = *inst.type->desc;
     if ((d.flags & kModulePreviewsWave) == 0) return;
     seen.insert(inst.serial);

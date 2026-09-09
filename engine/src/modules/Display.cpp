@@ -52,7 +52,7 @@ public:
     // No segment, or nobody subscribed. This is a fast path rather than a correctness guard: the writer
     // also rejects an out-of-range slot, so removing this check changes nothing observable except that
     // an unwatched meter would do the fold work every block for nobody.
-    if (c.telemetry == nullptr || c.telemetrySlot == kNoTelemetrySlot) return;
+    if (c.telemetry == nullptr || c.displaySlot == kNoTelemetrySlotCtx) return;
 
     float* out = scratch_.data();
     if (c.voice == 0) std::fill_n(out, static_cast<size_t>(c.numFrames) * 2, 0.f);
@@ -122,7 +122,7 @@ class Meter final : public Display {
       out[1] = c.numFrames > 0 ? std::sqrt(sum / static_cast<float>(c.numFrames)) : 0.f;
       out[2] = ch.clipHold > 0.f ? 1.f : 0.f;
     }
-    c.telemetry->writeMeter(c.telemetrySlot, values_, kChannels, block_);
+    c.telemetry->writeMeter(c.displaySlot, values_, kChannels, block_);
   }
 
   static constexpr uint32_t kChannels = 2;
@@ -174,7 +174,7 @@ class Scope final : public Display {
     // Until the ring has wrapped its oldest frame is frame 0; after that it is the one the head is
     // about to overwrite.
     const uint32_t first = filled_ < kTelemetryScopeFrames ? 0 : head_;
-    c.telemetry->writeScope(c.telemetrySlot, ring_.data(), 2, filled_, block_, first);
+    c.telemetry->writeScope(c.displaySlot, ring_.data(), 2, filled_, block_, first);
   }
 
   void restart(uint32_t stride) {
@@ -205,7 +205,7 @@ class Value final : public Display {
   void publish(ProcessContext& c, const float* interleaved) override {
     const uint32_t last = c.numFrames == 0 ? 0 : c.numFrames - 1;
     const float frame[2] = {interleaved[last * 2 + 0], interleaved[last * 2 + 1]};
-    c.telemetry->writeValue(c.telemetrySlot, frame, 2, block_);
+    c.telemetry->writeValue(c.displaySlot, frame, 2, block_);
   }
 };
 

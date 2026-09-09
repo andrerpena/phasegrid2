@@ -42,8 +42,8 @@ const cases: Record<CommandName, { valid: unknown; invalid: unknown }> = {
   "engine.shutdown": { valid: {}, invalid: "now" },
   "catalog.get": { valid: {}, invalid: null },
   "telemetry.subscribe": {
-    valid: { modules: ["meter1", "scope1"], previews: ["osc1"] },
-    invalid: { modules: [1, 2] },
+    valid: { watch: { pattern1: ["params", "display"], osc1: ["preview"] } },
+    invalid: { watch: { pattern1: ["spectrum"] } },
   },
   "telemetry.unsubscribe": { valid: {}, invalid: "all" },
   "module.preview": {

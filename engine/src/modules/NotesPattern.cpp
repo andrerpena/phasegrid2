@@ -135,7 +135,7 @@ private:
   /// would have to parse mini-notation to know where the notes are, and the module has already done
   /// that. So the face's piano roll is fed the same notes the note stream is.
   void publish(const ProcessContext& c) {
-    if (c.telemetry == nullptr || c.telemetrySlot == kNoTelemetrySlotCtx) return;
+    if (c.telemetry == nullptr || c.displaySlot == kNoTelemetrySlotCtx) return;
     const TransportSnapshot& t = *c.transport;
     const float transpose = lanes::lane(c.param(2).at(0), 0);
     const float knob = std::clamp(lanes::lane(c.param(3).at(0), 0), 0.f, 1.f);
@@ -159,7 +159,7 @@ private:
     }
     const double quarters =
       quartersPerCycle(static_cast<uint32_t>(lanes::lane(c.param(0).at(0), 0)), t);
-    c.telemetry->writeNotes(c.telemetrySlot, published_.data(), count, static_cast<float>(quarters),
+    c.telemetry->writeNotes(c.displaySlot, published_.data(), count, static_cast<float>(quarters),
                             static_cast<float>(t.quartersPerBar()),
                             phase_[c.numFrames == 0 ? 0 : c.numFrames - 1], block_++);
   }

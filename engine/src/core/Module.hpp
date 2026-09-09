@@ -9,6 +9,7 @@
 #include "core/Event.hpp"
 #include "core/Param.hpp"
 #include "core/Signal.hpp"
+#include "core/TelemetryChannel.hpp"
 
 namespace pg {
 
@@ -66,7 +67,6 @@ struct AudioBus {
 };
 
 class TelemetryWriter;
-inline constexpr uint32_t kNoTelemetrySlotCtx = 0xFFFFFFFFu;
 
 /// Built by the scheduler per Process op. Port indices are the descriptor's declared indices.
 struct ProcessContext {
@@ -74,11 +74,13 @@ struct ProcessContext {
   uint32_t voice = 0;                 // voice PAIR index
   uint32_t voicePairs = 1;            // how many pairs this program runs, so a module can tell it is last
   Mask voiceMask = Mask(static_cast<uint32_t>(-1));   // lanes of voices that exist in this pair
-  /// Where a `kModuleWritesTelemetry` module publishes, or null and `kNoTelemetrySlot` when nobody is
-  /// watching. Assigned by `telemetry.subscribe` rather than by the compiler, so subscribing does not
-  /// recompile the graph and cannot glitch the audio.
+  /// Where a `kModuleWritesTelemetry` module publishes what it draws about itself, or null and
+  /// `kNoTelemetrySlotCtx` when nobody is watching that channel. This slot is the module's alone: the
+  /// parameter values the scheduler publishes for the same module go to a different one, so a module
+  /// with a picture AND modulated knobs shows both. Assigned by `telemetry.subscribe` rather than by
+  /// the compiler, so subscribing does not recompile the graph and cannot glitch the audio.
   TelemetryWriter* telemetry = nullptr;
-  uint32_t telemetrySlot = kNoTelemetrySlotCtx;
+  uint32_t displaySlot = kNoTelemetrySlotCtx;
   double sampleRate = 48000.0;
   const TransportSnapshot* transport = nullptr;
   AudioBus* outputBus = nullptr;

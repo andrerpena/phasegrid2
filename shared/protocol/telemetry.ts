@@ -32,14 +32,28 @@ export const TELEMETRY_NOTE_HEADER_FLOATS = 4;
 /** `flags` bit 0 of a note record: it is sounding right now. */
 export const TELEMETRY_NOTE_SOUNDING = 1;
 
+/**
+ * What a module publishes, as opposed to what the bytes in a slot are.
+ *
+ * A `TelemetryKind` says what a slot CONTAINS; a channel says who writes it and why. They are not the
+ * same axis: `display` carries four different kinds depending on the module, and one module may hold
+ * several channels at once -- a pattern draws its own piano roll AND has knobs that modulation turns,
+ * which are two publishers writing two kinds. A slot each, so neither can overwrite the other.
+ *
+ * `telemetry.subscribe` speaks these names and no others. The engine's `TelemetryChannel`
+ * (`engine/src/core/TelemetryChannel.hpp`) is the same list.
+ */
+export const TELEMETRY_CHANNELS = ["params", "display", "preview"] as const;
+export type TelemetryChannel = (typeof TELEMETRY_CHANNELS)[number];
+
 export enum TelemetryKind {
   None = 0,
   Meter = 1,
   Scope = 2,
   /**
    * The effective value of every parameter of a subscribed module, after modulation, in display
-   * units and descriptor order. Written by the scheduler for any module that does not publish a kind
-   * of its own; it is what lets a knob turn when something is plugged into it.
+   * units and descriptor order. Written by the scheduler for any module watched on the `params`
+   * channel; it is what lets a knob turn when something is plugged into it.
    */
   Params = 3,
   /**

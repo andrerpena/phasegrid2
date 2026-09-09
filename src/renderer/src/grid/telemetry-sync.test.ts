@@ -5,6 +5,8 @@ import { EMPTY_PATCH, type PatchDoc } from "@shared/protocol/patch";
 import {
   type NotesReading,
   type SlotReading,
+  TELEMETRY_CHANNELS,
+  type TelemetryChannel,
   TelemetryKind,
 } from "@shared/protocol/telemetry";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -50,8 +52,8 @@ const MODULATED: PatchDoc = {
   ],
 };
 
-const subscriptions: string[][] = [];
-const previewRequests: string[][] = [];
+/** Every `watch` the sync has sent, as sent. */
+const subscriptions: Record<string, TelemetryChannel[]>[] = [];
 const live: [string, string, number | null][] = [];
 const waves: [string, number[]][] = [];
 const traces: [string, string, number[][]][] = [];
@@ -63,7 +65,7 @@ const opened: string[] = [];
 
 beforeEach(() => {
   subscriptions.length = 0;
-  previewRequests.length = 0;
+  noteReadings.length = 0;
   live.length = 0;
   waves.length = 0;
   traces.length = 0;
@@ -92,18 +94,25 @@ beforeEach(() => {
     call: vi.fn(
       async (
         cmd: string,
-        args: { modules?: string[]; previews?: string[] },
+        args: { watch?: Record<string, TelemetryChannel[]> },
       ) => {
         if (cmd === "telemetry.subscribe") {
-          subscriptions.push(args.modules ?? []);
-          previewRequests.push(args.previews ?? []);
-          // Slots from one pool: modules first, then previews, as the engine hands them out.
-          const slots: Record<string, number> = {};
-          const previewSlots: Record<string, number> = {};
+          const watch = args.watch ?? {};
+          subscriptions.push(watch);
+          // Numbered the way the engine numbers them: modules in id order, channels in the enum's, so
+          // a test that pins a slot number is pinning what the engine would really have answered.
+          const slots: Record<
+            string,
+            Partial<Record<TelemetryChannel, number>>
+          > = {};
           let next = 0;
-          for (const m of args.modules ?? []) slots[m] = next++;
-          for (const m of args.previews ?? []) previewSlots[m] = next++;
-          return { slots, previewSlots } as never;
+          for (const moduleId of Object.keys(watch).sort()) {
+            const given: Partial<Record<TelemetryChannel, number>> = {};
+            for (const channel of TELEMETRY_CHANNELS)
+              if (watch[moduleId].includes(channel)) given[channel] = next++;
+            slots[moduleId] = given;
+          }
+          return { slots } as never;
         }
         return {} as never;
       },
@@ -157,6 +166,25 @@ const READOUT: PatchDoc = {
       id: "e3",
       from: { module: "osc", port: "out" },
       to: { module: "readout", port: "in" },
+    },
+  ],
+};
+
+/**
+ * An LFO into a pattern's Legato: a module that draws its own piano roll and has a knob modulation
+ * turns. Both at once is the case one slot per module could not serve.
+ */
+const PATTERNED: PatchDoc = {
+  ...EMPTY_PATCH,
+  modules: [
+    moduleNode("lfo", "mod.lfo"),
+    moduleNode("pattern", "notes.pattern"),
+  ],
+  edges: [
+    {
+      id: "e1",
+      from: { module: "lfo", port: "out" },
+      to: { module: "pattern", port: "param:legato" },
     },
   ],
 };
@@ -217,14 +245,16 @@ describe("telemetry sync", () => {
     await flush();
     sync.stop();
     expect(opened).toEqual(["/pg-test"]);
-    expect(subscriptions).toEqual([["osc"]]);
-    expect(previewRequests).toEqual([["lfo", "osc"]]);
+    // One request naming every pair: the sine's knobs, and both wave panels.
+    expect(subscriptions).toEqual([
+      { osc: ["params", "preview"], lfo: ["preview"] },
+    ]);
   });
 
   it("puts a published picture on the panel, and only a new one", async () => {
     const sync = startTelemetrySync(target, schedule);
     await flush();
-    // Slot 0 is the sine's knobs; 1 and 2 are the LFO's and the sine's pictures.
+    // Slot 0 is the LFO's picture, 1 the sine's knobs, 2 the sine's picture.
     readings.set(2, {
       kind: TelemetryKind.Preview,
       blockIndex: 7n,
@@ -248,9 +278,13 @@ describe("telemetry sync", () => {
     usePatchStore.setState({ doc: SCOPED, version: 0 });
     const sync = startTelemetrySync(target, schedule);
     await flush();
-    expect(subscriptions.at(-1)).toEqual(["osc", "scope"]);
-    // Slot 1 is the scope's: a window, not knob values.
-    readings.set(1, {
+    expect(subscriptions.at(-1)).toEqual({
+      osc: ["params", "preview"],
+      lfo: ["preview"],
+      scope: ["display"],
+    });
+    // Slot 3 is the scope's display channel: a window, not knob values.
+    readings.set(3, {
       kind: TelemetryKind.Scope,
       blockIndex: 3n,
       channels: [
@@ -271,14 +305,14 @@ describe("telemetry sync", () => {
         ],
       ],
     ]);
-    readings.set(1, {
+    readings.set(3, {
       kind: TelemetryKind.Scope,
       blockIndex: 4n,
       channels: [Float32Array.from([1, 1, 1]), Float32Array.from([1, 1, 1])],
     });
     tick?.();
     expect(traces).toHaveLength(2);
-    // Its slot never feeds a knob: the scope's parameter is not modulated and its slot is not Params.
+    // Nothing is plugged into the scope's Time, so it holds no params channel and no knob to turn.
     expect(live.filter(([module]) => module === "scope")).toEqual([]);
     sync.stop();
   });
@@ -287,9 +321,13 @@ describe("telemetry sync", () => {
     usePatchStore.setState({ doc: READOUT, version: 0 });
     const sync = startTelemetrySync(target, schedule);
     await flush();
-    expect(subscriptions.at(-1)).toEqual(["osc", "readout"]);
-    // Slot 1 is the readout's, and it carries a Value rather than a window.
-    readings.set(1, {
+    expect(subscriptions.at(-1)).toEqual({
+      osc: ["params", "preview"],
+      lfo: ["preview"],
+      readout: ["display"],
+    });
+    // Slot 3 is the readout's, and it carries a Value rather than a window.
+    readings.set(3, {
       kind: TelemetryKind.Value,
       blockIndex: 5n,
       values: [-0.25, 0.5],
@@ -305,8 +343,12 @@ describe("telemetry sync", () => {
     usePatchStore.setState({ doc: METERED, version: 0 });
     const sync = startTelemetrySync(target, schedule);
     await flush();
-    expect(subscriptions.at(-1)).toEqual(["level", "osc"]);
-    // Slot 0 is the meter's: the modules are sorted, and `level` comes before `osc`.
+    expect(subscriptions.at(-1)).toEqual({
+      osc: ["params", "preview"],
+      lfo: ["preview"],
+      level: ["display"],
+    });
+    // Slot 0 is the meter's: the modules are sorted, and `level` comes before `lfo` and `osc`.
     readings.set(0, {
       kind: TelemetryKind.Meter,
       blockIndex: 11n,
@@ -317,7 +359,7 @@ describe("telemetry sync", () => {
     tick?.();
     tick?.();
     expect(levels).toEqual([["level", "11", [0.8, 0.4], [1, 0]]]);
-    // Its slot is not knob values: a watched display module publishes its own kind.
+    // The meter has no parameters at all, so it is watched on one channel and nothing feeds a knob.
     expect(live.filter(([module]) => module === "level")).toEqual([]);
     sync.stop();
   });
@@ -327,7 +369,7 @@ describe("telemetry sync", () => {
     const sync = startTelemetrySync(target, schedule);
     await flush();
     useEngineStore.setState({ running: false });
-    readings.set(1, {
+    readings.set(3, {
       kind: TelemetryKind.Scope,
       blockIndex: 9n,
       channels: [Float32Array.from([0.25])],
@@ -341,15 +383,15 @@ describe("telemetry sync", () => {
   it("turns a published value into a knob position, every frame", async () => {
     const sync = startTelemetrySync(target, schedule);
     await flush();
-    // Fold runs 0..48 semitones; the engine says it is at 12 right now.
-    readings.set(0, {
+    // Fold runs 0..48 semitones; the engine says it is at 12 right now. Slot 1 is the sine's params.
+    readings.set(1, {
       kind: TelemetryKind.Params,
       blockIndex: 1n,
       values: [12],
     });
     tick?.();
     expect(live).toEqual([["osc", "fold", 0.25]]);
-    readings.set(0, {
+    readings.set(1, {
       kind: TelemetryKind.Params,
       blockIndex: 2n,
       values: [24],
@@ -359,25 +401,49 @@ describe("telemetry sync", () => {
     sync.stop();
   });
 
-  it("keeps the knobs live against an engine that answers without preview slots", async () => {
-    // A renderer hot-reloaded against an engine still running the older protocol. Nothing about the
-    // knobs changed between the two, so they must not go with the pictures.
-    useEngineStore.setState({
-      call: vi.fn(async (cmd: string, args: { modules?: string[] }) => {
-        if (cmd === "telemetry.subscribe")
-          return { slots: { [args.modules?.[0] ?? ""]: 0 } } as never;
-        return {} as never;
-      }) as never,
-    });
+  it("drives the knobs of a module that also draws itself", async () => {
+    // The bug the channels exist for: a pattern publishes its own piano roll, which used to be the
+    // whole of what its slot could carry, so the Legato an LFO was moving never moved on screen.
+    usePatchStore.setState({ doc: PATTERNED, version: 0 });
     const sync = startTelemetrySync(target, schedule);
     await flush();
-    readings.set(0, {
+    expect(subscriptions.at(-1)).toEqual({
+      lfo: ["preview"],
+      pattern: ["params", "display"],
+    });
+    // Slot 0 is the LFO's picture, 1 the pattern's knobs, 2 its notes. Both of the pattern's arrive
+    // in the same frame, from the two slots, and neither costs the other.
+    readings.set(1, {
       kind: TelemetryKind.Params,
       blockIndex: 1n,
-      values: [12],
+      // cycle, legato, transpose, gain. Legato runs 0.01..1, so 0.505 is half a turn.
+      values: [4, 0.505, 0, 1],
+    });
+    readings.set(2, {
+      kind: TelemetryKind.Notes,
+      blockIndex: 6n,
+      notes: [
+        {
+          start: 0,
+          length: 0.5,
+          pitch: 60,
+          velocity: 1,
+          from: 0,
+          to: 2,
+          textIndex: 0,
+          sounding: true,
+        },
+      ],
+      quartersPerCycle: 4,
+      quartersPerBar: 4,
+      phase: 0.5,
     });
     tick?.();
-    expect(live).toEqual([["osc", "fold", 0.25]]);
+    expect(live).toHaveLength(1);
+    expect(live[0][0]).toBe("pattern");
+    expect(live[0][1]).toBe("legato");
+    expect(live[0][2]).toBeCloseTo(0.5, 6);
+    expect(noteReadings).toEqual([["pattern", "6", 1]]);
     sync.stop();
   });
 
@@ -387,7 +453,7 @@ describe("telemetry sync", () => {
     // draws those from what the patch is set to.
     const sync = startTelemetrySync(target, schedule);
     await flush();
-    readings.set(0, {
+    readings.set(1, {
       kind: TelemetryKind.Params,
       blockIndex: 1n,
       values: [12],
@@ -398,7 +464,7 @@ describe("telemetry sync", () => {
     useEngineStore.setState({ running: false });
     expect(live.at(-1)).toEqual(["osc", "fold", null]);
     live.length = 0;
-    readings.set(0, {
+    readings.set(1, {
       kind: TelemetryKind.Params,
       blockIndex: 2n,
       values: [36],
@@ -417,7 +483,7 @@ describe("telemetry sync", () => {
   it("skips a frame whose slot was torn or not yet written", async () => {
     const sync = startTelemetrySync(target, schedule);
     await flush();
-    readings.set(0, null);
+    readings.set(1, null);
     tick?.();
     expect(live).toEqual([]);
     sync.stop();
@@ -434,8 +500,11 @@ describe("telemetry sync", () => {
     usePatchStore.getState().apply([{ op: "edgeRemove", id: "e1" }]);
     await flush();
     sync.stop();
-    // Nothing left to watch: the engine is told so, or the old subscription would keep publishing.
-    expect(subscriptions).toEqual([["osc"], []]);
+    // The sine's knobs are gone from the request; its picture is not, and nothing else changed.
+    expect(subscriptions).toEqual([
+      { osc: ["params", "preview"], lfo: ["preview"] },
+      { osc: ["preview"], lfo: ["preview"] },
+    ]);
   });
 
   it("asks once for a burst of edits that leave the set unchanged", async () => {
@@ -446,7 +515,9 @@ describe("telemetry sync", () => {
       .apply([{ op: "moduleAdd", id: "extra", type: "amp.vca" }]);
     await flush();
     sync.stop();
-    expect(subscriptions).toEqual([["osc"]]);
+    expect(subscriptions).toEqual([
+      { osc: ["params", "preview"], lfo: ["preview"] },
+    ]);
   });
 
   /** A second LFO with the first one in its Shape socket: a watched module with room for more. */
@@ -472,7 +543,13 @@ describe("telemetry sync", () => {
     withSecondLfo();
     const sync = startTelemetrySync(target, schedule);
     await flush();
-    expect(subscriptions).toEqual([["lfo2", "osc"]]);
+    expect(subscriptions).toEqual([
+      {
+        osc: ["params", "preview"],
+        lfo: ["preview"],
+        lfo2: ["params", "preview"],
+      },
+    ]);
     usePatchStore.getState().apply([
       {
         op: "edgeAdd",
@@ -484,8 +561,8 @@ describe("telemetry sync", () => {
     await flush();
     // The engine publishes every parameter of a watched module, so it has nothing new to hear.
     expect(subscriptions).toHaveLength(1);
-    // Slot 0 is lfo2's knobs: rate, shape, depth in descriptor order.
-    readings.set(0, {
+    // Slot 1 is lfo2's knobs: rate, shape, depth in descriptor order.
+    readings.set(1, {
       kind: TelemetryKind.Params,
       blockIndex: 1n,
       values: [2, 0.5, 0.25],
@@ -516,7 +593,7 @@ describe("telemetry sync", () => {
     // feeds it, so a value read for it would be a knob turning on its own.
     expect(live).toEqual([["lfo2", "depth", null]]);
     expect(subscriptions).toHaveLength(1);
-    readings.set(0, {
+    readings.set(1, {
       kind: TelemetryKind.Params,
       blockIndex: 1n,
       values: [2, 0.5, 0.25],

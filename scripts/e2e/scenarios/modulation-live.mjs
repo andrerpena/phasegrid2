@@ -6,6 +6,10 @@ import { projectDoc, seedProject } from "../harness.mjs";
  *
  * The engine publishes every parameter of a watched module, so the second cable changes nothing it
  * has to be told; the interface has to notice on its own which knobs to drive from what it reads.
+ *
+ * And a module that draws a picture of itself is watched on two channels at once: the pattern's
+ * Legato turns under its cable while its piano roll keeps drawing. With one slot per module the
+ * picture took it and the knob never moved, which is the bug the channels exist for.
  */
 const PATCH = {
   schemaVersion: 1,
@@ -13,6 +17,7 @@ const PATCH = {
   feedbackMode: "sample",
   modules: [
     { id: "lfo", type: "mod.lfo", x: 48, y: 48, params: { rate: 8 } },
+    { id: "pattern", type: "notes.pattern", x: 48, y: 288 },
     { id: "target", type: "mod.lfo", x: 48, y: 192 },
     { id: "sine", type: "osc.sine", x: 336, y: 48 },
     { id: "out", type: "io.audioOut", x: 600, y: 48 },
@@ -27,6 +32,11 @@ const PATCH = {
       id: "e2",
       from: { module: "lfo", port: "out" },
       to: { module: "target", port: "param:shape" },
+    },
+    {
+      id: "e3",
+      from: { module: "lfo", port: "out" },
+      to: { module: "pattern", port: "param:legato" },
     },
   ],
 };
@@ -48,10 +58,28 @@ const turning = (module, param) => {
   })()`;
 };
 
+/**
+ * Whether a module's piano roll has drawn again since this was last asked: the engine numbers every
+ * publish, so a moving index is the display channel still arriving. Same shape as `turning`.
+ */
+const drawing = (module) => {
+  const key = JSON.stringify(`${module}.pianoRoll`);
+  const arg = JSON.stringify(module);
+  return `(() => {
+    const last = (window.__pgRolls ??= {});
+    const roll = window.pg.grid.face(${arg})?.find((b) => b.kind === "pianoRoll");
+    const now = roll?.notes?.index;
+    if (now === null || now === undefined || now === last[${key}]) return false;
+    last[${key}] = now;
+    return true;
+  })()`;
+};
+
 export default {
   name: "modulation-live",
   description:
-    "two knobs on one module both turn under modulation, and one rests when its cable is pulled",
+    "two knobs on one module both turn under modulation, one rests when its cable is pulled, and a " +
+    "module that draws itself turns its knob while it draws",
   seed(ws) {
     seedProject(
       ws,
@@ -119,5 +147,22 @@ export default {
       turning("target", "shape"),
     );
     await screenshot("modulation-live-one");
+
+    // A module that publishes a picture of its own: the knob and the picture are two channels, and
+    // asking for one must not cost the other.
+    await checkEventually(
+      "the pattern's legato knob turns under the LFO",
+      turning("pattern", "legato"),
+    );
+    await checkEventually(
+      "and turns again, so it is a moving value",
+      turning("pattern", "legato"),
+    );
+    await checkEventually(
+      "while its piano roll keeps drawing",
+      drawing("pattern"),
+    );
+    await checkEventually("and draws again", drawing("pattern"));
+    await screenshot("modulation-live-pattern");
   },
 };

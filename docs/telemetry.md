@@ -28,30 +28,48 @@ trips per second per meter.
   Its own kind rather than a meter, because a meter's peak is a magnitude and +0.5 and -0.5 read the
   same through one, while the sign is most of what a control voltage is read for. Its face
   (`value`, `kModulePublishesValue`) prints it.
-- Any other subscribed module publishes a `Params` slot: the effective value of every one of its
-  parameters, in display units and descriptor order, after whatever is plugged into its `param:` inputs
-  has been added. The scheduler writes it after the module's `process`, from voice pair 0's lane 0 and
-  the block's last frame, so no module knows it is being watched. It is what lets a knob on the
-  interface turn when something modulates it. Inside a sample-level feedback cluster the write happens
-  once per sample rather than once per block, which is correct and merely busier.
-- A module with a wave panel (`previewsWave`) can be asked for its picture as well: `telemetry.subscribe`
-  takes `previews` beside `modules` and answers `previewSlots` from the same pool. The engine's message
+- A subscribed module publishes a `Params` slot: the effective value of every one of its parameters, in
+  display units and descriptor order, after whatever is plugged into its `param:` inputs has been added.
+  The scheduler writes it after the module's `process`, from voice pair 0's lane 0 and the block's last
+  frame, so no module knows it is being watched. It is what lets a knob on the interface turn when
+  something modulates it. Inside a sample-level feedback cluster the write happens once per sample
+  rather than once per block, which is correct and merely busier.
+- A module with a wave panel (`previewsWave`) can be asked for its picture as well. The engine's message
   thread (`PreviewPublisher`, ticked from the command loop about thirty times a second) reads the values
   the audio thread left on the instance, asks `Module::preview` when they have moved, and writes one cycle
   into a `Preview` slot. That is how a face follows the sound under modulation, under a hand, and while a
   smoother is still ramping. `hello` lists `previews` among the capabilities when this is on; a renderer
-  falls back to `module.preview` over the socket when it is not, which is also what keeps a hot-reloaded
-  renderer working against an engine that predates pictures. A held patch (`audio.setRunning`) runs no
+  falls back to `module.preview` over the socket when it is not. A held patch (`audio.setRunning`) runs no
   module, so nothing publishes `Params` and the knobs rest where the document has them; the pictures keep
   coming, drawn from the model's values, so a face still follows a knob turned while the patch is stopped.
-- The renderer owns the subscription set in one place (`src/renderer/src/grid/telemetry-sync.ts`):
-  `telemetry.subscribe` replaces the whole set, so two subscribers would cancel each other. A scope
-  module is named in the same `modules` list as the modulated ones (the engine gives any watched
-  module a slot; a `kModuleWritesTelemetry` module writes its own kind into it) and its slot is read
-  by the kind it carries rather than as knob values. Scopes and readouts share that one list:
-  `displayModules` collects both, and the tick dispatches on the slot's kind, so another display
-  module is a flag and a case rather than a second path.
-- `telemetry.subscribe` decides which module writes into which slot and returns the map.
+
+## Channels
+
+Those three publishers are different things about the same module, so they are named separately and get
+a slot each. A **channel** says who writes and why; a `TelemetryKind` says what the bytes are, and the
+two are not the same axis -- `display` carries four kinds depending on the module.
+
+- `params`: the scheduler, after `process`. Any module with parameters.
+- `display`: the module itself, on the audio thread. A `kModuleWritesTelemetry` module only.
+- `preview`: `PreviewPublisher`, on the message thread. A `previewsWave` module only.
+
+`telemetry.subscribe` takes `watch`, a module id to the channels wanted of it, and answers the slot for
+each pair; that map is the only place the module-to-slot mapping exists. The list lives once, in
+`engine/src/core/TelemetryChannel.hpp` and `shared/protocol/telemetry.ts`, with `moduleServes` saying
+which module can serve which -- a pair it cannot is refused rather than answered with a slot nothing
+writes into.
+
+One channel per slot is the point. A pattern draws its own piano roll AND has a Legato an LFO can turn,
+and while a module had a single slot the picture won: the scheduler skipped any module that published a
+kind of its own, so no knob on a face that drew anything could ever move. Two channels, two slots, both
+live.
+
+- The renderer owns the subscription set in one place (`src/renderer/src/grid/telemetry-sync.ts`), and
+  computes it with one pure function per channel: `modulatedModules` (which knobs have a cable, and
+  which parameter each is), `displayModules`, `previewedModules`. They are folded into the one `watch`
+  and the reply into one slot map per channel. `telemetry.subscribe` replaces the whole set, so two
+  subscribers would cancel each other. The display tick dispatches on the slot's kind, so another
+  display module is a flag and a case rather than a second path.
 
 ## Why a seqlock
 

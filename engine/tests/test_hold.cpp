@@ -100,7 +100,7 @@ TEST_CASE("a held patch stops publishing, so the interface stops moving", "[hold
   std::string error;
   REQUIRE(writer.create(uniqueName("params"), 4, 48000.0, 64, error));
   rig.engine.setTelemetry(&writer);
-  REQUIRE(rig.engine.setTelemetrySlot("osc", 0));
+  REQUIRE(rig.engine.setSlot("osc", TelemetryChannel::Params, 0));
 
   rig.render(2);
   const uint32_t moving = writer.slot(0)->seq.load();
@@ -123,7 +123,7 @@ TEST_CASE("a face held still shows what the patch is set to, and follows a knob"
   REQUIRE(writer.create(uniqueName("preview"), 4, 48000.0, 64, error));
   rig.engine.setTelemetry(&writer);
   PreviewPublisher publisher{rig.engine, writer};
-  REQUIRE(rig.engine.setPreviewSlot("osc", 0));
+  REQUIRE(rig.engine.setSlot("osc", TelemetryChannel::Preview, 0));
 
   rig.render(4);                     // the LFO has moved Fold well away from the document's twelve
   rig.engine.setRunning(false);
