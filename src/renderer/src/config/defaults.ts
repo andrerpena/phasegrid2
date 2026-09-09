@@ -96,7 +96,13 @@ export const CONFIG_SCHEMA: Record<string, ConfigPropertySchema> = {
     type: "object",
     default: {},
     description:
-      'Colour overrides as flat dot-paths: "grid.gridLine", "signal.audio", "ui.background". Says what you changed about the active theme rather than restating it.',
+      'Colour overrides on whichever theme is active, as flat dot-paths: "ui.background", "grid.gridLine", "signal.audio". Says what you changed rather than restating a palette.',
+  },
+  themes: {
+    type: "object",
+    default: {},
+    description:
+      'Themes this workspace defines, keyed by id. Each says only what differs from the theme it extends, e.g. { "midnight": { "name": "Midnight", "extends": "dark", "colors": { "background": "oklch(0.1 0.02 260)" } } }. An id matching a built-in replaces it.',
   },
   keybindings: {
     type: "array",

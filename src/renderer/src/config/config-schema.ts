@@ -5,6 +5,7 @@ import {
 } from "@renderer/config/registry-ids";
 import { GRID_VAR_NAMES } from "@renderer/theming/theme";
 import { dark } from "@renderer/theming/themes";
+import { WorkspaceThemesSchema } from "@renderer/theming/workspace-themes";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { CONFIG_SCHEMA } from "./defaults";
@@ -143,6 +144,9 @@ export const ConfigOverridesSchema = z
     "layout.statusBars": StatusBarLayoutSchema.optional(),
     "layout.controlBars": ControlBarLayoutSchema.optional(),
     theme: ThemeOverridesSchema.optional(),
+    themes: WorkspaceThemesSchema.describe(
+      CONFIG_SCHEMA.themes.description,
+    ).optional(),
     keybindings: z
       .array(KeybindingEntrySchema)
       .describe(CONFIG_SCHEMA.keybindings.description)

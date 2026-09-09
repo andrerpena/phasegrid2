@@ -8,7 +8,7 @@ import {
 import { viewportStore } from "@renderer/grid/viewport-store";
 import { hexToRgb } from "@renderer/lib/color";
 import { usePatchStore } from "@renderer/patch/patch-store";
-import { useGridThemeStore } from "@renderer/theming/grid-theme-store";
+import { useThemeStore } from "@renderer/theming/theme-store";
 import { Map as MapIcon } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { WidgetDefinition } from "../types";
@@ -111,7 +111,7 @@ const MiniMapView = () => {
 
       const doc = usePatchStore.getState().doc;
       const catalog = useCatalogStore.getState().byId;
-      const colors = useGridThemeStore.getState().colors;
+      const colors = useThemeStore.getState().theme.grid;
       const bounds = patchBounds(doc, catalog);
 
       // Reallocated only when the patch's extent changes shape, which is rare -- moving a module

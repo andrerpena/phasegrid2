@@ -483,6 +483,44 @@ try {
         await replaceDocument(json);
       };
 
+      // ── Colours written in the settings reach both CSS and the canvas ──────
+      // `ui.*` was the path that silently did nothing while the palette lived in a hand-written
+      // stylesheet: the editor offered these keys and nothing could write them into CSS.
+      await typeSettings(
+        '{"theme": {"ui.background": "#123456", "grid.gridLine": "#654321"}, "themes": {"midnight": {"name": "Midnight", "extends": "dark", "colors": {"card": "#0a0b0c"}}}}',
+      );
+      await sleep(600);
+      const colours = await evaluate(`
+        const read = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+        return { background: read("--background"), gridLine: read("--grid-line"), card: read("--card") };`);
+      check(
+        "6. an interface colour written in the settings reaches CSS",
+        colours.background === "#123456",
+        JSON.stringify(colours),
+      );
+      check(
+        "6. and so does a canvas colour",
+        colours.gridLine === "#654321",
+        JSON.stringify(colours),
+      );
+
+      // A theme the workspace defined is offered beside the built-ins. `mod+alt+t` is the default
+      // binding for the picker; the settings above do not rebind anything.
+      await evaluate(`press("t", { metaKey: true, altKey: true });`);
+      await sleep(400);
+      const offeredThemes = await evaluate(
+        `return [...document.querySelectorAll('[data-testid="theme-picker-navigator-list"] button')].map((b) => b.textContent.trim());`,
+      );
+      check(
+        "6. a theme the workspace defines appears in the picker",
+        offeredThemes.some((t) => t.includes("Midnight")),
+        JSON.stringify(offeredThemes),
+      );
+      await evaluate(
+        `document.querySelector("dialog").dispatchEvent(new Event("cancel", { cancelable: true }));`,
+      );
+      await sleep(250);
+
       await typeSettings(
         '{"grid.snap": 16, "keybindings": [{"key": "mod+b", "remove": true}]}',
       );

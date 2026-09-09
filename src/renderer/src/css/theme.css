@@ -67,135 +67,19 @@
   --radius: 0.5rem;
 }
 
-/* Dark is also the bare `:root` case, so the window never flashes light before the store runs. */
-:root,
-[data-theme="dark"] {
+/*
+  The ground, for the frame before the script runs.
+
+  The generated stylesheet is injected by JavaScript, and between the browser applying this file and
+  that happening there is one frame in which `var(--background)` resolves to nothing and the window
+  paints as whatever the platform's default is. These two are the only colours that show in that
+  frame, so they are the only ones duplicated -- and `theme-parity.test.ts` checks them against the
+  default theme, so they cannot drift.
+
+  Everything else deliberately has no fallback: a colour missing from the generated sheet should be
+  visibly missing, not quietly some other theme's value.
+*/
+:root {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --log-info: oklch(0.708 0 0);
-  --log-warn: oklch(0.8 0.15 85);
-  --log-error: oklch(0.704 0.191 22.216);
-
-  --grid-background: #0b0c0e;
-  --grid-line: #191c21;
-  --node-fill: #1b1e23;
-  --node-stroke: #2f343c;
-  --node-selected: #4d7cfe;
-  --knob-body: #c9ced6;
-  --knob-pointer: #2b2f36;
-  --knob-label: #9aa0aa;
-  --marquee: #4d7cfe;
-  --playhead: #f5a524;
-  --signal-any: #8a8f98;
-  --signal-audio: #e5484d;
-  --signal-cv: #f76b15;
-  --signal-gate: #ffd230;
-  --signal-pitch: #f5a524;
-  --signal-phase: #a276f2;
-  --signal-note: #46b17b;
-}
-
-/* Light. Same roles, inverted ground. */
-[data-theme="light"] {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.961 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.961 0 0);
-  --muted-foreground: oklch(0.45 0 0);
-  --accent: oklch(0.961 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0 0 0 / 10%);
-  --input: oklch(0 0 0 / 15%);
-  --ring: oklch(0.708 0 0);
-  --log-info: oklch(0.45 0 0);
-  --log-warn: oklch(0.55 0.17 55);
-  --log-error: oklch(0.577 0.245 27.325);
-
-  --grid-background: #f4f5f7;
-  --grid-line: #e4e6eb;
-  --node-fill: #ffffff;
-  --node-stroke: #cfd3da;
-  --node-selected: #3b5bdb;
-  --knob-body: #e9ebef;
-  --knob-pointer: #3a3f47;
-  --knob-label: #6b7280;
-  --marquee: #3b5bdb;
-  --playhead: #b45309;
-  --signal-any: #6b7280;
-  --signal-audio: #cd2b31;
-  --signal-cv: #c2410c;
-  --signal-gate: #a16207;
-  --signal-pitch: #b45309;
-  --signal-phase: #7c3aed;
-  --signal-note: #15803d;
-}
-
-/* Terminal. Phosphor green on black. */
-[data-theme="terminal"] {
-  --background: oklch(0.05 0 0);
-  --foreground: oklch(0.8 0.15 136);
-  --card: oklch(0.1 0.02 136);
-  --card-foreground: oklch(0.8 0.15 136);
-  --popover: oklch(0.08 0.02 136);
-  --popover-foreground: oklch(0.8 0.15 136);
-  --primary: oklch(0.75 0.18 136);
-  --primary-foreground: oklch(0.05 0 0);
-  --secondary: oklch(0.2 0.08 136);
-  --secondary-foreground: oklch(0.8 0.15 136);
-  --muted: oklch(0.15 0.05 136);
-  --muted-foreground: oklch(0.6 0.12 136);
-  --accent: oklch(0.15 0.05 136);
-  --accent-foreground: oklch(0.8 0.15 136);
-  --destructive: oklch(0.6 0.25 25);
-  --destructive-foreground: oklch(0.05 0 0);
-  --border: oklch(0.3 0.1 136);
-  --input: oklch(0.25 0.08 136);
-  --ring: oklch(0.75 0.18 136);
-  --log-info: oklch(0.6 0.12 136);
-  --log-warn: oklch(0.75 0.18 85);
-  --log-error: oklch(0.6 0.25 25);
-
-  --grid-background: #000000;
-  --grid-line: #0d2b0d;
-  --node-fill: #071a07;
-  --node-stroke: #1a5c1a;
-  --node-selected: #00ff00;
-  --knob-body: #0f3d0f;
-  --knob-pointer: #00ff00;
-  --knob-label: #00cc00;
-  --marquee: #00ff00;
-  --playhead: #33ff33;
-  --signal-any: #008f2e;
-  --signal-audio: #00ff41;
-  --signal-cv: #7dff00;
-  --signal-gate: #c8ff00;
-  --signal-pitch: #a6ff2b;
-  --signal-phase: #00ffa6;
-  --signal-note: #3dff7a;
 }

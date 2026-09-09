@@ -1,8 +1,7 @@
 import { SearchableTreeNavigator } from "@renderer/components/command-palette";
 import { ModalFrame, useModalStore } from "@renderer/components/floating/modal";
 import type { MenuItem } from "@renderer/menu/types";
-import { useThemeStore } from "@renderer/theming/theme-store";
-import { THEMES } from "@renderer/theming/themes";
+import { rememberTheme, useThemeStore } from "@renderer/theming/theme-store";
 import { Moon, Palette, Sun } from "lucide-react";
 import type { CommandDefinition } from "../types";
 
@@ -22,12 +21,15 @@ export const workbenchSetTheme: CommandDefinition<never> = {
   execute: () => {
     const { setTheme } = useThemeStore.getState();
     const original = useThemeStore.getState().theme.id;
+    // Read from the store, not from the built-in list: a workspace can define its own themes and
+    // they belong in the picker beside the ones that shipped.
+    const themes = useThemeStore.getState().available;
 
     const ordered = [
-      ...THEMES.filter((t) => t.id === original),
-      ...THEMES.filter((t) => t.id !== original).sort((a, b) =>
-        a.name.localeCompare(b.name),
-      ),
+      ...themes.filter((t) => t.id === original),
+      ...themes
+        .filter((t) => t.id !== original)
+        .sort((a, b) => a.name.localeCompare(b.name)),
     ];
 
     const items: MenuItem[] = ordered.map((theme) => ({
@@ -35,9 +37,12 @@ export const workbenchSetTheme: CommandDefinition<never> = {
       label: theme.name,
       subtitle: theme.id,
       icon: theme.type === "dark" ? Moon : Sun,
-      // Choosing closes without dismissing, so the preview stands.
+      // Choosing closes without dismissing, so the preview stands -- and only choosing writes the
+      // setting, because arrowing through the list would otherwise put a dozen entries through the
+      // save path for one decision.
       onExecute: () => {
         setTheme(theme.id);
+        rememberTheme(theme.id);
         useModalStore.getState().closeAllModals();
       },
       onFocus: () => setTheme(theme.id),

@@ -22,7 +22,7 @@ import { useKeybindings } from "@renderer/keybindings/use-keybindings";
 import { useLayoutStore } from "@renderer/layout/layout-store";
 import { startEngineSync } from "@renderer/patch/engine-sync";
 import { startDirtyTracking } from "@renderer/project/dirty";
-import { watchGridTheme } from "@renderer/theming/grid-theme-store";
+import { watchWorkspaceThemes } from "@renderer/theming/workspace-themes";
 import { startProjectCommands } from "@renderer/workspace/project-commands";
 import { SaveAsDialog } from "@renderer/workspace/SaveAsDialog";
 import { startSessionPersistence } from "@renderer/workspace/session";
@@ -86,10 +86,10 @@ export const App = () => {
     const stopSession = startSessionPersistence();
     const stopCommands = startProjectCommands();
     const stopClose = startCloseGuard();
-    // Both follow the settings: a panel moved in `workspace.json` moves in the window, and a colour
-    // typed there repaints the canvas.
+    // Both follow the settings: a panel moved in `workspace.json` moves in the window, and a theme
+    // or a colour written there reaches the panels and the canvas alike.
     const stopLayout = watchWidgetLayout();
-    const stopGridTheme = watchGridTheme();
+    const stopThemes = watchWorkspaceThemes();
     return () => {
       stopStatus();
       stopSync();
@@ -99,7 +99,7 @@ export const App = () => {
       stopCommands();
       stopClose();
       stopLayout();
-      stopGridTheme();
+      stopThemes();
     };
   }, [connect, loadCatalog, loadLayout, boot]);
 
