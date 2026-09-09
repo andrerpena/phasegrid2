@@ -333,18 +333,18 @@ export class GridInteraction {
     );
     if (anchor === null) return;
     const over = this.renderer.portAt(state.current, { knobs: true });
-    const loose =
-      over !== null && over.socket.side !== state.fromSide
-        ? { x: over.x, y: over.y, facing: over.socket.facing }
-        : {
-            x: state.current.x,
-            y: state.current.y,
-            // A loose end faces the way the socket it is looking for would.
-            facing:
-              state.fromSide === "output"
-                ? ("left" as const)
-                : ("right" as const),
-          };
+    const snapped = over !== null && over.socket.side !== state.fromSide;
+    const loose = snapped
+      ? { x: over.x, y: over.y, facing: over.socket.facing }
+      : {
+          x: state.current.x,
+          y: state.current.y,
+          // A loose end faces the way the socket it is looking for would.
+          facing:
+            state.fromSide === "output"
+              ? ("left" as const)
+              : ("right" as const),
+        };
     const color = this.renderer.portColor(
       state.from.module,
       state.from.port,
@@ -358,6 +358,8 @@ export class GridInteraction {
       color,
       toFacing: to.facing,
       fromFacing: from.facing,
+      // A head at the pointer while the input end is in the hand; on the socket's rim once over one.
+      snapped: state.fromSide === "input" || snapped,
     });
   }
 

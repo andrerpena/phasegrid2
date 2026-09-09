@@ -3,7 +3,7 @@ import type { PhasegridTheme } from "@renderer/theming/theme";
 import type { ModuleDescriptor } from "@shared/protocol/catalog";
 import type { PatchDoc } from "@shared/protocol/patch";
 import { type Application, Container, Graphics } from "pixi.js";
-import { Cable, cableControlPoints } from "./components/Cable";
+import { Cable, cableShape, drawCableShape } from "./components/Cable";
 import { NodeView } from "./components/NodeView";
 import { type Facing, hitKnob, hitSocket, type Socket, socketOf } from "./face";
 import { Viewport } from "./viewport";
@@ -330,6 +330,8 @@ export class GridRenderer {
       /** The ways the two sockets face, once the loose end is over one. */
       toFacing?: Facing;
       fromFacing?: Facing;
+      /** Whether the input end is on a socket, which the arrowhead then stops short of. */
+      snapped?: boolean;
     } | null,
   ): void {
     this.overlay.clear();
@@ -346,26 +348,20 @@ export class GridRenderer {
         .stroke({ width: 1, color: hexToNumber(this.theme.grid.marquee) });
     }
     if (pendingCable !== null) {
-      // The same curve a finished cable takes, so the drag shows where the cable will actually lie.
-      const [c1, c2] = cableControlPoints(
-        pendingCable.from,
-        pendingCable.to,
-        pendingCable.toFacing,
-        pendingCable.fromFacing,
+      // The same shape a finished cable takes, so the drag shows where the cable will actually lie.
+      // The overlay is in screen space while the cable is in the world, so each point is mapped.
+      drawCableShape(
+        this.overlay,
+        cableShape(
+          pendingCable.from,
+          pendingCable.to,
+          pendingCable.toFacing,
+          pendingCable.fromFacing,
+          pendingCable.snapped ? undefined : 0,
+        ),
+        { width: 2, color: pendingCable.color, alpha: 0.8 },
+        (p) => this.viewport.toScreen(p),
       );
-      const from = this.viewport.toScreen(pendingCable.from);
-      const to = this.viewport.toScreen(pendingCable.to);
-      const p1 = this.viewport.toScreen(c1);
-      const p2 = this.viewport.toScreen(c2);
-      this.overlay
-        .moveTo(from.x, from.y)
-        .bezierCurveTo(p1.x, p1.y, p2.x, p2.y, to.x, to.y)
-        .stroke({
-          width: 2,
-          color: pendingCable.color,
-          alpha: 0.8,
-          cap: "round",
-        });
     }
   }
 

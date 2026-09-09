@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { cableControlPoints } from "./Cable";
+import { CABLE_HEAD_LENGTH, cableControlPoints, cableShape } from "./Cable";
 
 describe("cable shape", () => {
   it("leaves an output rightward and enters an input leftward", () => {
-    // The curve is what shows the direction of flow without drawing arrowheads on every cable.
+    // The curve shows the direction of flow before the arrowhead does.
     const [c1, c2] = cableControlPoints({ x: 0, y: 0 }, { x: 300, y: 100 });
     expect(c1.x).toBeGreaterThan(0);
     expect(c2.x).toBeLessThan(300);
@@ -59,5 +59,49 @@ describe("cable shape", () => {
     expect(c1.y).toBeGreaterThan(0);
     expect(c2.x).toBe(300);
     expect(c2.y).toBeLessThan(100);
+  });
+});
+
+describe("cable arrowhead", () => {
+  it("points into a left-facing input from the left, tip on the socket's rim", () => {
+    const shape = cableShape({ x: 0, y: 0 }, { x: 300, y: 100 }, "left");
+    const [tip, left, right] = shape.head;
+    expect(tip.x).toBeLessThan(300);
+    expect(tip.x).toBeGreaterThan(300 - CABLE_HEAD_LENGTH);
+    expect(tip.y).toBe(100);
+    // The base is further back along the approach and spread across it.
+    expect(left.x).toBe(right.x);
+    expect(left.x).toBeCloseTo(tip.x - CABLE_HEAD_LENGTH);
+    expect(Math.min(left.y, right.y)).toBeLessThan(100);
+    expect(Math.max(left.y, right.y)).toBeGreaterThan(100);
+  });
+
+  it("stops the curve at the base of the head rather than under it", () => {
+    // A stroke that ran on to the socket's centre would poke out of the head's sides.
+    const shape = cableShape({ x: 0, y: 0 }, { x: 300, y: 100 }, "left");
+    expect(shape.end.x).toBe(shape.head[1].x);
+    expect(shape.end.y).toBe(100);
+  });
+
+  it("points up into a socket at a knob's foot", () => {
+    const shape = cableShape({ x: 0, y: 0 }, { x: 300, y: 100 }, "down");
+    const [tip, left, right] = shape.head;
+    expect(tip.x).toBe(300);
+    expect(tip.y).toBeGreaterThan(100);
+    expect(left.y).toBe(right.y);
+    expect(left.y).toBeGreaterThan(tip.y);
+    expect(left.x).not.toBe(right.x);
+  });
+
+  it("wears the head right on a loose end being dragged", () => {
+    // Nothing to stop short of: the tip is the pointer.
+    const shape = cableShape(
+      { x: 0, y: 0 },
+      { x: 300, y: 100 },
+      "left",
+      "right",
+      0,
+    );
+    expect(shape.head[0]).toEqual({ x: 300, y: 100 });
   });
 });
