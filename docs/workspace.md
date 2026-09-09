@@ -58,10 +58,31 @@ set behaves as it always did — and the Settings panel's Defaults and Calculate
 shipped and what is actually in force.
 
 Some of what is here is about the window rather than about the sound. `layout.widgets` says which
-panel is in which dock slot, `layout.statusBars` and `layout.controlBars` do the same for the strip
-along the bottom and the controls over the canvas, and `theme` overrides individual colours as flat
-dot-paths (`grid.*` and `signal.*` for the canvas, `ui.*` for everything else). Those are settings
-because they are how you work, and a workspace you copy to another machine should arrive with them.
+panel is in which dock slot, and `layout.statusBars` and `layout.controlBars` do the same for the
+strip along the bottom and the controls over the canvas.
+
+Three settings cover colour. `ui.theme` is the theme the window opens in — choosing one from the
+picker writes it here. `theme` overrides individual colours on whichever theme is active, as flat
+dot-paths: `ui.*` for the interface, `grid.*` and `signal.*` for the canvas. And `themes` defines
+whole themes, each saying only what differs from the one it extends:
+
+```json
+"themes": {
+  "midnight": {
+    "name": "Midnight",
+    "extends": "dark",
+    "colors": { "background": "oklch(0.1 0.02 260)" },
+    "grid": { "signal": { "audio": "#ff5c5c" } }
+  }
+}
+```
+
+Those appear in the theme picker beside the ones that shipped, and an id matching a built-in replaces
+it. Canvas colours must be `#rrggbb` — the grid parses nothing else — and one that is not is dropped
+rather than drawn black.
+
+All of it is settings because it is how you work, and a workspace you copy to another machine should
+arrive with it.
 
 Two things do **not** live here, because they belong to the display rather than to the folder: the
 dock's *geometry* — column widths and split ratios — and the pointer to the workspace you were last

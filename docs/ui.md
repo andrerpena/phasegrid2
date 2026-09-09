@@ -9,18 +9,27 @@ difference is noted and the reason given.
 
 ## Colour
 
-Colours exist twice.
+The palette lives once, in `theming/themes/*.ts`, and reaches the page as data.
 
-`src/renderer/src/css/theme.css` declares them as custom properties and maps each into Tailwind's
-`@theme` block, which is what makes `bg-background`, `text-muted-foreground`, `border-border` and
-`text-signal-audio` exist as classes. `src/renderer/src/theming/themes/*.ts` holds the same values
-again, because the Pixi canvas cannot read a stylesheet and the grid renderer needs them as data.
+`css/theme.css` says only what each colour is *called*: an `@theme` block mapping
+`--color-background: var(--background)` and so on, which is what makes `bg-background`,
+`text-muted-foreground`, `border-border` and `text-signal-audio` exist as classes. It holds no
+values. Tailwind resolves `var(--background)` per element at runtime, so a name declared there with
+nothing behind it yet is fine.
 
-Two lists of the same thing drift, so `theming/theme-parity.test.ts` reads the stylesheet and fails
-if a theme's block and its object disagree about a key, a value, or a missing `@theme` mapping.
-Change one and the test names the other. All three failure modes were checked by introducing them.
+The values are generated. `theming/theme-variables.ts` turns each theme into a
+`[data-theme="id"] { … }` rule and injects them all as one `<style>` element at startup — and again
+whenever the set of themes changes, which is how a workspace can define one. This is Nubase's
+arrangement, and it is why the theme can be typed, stored in JSON and overridden per workspace.
 
-Naming is mechanical, and the test depends on it:
+Two values are still written twice: `--background` and `--foreground`, in a bare `:root` block. They
+are the only colours that show in the one frame between the browser applying the stylesheet and the
+script running. Everything else deliberately has no fallback, so a colour missing from the generated
+sheet is visibly missing rather than quietly some other theme's. `theme-parity.test.ts` checks those
+two against the default theme, and checks that every colour has a `@theme` mapping — a class Tailwind
+never heard of produces no rule, which looks exactly like a class that produces the wrong one.
+
+Naming is mechanical, and the generator and the test share the rule:
 
 | In TypeScript | As a custom property | As a class |
 | --- | --- | --- |
@@ -30,21 +39,66 @@ Naming is mechanical, and the test depends on it:
 
 Interface colours may be any CSS colour; the `oklch` ones came from OSMC. **Grid colours must be
 `#rrggbb`** — `hexToNumber` in `lib/color.ts` is what turns a colour into the integer Pixi wants and
-it parses nothing else, so an `oklch` grid colour renders as black.
+it parses nothing else, so an `oklch` grid colour would render as black. A workspace theme or an
+override that puts one there is dropped rather than drawn.
 
-Adding a colour is four edits: the `UIColors` or `GridColors` interface, all three theme objects, the
-`@theme` mapping, and all three `[data-theme]` blocks. The test checks the last two against the
-first.
+Adding a colour is two edits: the `UIColors` or `GridColors` interface (the compiler then demands the
+theme objects), and one line in the `@theme` block.
 
-`applyTheme` only writes `data-theme` and `color-scheme`; the stylesheet owns the values. The store
-that holds the active theme touches nothing — `watchTheme` puts it on the document, the way
+`applyTheme` only writes `data-theme` and `color-scheme`; everything else follows from the cascade.
+The store that holds the active theme touches nothing — `watchTheme` puts it on the document, the way
 `watchEngine` connects a store to the world elsewhere — which is what lets a theme be switched in a
 test with no DOM.
 
-**`grid-theme-store`** is what the canvas actually reads: the active theme's grid colours with the
-settings file's `grid.*` and `signal.*` overrides on top, recomputed when either changes. That is
-why a colour typed into `workspace.json` repaints the canvas without a reload. It ignores anything it
-cannot draw.
+### What a workspace can change
+
+Two settings, resolved together in `theming/workspace-themes.ts` into the one list the store holds —
+so a colour written in `workspace.json` reaches the panels and the canvas by the same route.
+
+`ui.theme` is the theme the window opens in, and choosing one in the picker writes it. Only choosing:
+the picker previews as you arrow through it, and writing on every preview would put a dozen entries
+through the save path for one decision.
+
+`theme` overrides individual colours on whichever theme is active, as flat dot-paths — `ui.background`,
+`grid.gridLine`, `signal.audio`. Applied to every theme rather than only the active one:
+observationally the same, since one is active at a time, and it means the generated stylesheet is
+correct without knowing which.
+
+`themes` defines whole themes, keyed by id, each saying only what differs from the theme it
+`extends`:
+
+```json
+"themes": {
+  "midnight": {
+    "name": "Midnight",
+    "extends": "dark",
+    "colors": { "background": "oklch(0.1 0.02 260)" },
+    "grid": { "gridLine": "#1a1f2e", "signal": { "audio": "#ff5c5c" } }
+  }
+}
+```
+
+They appear in the picker beside the built-ins. An id matching a built-in replaces it, because "dark,
+but a bit different" is the obvious thing to want and the alternative is making people invent a
+second name for it. A theme that does not validate is left out and the rest are kept: one malformed
+entry should cost that entry, not every theme in the file.
+
+There is no separate store for the canvas's colours. Overrides are resolved into the theme objects
+before anything reads them, so the canvas reads the active theme and that is all.
+
+### Colours for things that cannot read CSS
+
+`lib/css-color.ts` resolves any CSS colour — or a `var(--name)` reference — to hex, by setting it as a
+`background-color`, reading the computed value, and painting it onto a 1×1 canvas when that value is a
+syntax no regex should parse. The canvas does the colour-space conversion.
+
+This is not a theoretical fallback: Chromium serialises `oklch` verbatim, so the computed value of
+`--background` is not something `rgbToHex` can read, and the canvas step is what actually produces the
+colour. The e2e check does both steps for that reason.
+
+It exists for the places handed a *resolved* colour with nowhere else to get one — currently the
+settings editor's Monaco theme. **Not** for the canvas's palette, which stays in the theme objects
+and is read directly, keeping that path pure and testable.
 
 ## The dock
 
@@ -129,6 +183,15 @@ someone edit freely rather than in one keystroke that has to be right.
 The panel is three tabs: Overrides is what you wrote, Defaults is what shipped, Calculated is what
 the application is running on. Three rather than one because "why is this value what it is" is the
 question a settings file eventually raises, and the answer is the difference between two of them.
+
+**The editor is in the application's colours.** `components/monaco-theme.ts` derives Monaco's whole
+palette from custom properties — ground, gutter, selection, the suggest and hover widgets, the
+scrollbar, and four syntax slots mapped onto the signal-role colours the canvas already draws, so a
+JSON key is the colour a phase cable is. It re-derives on `data-theme` via a `MutationObserver`
+rather than a store subscription, because it reads the *resolved* value of a property: it has to run
+after the attribute is on the document and the new values have cascaded, not when the store changed.
+`isDark` picks the base theme from the background's luminance rather than the theme's declared
+`type`, since a workspace theme can say `dark` over a pale ground.
 
 **Monaco is imported narrowly and loaded late.** `import * as monaco from "monaco-editor"` registers
 every language it ships — abap, solidity, freemarker — which was a 7.7 MB chunk and ninety tokenizer
@@ -236,3 +299,9 @@ here. Its modal was replaced rather than copied: phasegrid stays on the platform
 gives a real focus trap and the top layer for free instead of a headless UI dependency. Its command
 palette filter was replaced by phasegrid's subsequence ranking, which puts "Add Module" first when
 you type `adm` where a substring filter finds nothing.
+
+Its theme arrangement was replaced too, by the one in **Nubase** (`/Users/andrepena/gitp/nubase`),
+which is where this structure originally came from: OSMC writes the palette out twice, once as CSS
+and once as TypeScript, and the two drift. Nubase keeps the values in TypeScript and generates the
+CSS, which is what the Colour section above describes. Nubase's `runtime-theme-generator.ts`,
+`monaco-theme.ts` and type scale are all taken from there.

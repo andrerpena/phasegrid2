@@ -33,7 +33,7 @@ OSMC's Tailwind-based components carried with them, which did not come across an
 | Question | Decision | Reason |
 | --- | --- | --- |
 | Styling | Tailwind v4; all CSS Modules removed | The components being copied are written in it, and porting each one's styling was the step that kept being paid for and never finished |
-| Theme source of truth | Duplicated: `css/theme.css` and `theming/themes/*.ts`, with a parity test | CSS needs the values for Tailwind's `@theme`; the Pixi canvas cannot read a stylesheet. The test is the mitigation for the drift the original spec avoided by having one copy |
+| Theme source of truth | ~~Duplicated: `css/theme.css` and `theming/themes/*.ts`, with a parity test~~ **Superseded 2026-09-09 — see below.** | ~~CSS needs the values for Tailwind's `@theme`~~ Only the *names* are needed; see the amendment note at the end |
 | Dock persistence | Split: geometry in `userData`, widget→slot in `workspace.json` | Column widths are about the display; which panel is where is about how you work, and a workspace should carry it |
 | Minimap coordinates | Buffer sized from the patch's own extent | OSMC's world is a bounded grid; a patch is an unbounded plane, so the buffer is a window and drawers are given an origin offset |
 | Centre slot | One pinned `grid` widget hosting the project tabs | The dock's tabs and the document's tabs answer different questions; collapsing them would make closing a project and closing a panel the same gesture |
@@ -76,8 +76,8 @@ registry shape, and the minimap's static/dynamic layering.
 - `docs/design-system.md`, as described in the original spec, does not apply: the tokens are
   Tailwind's plus `css/theme.css`. `docs/ui.md` replaces it.
 - `scripts/check-no-tailwind.mjs` is not written and would now be wrong.
-- Adding a colour costs four edits and is guarded by `theming/theme-parity.test.ts`. That is the
-  price of the duplication and it was accepted with the trade understood.
+- ~~Adding a colour costs four edits and is guarded by `theming/theme-parity.test.ts`.~~ Two edits;
+  see the amendment note below.
 - `layout.widgets`, `layout.statusBars`, `layout.controlBars` and `theme` are new settings keys, so
   a `workspace.json` written before this change still loads — they are all optional.
 
@@ -89,3 +89,43 @@ slot rendering its panels as tabs, closing a panel and adding it back from the s
 grid having no close button, the settings editor mounting under `script-src 'self'` and being typed
 into, the theme picker previewing and reverting, the minimap sizing itself to the patch and painting
 it, and a two-finger scroll panning where a wheel click zooms.
+
+
+---
+
+## Amendment, 2026-09-09: the palette is not duplicated after all
+
+The decision above accepted writing the palette twice, on the grounds that Tailwind's `@theme` block
+needs the values at build time. **That premise was wrong.** `@theme` needs only the *names*:
+`--color-background: var(--background)` is resolved per element at runtime, so a name declared with
+nothing behind it is fine.
+
+This became clear on being shown **Nubase** (`/Users/andrepena/gitp/nubase`), which is where this
+theme structure came from before OSMC. Nubase keeps the values in TypeScript and generates the
+`[data-theme]` blocks into a `<style>` element at startup (`theming/runtime-theme-generator.ts`).
+OSMC has the values twice; Nubase does not.
+
+phasegrid now follows Nubase. `css/theme.css` carries the `@theme` mapping and two ground colours for
+the frame before the script runs — 69 lines where it was 201. The parity test changed from "the two
+copies agree", which can only be checked, to "Tailwind was told about every colour", which cannot be
+satisfied by accident.
+
+Three things fell out of the palette being data, two of them bugs the duplication had been hiding:
+
+- **`ui.theme` did nothing.** It was in `defaults.ts`, validated, completed by the settings editor and
+  documented, and nothing read it.
+- **`theme`'s `ui.*` paths did nothing.** Offered by autocomplete; no code could write an interface
+  colour into CSS. They reached the canvas only because `grid-theme-store` re-implemented the merge
+  for `grid.*` and `signal.*` alone. That store is now gone — overrides resolve into the theme objects
+  before anything reads them.
+- **A workspace can define whole themes**, under a `themes` setting, each extending another. This is
+  the capability the static stylesheet foreclosed.
+
+Also taken from Nubase in the same pass: `monaco-theme.ts`, so the settings editor takes the
+application's palette instead of `vs-dark`; the canvas-based colour resolution in `lib/css-color.ts`
+that makes it possible; and its type scale and scrollbar styling.
+
+What was *not* taken: Nubase's `themeIds` config, which selects the available themes — marginal for
+three built-ins, and `themes` covers the interesting half. The canvas palette is also deliberately
+left out of CSS resolution: grid colours stay `#rrggbb` in the theme objects and are read directly,
+which keeps that path pure and testable.
