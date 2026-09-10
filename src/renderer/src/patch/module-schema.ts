@@ -47,6 +47,7 @@ const UNIT_SUFFIX: Record<ParamDesc["unit"], string> = {
   semitones: "st",
   percent: "%",
   ratio: "×",
+  milliseconds: "ms",
 };
 
 /** Parameters worth showing, in the order the engine declared them. */

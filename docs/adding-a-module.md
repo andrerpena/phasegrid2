@@ -111,6 +111,23 @@ reuse `pg::vendor::deriveTriggers` (`engine/src/vital/Triggers.hpp`) rather than
 fields by hand. Reach for this only when the spec genuinely does not fit -- it is more code, and the
 adapter's checklist below exists because each of its items was a bug.
 
+## Owning vendored primitives
+
+One step further, and the last resort: a module that keeps the vendored library's `poly_float`,
+`OnePoleFilter`, `StereoMemory`, `futils` and `utils` but writes its own topology out of them.
+`fx.reverb` (`engine/src/modules/FxReverb.cpp`) is the case, and the test for reaching this far is
+whether the TOPOLOGY is what is wrong: the vendored reverb put its diffusers inside its feedback loop
+and did not scale them with its size control, which made its reverb time wrong by up to four times, and
+no amount of reparameterising reaches that (docs/adrs/0009). `engine/vendor/vital` is not ours to edit
+-- `NOTICE.md` lists the only files we have touched, all of them missing includes, and a re-vendor
+overwrites them -- so a fault in the vendored arrangement of vendored parts is fixed by rearranging
+them here.
+
+Everything the ordinary rules say still applies, and two of them bite harder: `process` allocates
+nothing, so every delay line is sized in `prepare` for the longest setting the knobs allow and
+`reset(voicePair)` zeroes them in place; and a param declares the unit and taper it really has, since
+there is no vendored table to inherit a wrong one from.
+
 ## Wrapping a vendored module
 
 A module built on the vendored DSP (`engine/vendor/vital`) has no class of its own. It is one `ModuleSpec` value in a

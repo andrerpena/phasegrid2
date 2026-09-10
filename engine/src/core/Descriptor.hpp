@@ -12,7 +12,10 @@ enum class PortKind : uint8_t { Continuous = 0, Event = 1 };
 /// bare triggers stays `Gate`, so the two read differently in the editor. Append new roles at the end:
 /// the value crosses the descriptor ABI.
 enum class SignalRole : uint8_t { Any = 0, Audio, Cv, Gate, Pitch, Phase, Note };
-enum class ParamUnit : uint8_t { None = 0, Hz, Seconds, Db, Semitones, Percent, Ratio };
+/// Append new units at the end: the value crosses the descriptor ABI. `Milliseconds` is its own
+/// unit rather than a small `Seconds` range because a pre-delay of four milliseconds reads as
+/// "4.00 ms" on every instrument that has one, and "0.004 s" on none of them.
+enum class ParamUnit : uint8_t { None = 0, Hz, Seconds, Db, Semitones, Percent, Ratio, Milliseconds };
 /**
  * How a knob's turn maps onto the value: the taper.
  *

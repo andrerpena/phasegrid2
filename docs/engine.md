@@ -185,9 +185,9 @@ Built-ins are registered in `engine/src/modules/builtin.cpp`, one line each. Own
 
 - own: `io.audioOut`, `note.toCv`, `note.toPoly`, `notes.clip`, `notes.pattern`, `phase.clock`, `math.scaleOffset`,
   `mix.mixer`, `amp.vca`, `osc.sawtooth`, `osc.pulse`, `osc.sine`, `mod.lfo`, `display.meter`, `display.scope`,
-  `display.value`, `display.piano`, `voices.sum`, `env.adsr`, and the four note effects `notefx.chord`, `notefx.quantize`, `notefx.arp`, `notefx.humanize`
+  `display.value`, `display.piano`, `voices.sum`, `env.adsr`, `fx.reverb`, and the four note effects `notefx.chord`, `notefx.quantize`, `notefx.arp`, `notefx.humanize`
 - vendored-backed: `osc.wavetable`, `sampler.player`, `filter.multi`, `mod.random`, and the
-  eight audio effects `fx.reverb`, `fx.delay`, `fx.chorus`, `fx.flanger`, `fx.phaser`, `fx.distortion`,
+  seven audio effects `fx.delay`, `fx.chorus`, `fx.flanger`, `fx.phaser`, `fx.distortion`,
   `fx.compressor`, `fx.eq`.
 
 A descriptor's `category` is the heading a catalogue shows the module under, written as a person reads it --

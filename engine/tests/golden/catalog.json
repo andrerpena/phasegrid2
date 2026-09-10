@@ -1,5 +1,5 @@
 {
-  "catalogHash": "fbdb9ac0040d0f7e",
+  "catalogHash": "a97c2777db3ccc74",
   "conventions": {
     "blockSize": 128,
     "gateThreshold": 0,
@@ -3612,26 +3612,103 @@
     },
     {
       "category": "Audio FX",
-      "doc": "Reverb with pre-filtering, low/high shelving and a chorused tail. Decay Time is a power of two in seconds; the cutoffs are MIDI note numbers.",
-      "face": null,
+      "doc": "An algorithmic reverb: early reflections whose Mode and Size say what room this is, a tail whose Reverb Time is split into three bands so the low end can ring on after the top has gone, a Late Mix between the two, and Width and Mix on the way out. It is a global effect: put it after voices.sum so it runs once on the whole chord rather than once per voice.",
+      "face": [
+        [
+          "in",
+          "select:mode",
+          "size",
+          "size",
+          "predelay",
+          "predelay",
+          "diffusion",
+          "diffusion",
+          "buildup",
+          "buildup",
+          "time",
+          "time",
+          "time",
+          "time",
+          "meter",
+          "meter",
+          "out"
+        ],
+        [
+          ".",
+          "select:mode",
+          "size",
+          "size",
+          "predelay",
+          "predelay",
+          "diffusion",
+          "diffusion",
+          "buildup",
+          "buildup",
+          "time",
+          "time",
+          "time",
+          "time",
+          "meter",
+          "meter",
+          "."
+        ],
+        [
+          ".",
+          ".",
+          "low_freq",
+          "low_freq",
+          "low_factor",
+          "low_factor",
+          "high_freq",
+          "high_freq",
+          "high_factor",
+          "high_factor",
+          "late_mix",
+          "late_mix",
+          "width",
+          "width",
+          "mix",
+          "mix",
+          "."
+        ],
+        [
+          ".",
+          ".",
+          "low_freq",
+          "low_freq",
+          "low_factor",
+          "low_factor",
+          "high_freq",
+          "high_freq",
+          "high_factor",
+          "high_factor",
+          "late_mix",
+          "late_mix",
+          "width",
+          "width",
+          "mix",
+          "mix",
+          "."
+        ]
+      ],
       "flags": {
         "needsTransport": false,
         "previewsEnvelope": false,
         "previewsWave": false,
         "publishesKeys": false,
-        "publishesMeter": false,
+        "publishesMeter": true,
         "publishesNotes": false,
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
         "voiceEntry": false,
         "voiceExit": false,
-        "writesTelemetry": false
+        "writesTelemetry": true
       },
       "id": "fx.reverb",
       "inputs": [
         {
-          "doc": "Audio input",
+          "doc": "Audio to be reverberated. Stereo: the left and right lanes stay apart the whole way through",
           "id": "in",
           "implicit": false,
           "kind": "continuous",
@@ -3639,118 +3716,136 @@
           "role": "audio"
         },
         {
-          "doc": "Reverb Chorus Amount",
-          "id": "param:chorus_amount",
-          "implicit": true,
-          "kind": "continuous",
-          "name": "Reverb Chorus Amount",
-          "param": "chorus_amount",
-          "role": "cv"
-        },
-        {
-          "doc": "Reverb Chorus Frequency",
-          "id": "param:chorus_frequency",
-          "implicit": true,
-          "kind": "continuous",
-          "name": "Reverb Chorus Frequency",
-          "param": "chorus_frequency",
-          "role": "cv"
-        },
-        {
-          "doc": "Reverb Decay Time",
-          "id": "param:decay_time",
-          "implicit": true,
-          "kind": "continuous",
-          "name": "Reverb Decay Time",
-          "param": "decay_time",
-          "role": "cv"
-        },
-        {
-          "doc": "Reverb Delay",
-          "id": "param:delay",
-          "implicit": true,
-          "kind": "continuous",
-          "name": "Reverb Delay",
-          "param": "delay",
-          "role": "cv"
-        },
-        {
-          "doc": "Reverb Mix",
-          "id": "param:dry_wet",
-          "implicit": true,
-          "kind": "continuous",
-          "name": "Reverb Mix",
-          "param": "dry_wet",
-          "role": "cv"
-        },
-        {
-          "doc": "Reverb High Cutoff",
-          "id": "param:high_shelf_cutoff",
-          "implicit": true,
-          "kind": "continuous",
-          "name": "Reverb High Cutoff",
-          "param": "high_shelf_cutoff",
-          "role": "cv"
-        },
-        {
-          "doc": "Reverb High Gain",
-          "id": "param:high_shelf_gain",
-          "implicit": true,
-          "kind": "continuous",
-          "name": "Reverb High Gain",
-          "param": "high_shelf_gain",
-          "role": "cv"
-        },
-        {
-          "doc": "Reverb Low Cutoff",
-          "id": "param:low_shelf_cutoff",
-          "implicit": true,
-          "kind": "continuous",
-          "name": "Reverb Low Cutoff",
-          "param": "low_shelf_cutoff",
-          "role": "cv"
-        },
-        {
-          "doc": "Reverb Low Gain",
-          "id": "param:low_shelf_gain",
-          "implicit": true,
-          "kind": "continuous",
-          "name": "Reverb Low Gain",
-          "param": "low_shelf_gain",
-          "role": "cv"
-        },
-        {
-          "doc": "Reverb Pre High Cutoff",
-          "id": "param:pre_high_cutoff",
-          "implicit": true,
-          "kind": "continuous",
-          "name": "Reverb Pre High Cutoff",
-          "param": "pre_high_cutoff",
-          "role": "cv"
-        },
-        {
-          "doc": "Reverb Pre Low Cutoff",
-          "id": "param:pre_low_cutoff",
-          "implicit": true,
-          "kind": "continuous",
-          "name": "Reverb Pre Low Cutoff",
-          "param": "pre_low_cutoff",
-          "role": "cv"
-        },
-        {
-          "doc": "Reverb Size",
+          "doc": "How big that space is, as a proportion of its usual size. It moves the early reflections; the tail's length is Reverb Time and its density is Buildup",
           "id": "param:size",
           "implicit": true,
           "kind": "continuous",
-          "name": "Reverb Size",
+          "name": "Size",
           "param": "size",
+          "role": "cv"
+        },
+        {
+          "doc": "Silence between the dry sound and the first reflection, in milliseconds",
+          "id": "param:predelay",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Pre-delay",
+          "param": "predelay",
+          "role": "cv"
+        },
+        {
+          "doc": "How smoothly the early reflections are spread. At zero they are discrete taps; turned up they smear into one another",
+          "id": "param:diffusion",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Diffusion",
+          "param": "diffusion",
+          "role": "cv"
+        },
+        {
+          "doc": "How smoothly the tail's reflections are spread, by diffusing what goes into the tank",
+          "id": "param:buildup",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Buildup",
+          "param": "buildup",
+          "role": "cv"
+        },
+        {
+          "doc": "How long the tail takes to fall by 60 dB. The wet level does not change with it",
+          "id": "param:time",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Reverb Time",
+          "param": "time",
+          "role": "cv"
+        },
+        {
+          "doc": "Where the low band ends",
+          "id": "param:low_freq",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Low Band Split",
+          "param": "low_freq",
+          "role": "cv"
+        },
+        {
+          "doc": "The low band's reverb time, relative to Reverb Time. Above 1 the low end rings on after the rest",
+          "id": "param:low_factor",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Low Band Factor",
+          "param": "low_factor",
+          "role": "cv"
+        },
+        {
+          "doc": "Where the high band begins",
+          "id": "param:high_freq",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "High Band Split",
+          "param": "high_freq",
+          "role": "cv"
+        },
+        {
+          "doc": "The high band's reverb time, relative to Reverb Time. Below 1 the top decays away first, which is what the air in a real room does",
+          "id": "param:high_factor",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "High Band Factor",
+          "param": "high_factor",
+          "role": "cv"
+        },
+        {
+          "doc": "Blends the early reflections (0%) with the tail (100%). It is a crossfade inside the wet signal; Mix still decides how much of that is heard",
+          "id": "param:late_mix",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Late Mix",
+          "param": "late_mix",
+          "role": "cv"
+        },
+        {
+          "doc": "Stereo width of the wet signal. 0% is mono, 100% is as the network made it",
+          "id": "param:width",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Width",
+          "param": "width",
+          "role": "cv"
+        },
+        {
+          "doc": "How much of the output is the reverb rather than the signal that came in",
+          "id": "param:mix",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Mix",
+          "param": "mix",
+          "role": "cv"
+        },
+        {
+          "doc": "How far the tank's delays drift. A little of it keeps a long tail from ringing metallically. The reference instrument has no such control; this is the one place this module goes past its panel",
+          "id": "param:mod_amount",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Modulation",
+          "param": "mod_amount",
+          "role": "cv"
+        },
+        {
+          "doc": "How fast that drift moves",
+          "id": "param:mod_rate",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Modulation Rate",
+          "param": "mod_rate",
           "role": "cv"
         }
       ],
       "name": "Reverb",
       "outputs": [
         {
-          "doc": "Dry/wet reverb output",
+          "doc": "The dry signal blended with the wet one by Mix",
           "id": "out",
           "implicit": false,
           "kind": "continuous",
@@ -3761,48 +3856,159 @@
       "params": [
         {
           "curve": "linear",
-          "default": 0.22360700368881226,
-          "doc": "Reverb Chorus Amount",
+          "default": 0.0,
+          "doc": "The kind of space the early reflections describe: a Room's arrive early and close together, a Hall's later and further apart",
+          "enumLabels": [
+            "Room",
+            "Hall"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "primary": true,
+            "structural": false
+          },
+          "group": "Early",
+          "id": "mode",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Mode",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 100.0,
+          "doc": "How big that space is, as a proportion of its usual size. It moves the early reflections; the tail's length is Reverb Time and its density is Buildup",
           "flags": {
             "enum": false,
             "hidden": false,
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
-            "primary": false,
+            "primary": true,
             "structural": false
           },
-          "id": "chorus_amount",
-          "max": 1.0,
+          "group": "Early",
+          "id": "size",
+          "max": 200.0,
           "min": 0.0,
-          "name": "Reverb Chorus Amount",
-          "uiWidget": "slider",
+          "name": "Size",
+          "uiWidget": "knob",
+          "unit": "percent"
+        },
+        {
+          "curve": "quartic",
+          "default": 4.0,
+          "doc": "Silence between the dry sound and the first reflection, in milliseconds",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "group": "Early",
+          "id": "predelay",
+          "max": 100.0,
+          "min": 0.0,
+          "name": "Pre-delay",
+          "uiWidget": "knob",
+          "unit": "milliseconds"
+        },
+        {
+          "curve": "linear",
+          "default": 70.0,
+          "doc": "How smoothly the early reflections are spread. At zero they are discrete taps; turned up they smear into one another",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "group": "Early",
+          "id": "diffusion",
+          "max": 100.0,
+          "min": 0.0,
+          "name": "Diffusion",
+          "uiWidget": "knob",
           "unit": "percent"
         },
         {
           "curve": "linear",
-          "default": -2.0,
-          "doc": "Reverb Chorus Frequency",
+          "default": 70.0,
+          "doc": "How smoothly the tail's reflections are spread, by diffusing what goes into the tank",
           "flags": {
             "enum": false,
             "hidden": false,
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
-            "primary": false,
+            "primary": true,
             "structural": false
           },
-          "id": "chorus_frequency",
-          "max": 3.0,
-          "min": -8.0,
-          "name": "Reverb Chorus Frequency",
-          "uiWidget": "slider",
+          "group": "Late",
+          "id": "buildup",
+          "max": 100.0,
+          "min": 0.0,
+          "name": "Buildup",
+          "uiWidget": "knob",
+          "unit": "percent"
+        },
+        {
+          "curve": "log",
+          "default": 1.2599999904632568,
+          "doc": "How long the tail takes to fall by 60 dB. The wet level does not change with it",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "group": "Late",
+          "id": "time",
+          "max": 31.600000381469727,
+          "min": 0.3160000145435333,
+          "name": "Reverb Time",
+          "uiWidget": "knob",
+          "unit": "seconds"
+        },
+        {
+          "curve": "log",
+          "default": 298.0,
+          "doc": "Where the low band ends",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "group": "Late",
+          "id": "low_freq",
+          "max": 1480.0,
+          "min": 65.4000015258789,
+          "name": "Low Band Split",
+          "uiWidget": "knob",
           "unit": "hz"
         },
         {
-          "curve": "linear",
-          "default": 0.0,
-          "doc": "Reverb Decay Time",
+          "curve": "log",
+          "default": 1.0,
+          "doc": "The low band's reverb time, relative to Reverb Time. Above 1 the low end rings on after the rest",
           "flags": {
             "enum": false,
             "hidden": false,
@@ -3812,17 +4018,60 @@
             "primary": true,
             "structural": false
           },
-          "id": "decay_time",
-          "max": 6.0,
-          "min": -6.0,
-          "name": "Reverb Decay Time",
-          "uiWidget": "slider",
-          "unit": "seconds"
+          "group": "Late",
+          "id": "low_factor",
+          "max": 1.7799999713897705,
+          "min": 0.5619999766349792,
+          "name": "Low Band Factor",
+          "uiWidget": "knob",
+          "unit": "ratio"
+        },
+        {
+          "curve": "log",
+          "default": 4000.0,
+          "doc": "Where the high band begins",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "group": "Late",
+          "id": "high_freq",
+          "max": 11200.0,
+          "min": 831.0,
+          "name": "High Band Split",
+          "uiWidget": "knob",
+          "unit": "hz"
+        },
+        {
+          "curve": "log",
+          "default": 1.0,
+          "doc": "The high band's reverb time, relative to Reverb Time. Below 1 the top decays away first, which is what the air in a real room does",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "group": "Late",
+          "id": "high_factor",
+          "max": 1.7799999713897705,
+          "min": 0.5619999766349792,
+          "name": "High Band Factor",
+          "uiWidget": "knob",
+          "unit": "ratio"
         },
         {
           "curve": "linear",
-          "default": 0.0,
-          "doc": "Reverb Delay",
+          "default": 75.0,
+          "doc": "Blends the early reflections (0%) with the tail (100%). It is a crossfade inside the wet signal; Mix still decides how much of that is heard",
           "flags": {
             "enum": false,
             "hidden": false,
@@ -3832,37 +4081,81 @@
             "primary": true,
             "structural": false
           },
-          "id": "delay",
-          "max": 0.30000001192092896,
+          "group": "Late",
+          "id": "late_mix",
+          "max": 100.0,
           "min": 0.0,
-          "name": "Reverb Delay",
-          "uiWidget": "slider",
-          "unit": "seconds"
+          "name": "Late Mix",
+          "uiWidget": "knob",
+          "unit": "percent"
         },
         {
           "curve": "linear",
+          "default": 100.0,
+          "doc": "Stereo width of the wet signal. 0% is mono, 100% is as the network made it",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "group": "Output",
+          "id": "width",
+          "max": 150.0,
+          "min": 0.0,
+          "name": "Width",
+          "uiWidget": "knob",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 50.0,
+          "doc": "How much of the output is the reverb rather than the signal that came in",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "group": "Output",
+          "id": "mix",
+          "max": 100.0,
+          "min": 0.0,
+          "name": "Mix",
+          "uiWidget": "knob",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 20.0,
+          "doc": "How far the tank's delays drift. A little of it keeps a long tail from ringing metallically. The reference instrument has no such control; this is the one place this module goes past its panel",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "group": "Modulation",
+          "id": "mod_amount",
+          "max": 100.0,
+          "min": 0.0,
+          "name": "Modulation",
+          "uiWidget": "knob",
+          "unit": "percent"
+        },
+        {
+          "curve": "log",
           "default": 0.25,
-          "doc": "Reverb Mix",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": true,
-            "structural": false
-          },
-          "id": "dry_wet",
-          "max": 1.0,
-          "min": 0.0,
-          "name": "Reverb Mix",
-          "uiWidget": "slider",
-          "unit": "percent"
-        },
-        {
-          "curve": "linear",
-          "default": 90.0,
-          "doc": "Reverb High Cutoff",
+          "doc": "How fast that drift moves",
           "flags": {
             "enum": false,
             "hidden": false,
@@ -3872,132 +4165,13 @@
             "primary": false,
             "structural": false
           },
-          "id": "high_shelf_cutoff",
-          "max": 128.0,
-          "min": 0.0,
-          "name": "Reverb High Cutoff",
-          "uiWidget": "slider",
-          "unit": "semitones"
-        },
-        {
-          "curve": "linear",
-          "default": -1.0,
-          "doc": "Reverb High Gain",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": false,
-            "structural": false
-          },
-          "id": "high_shelf_gain",
-          "max": 0.0,
-          "min": -6.0,
-          "name": "Reverb High Gain",
-          "uiWidget": "slider",
-          "unit": "db"
-        },
-        {
-          "curve": "linear",
-          "default": 0.0,
-          "doc": "Reverb Low Cutoff",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": false,
-            "structural": false
-          },
-          "id": "low_shelf_cutoff",
-          "max": 128.0,
-          "min": 0.0,
-          "name": "Reverb Low Cutoff",
-          "uiWidget": "slider",
-          "unit": "semitones"
-        },
-        {
-          "curve": "linear",
-          "default": 0.0,
-          "doc": "Reverb Low Gain",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": false,
-            "structural": false
-          },
-          "id": "low_shelf_gain",
-          "max": 0.0,
-          "min": -6.0,
-          "name": "Reverb Low Gain",
-          "uiWidget": "slider",
-          "unit": "db"
-        },
-        {
-          "curve": "linear",
-          "default": 110.0,
-          "doc": "Reverb Pre High Cutoff",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": false,
-            "structural": false
-          },
-          "id": "pre_high_cutoff",
-          "max": 128.0,
-          "min": 0.0,
-          "name": "Reverb Pre High Cutoff",
-          "uiWidget": "slider",
-          "unit": "semitones"
-        },
-        {
-          "curve": "linear",
-          "default": 0.0,
-          "doc": "Reverb Pre Low Cutoff",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": false,
-            "structural": false
-          },
-          "id": "pre_low_cutoff",
-          "max": 128.0,
-          "min": 0.0,
-          "name": "Reverb Pre Low Cutoff",
-          "uiWidget": "slider",
-          "unit": "semitones"
-        },
-        {
-          "curve": "linear",
-          "default": 0.5,
-          "doc": "Reverb Size",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": true,
-            "structural": false
-          },
-          "id": "size",
-          "max": 1.0,
-          "min": 0.0,
-          "name": "Reverb Size",
-          "uiWidget": "slider",
-          "unit": "percent"
+          "group": "Modulation",
+          "id": "mod_rate",
+          "max": 8.0,
+          "min": 0.009999999776482582,
+          "name": "Modulation Rate",
+          "uiWidget": "knob",
+          "unit": "hz"
         }
       ],
       "texts": []

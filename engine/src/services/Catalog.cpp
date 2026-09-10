@@ -32,6 +32,7 @@ const char* unitName(ParamUnit u) {
     case ParamUnit::Semitones: return "semitones";
     case ParamUnit::Percent:   return "percent";
     case ParamUnit::Ratio:     return "ratio";
+    case ParamUnit::Milliseconds: return "milliseconds";
   }
   return "none";
 }

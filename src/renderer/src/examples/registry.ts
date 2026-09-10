@@ -411,8 +411,9 @@ const EFFECTS: [string, string, string, Record<string, number>][] = [
   [
     "fx.reverb",
     "Reverb",
-    "Reverb on a bare tone. Turn Dry/Wet, then Decay Time and Size.",
-    { dry_wet: 0.6 },
+    "Reverb on a bare tone. Turn Mix for how much of it you hear, Reverb Time for how long the " +
+      "tail lasts, and Late Mix to move between the early reflections and that tail.",
+    { mix: 60 },
   ],
   [
     "fx.delay",
@@ -915,7 +916,7 @@ register({
         type: "fx.reverb",
         x: col(44),
         y: col(2),
-        params: { dry_wet: 0.4 },
+        params: { mix: 40 },
       },
     );
     const direct = edges.findIndex(
@@ -925,7 +926,11 @@ register({
     edges.push(
       edge("e7", ["env", "signal"], ["sum", "in"]),
       edge("e8", ["sum", "out"], ["verb", "in"]),
+      // Both channels: the reverb's output is a stereo signal in one cable, and io.audioOut reads
+      // the left lanes of inL and the right lanes of inR. Patched to inL alone it would mirror the
+      // left channel and the reverb's whole stereo image would be thrown away.
       edge("e9", ["verb", "out"], ["out", "inL"]),
+      edge("e10", ["verb", "out"], ["out", "inR"]),
     );
   }
 }

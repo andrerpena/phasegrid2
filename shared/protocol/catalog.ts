@@ -38,6 +38,7 @@ export const ParamUnitSchema = z.enum([
   "semitones",
   "percent",
   "ratio",
+  "milliseconds",
 ]);
 
 /**

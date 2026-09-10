@@ -5,56 +5,18 @@
 #include <memory>
 #include <string>
 #include "modules/builtin.hpp"
+#include "util/Fx.hpp"
 #include "util/GraphFixture.hpp"
 #include "util/RtGuard.hpp"
 
 namespace {
 
-const char* kEffects[] = {"fx.reverb",  "fx.delay",      "fx.chorus",     "fx.flanger",
-                          "fx.phaser",  "fx.distortion", "fx.compressor", "fx.eq"};
+// `fx.reverb` is not here: it is not a vendored-adapter module any more, and
+// `test_fx_reverb.cpp` holds its tests.
+const char* kEffects[] = {"fx.delay",      "fx.chorus",     "fx.flanger", "fx.phaser",
+                          "fx.distortion", "fx.compressor", "fx.eq"};
 
-/// A source into one effect. The source is either a gated oscillator (`sine`) or a DC level (`level`);
-/// both are steady, which matters because every one of these effects ramps its wet/dry mix and its filter
-/// coefficients across the first block it sees. An impulse fired into block 0 is swallowed by that ramp.
-struct Fx {
-  pg::test::GraphFixture f;
-  std::unique_ptr<pg::Program> program;
-
-  Fx(const char* id, std::map<std::string, float> params, bool sine, float level = 1.f) {
-    pg::registerBuiltinModules(f.reg);
-    f.node("dc", "test.const", {{"value", level}});
-    f.node("silence", "test.const", {{"value", 0.f}});
-    if (sine) {
-      f.node("gate", "test.const", {{"value", 1.f}});
-      f.node("src", "osc.wavetable", {{"table", 1.f}, {"level", 1.f}});
-      f.edge("g", "gate.out", "src.gate");
-    }
-    f.node("fx", id, std::move(params));
-    f.edge("in", sine ? "src.out" : "dc.out", "fx.in");
-    program = f.compile();
-  }
-  void run(int blocks) { for (int b = 0; b < blocks; ++b) f.run(*program, 64); }
-  float at(uint32_t frame, const char* port = "out") { return f.out(*program, "fx", port, frame); }
-  double rms(int blocks, const char* node = "fx", const char* port = "out") {
-    double sum = 0;
-    int n = 0;
-    for (int b = 0; b < blocks; ++b) {
-      f.run(*program, 64);
-      for (uint32_t i = 0; i < 64; ++i) {
-        const double v = f.out(*program, node, port, i);
-        sum += v * v;
-        ++n;
-      }
-    }
-    return std::sqrt(sum / n);
-  }
-  /// Replaces the source with silence, keeping the same effect instance (nothing structural changed).
-  void muteInput() {
-    REQUIRE(f.model.removeEdge("in"));
-    f.edge("in", "silence.out", "fx.in");
-    program = f.compile();
-  }
-};
+using pg::test::Fx;
 
 }  // namespace
 
@@ -141,25 +103,6 @@ TEST_CASE("fx.eq attenuates by the amount its gain knob asks for", "[vital]") {
   Fx cut("fx.eq", {{"low_mode", 0.f}, {"low_gain", -15.f}, {"low_cutoff", 100.f}}, /*sine=*/false, 0.5f);
   cut.run(200);
   REQUIRE(cut.at(40) == Catch::Approx(0.5f * std::pow(10.f, -15.f / 20.f)).margin(0.01f));
-}
-
-TEST_CASE("fx.reverb keeps ringing after its input stops", "[vital]") {
-  Fx fx("fx.reverb", {{"dry_wet", 1.f}, {"decay_time", 3.f}, {"size", 1.f}}, /*sine=*/true);
-  fx.run(100);
-  const double wet = fx.rms(50);
-  REQUIRE(wet > 0.05);
-
-  fx.muteInput();
-  fx.run(2);                       // the dry path is gone within a block; only the tail is left
-  REQUIRE(fx.rms(50) > wet / 20);  // still ringing
-
-  // The same graph without a reverb goes silent immediately, so the tail is the reverb's doing.
-  Fx bypass("fx.eq", {}, /*sine=*/true);
-  bypass.run(100);
-  REQUIRE(bypass.rms(50) > 0.05);
-  bypass.muteInput();
-  bypass.run(2);
-  REQUIRE(bypass.rms(50) < 1e-4);
 }
 
 TEST_CASE("effect readout outputs carry their value across the whole block", "[vital]") {
