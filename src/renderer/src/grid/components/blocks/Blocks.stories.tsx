@@ -1,6 +1,10 @@
 import { hexToNumber } from "@renderer/lib/color";
 import { useThemeStore } from "@renderer/theming/theme-store";
 import type { SignalRole } from "@shared/protocol/catalog";
+import {
+  type EnvelopeReading,
+  TelemetryKind,
+} from "@shared/protocol/telemetry";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Container, Text } from "pixi.js";
 import { useCallback } from "react";
@@ -8,12 +12,14 @@ import { composeFace, type JackBlock as JackGeometry } from "../../face";
 import { descriptor } from "../../fixtures";
 import { CELL } from "../../layout";
 import { PixiStage } from "../../stories/PixiStage";
+import { AdsrBlock } from "./AdsrBlock";
 import { blockStyle } from "./Block";
 import { JackBlock } from "./JackBlock";
 import { KnobBlock } from "./KnobBlock";
 import { MeterBlock } from "./MeterBlock";
 import { PianoBlock } from "./PianoBlock";
 import { ScopeBlock } from "./ScopeBlock";
+import { SelectBlock } from "./SelectBlock";
 import { ValueBlock } from "./ValueBlock";
 import { WaveBlock } from "./WaveBlock";
 
@@ -346,4 +352,125 @@ export const Meter: StoryObj<MeterArgs> = {
     right: { control: { type: "range", min: 0, max: 1.5, step: 0.01 } },
   },
   render: (args) => <MeterStage {...args} />,
+};
+
+interface EnvelopeArgs {
+  attack: number;
+  decay: number;
+  sustain: number;
+  release: number;
+  playhead: number;
+}
+
+/**
+ * A picture as the engine would publish it. Straight segments, since the point of the story is the
+ * block's drawing -- the breakpoints, the dashed sustain, the playhead -- and not the envelope's maths,
+ * which lives in the engine and is tested there.
+ */
+const CURVE_POINTS = 120;
+function envelopeReading(args: EnvelopeArgs): EnvelopeReading {
+  const total = args.attack + args.decay + args.release || 1;
+  const span = 1 - 0.25;
+  const attackEnd = (args.attack / total) * span;
+  const decayEnd = attackEnd + (args.decay / total) * span;
+  const sustainEnd = decayEnd + 0.25;
+  const level = (x: number): number => {
+    if (x < attackEnd) return x / (attackEnd || 1);
+    if (x < decayEnd)
+      return (
+        1 - (1 - args.sustain) * ((x - attackEnd) / (decayEnd - attackEnd))
+      );
+    if (x < sustainEnd) return args.sustain;
+    if (x < 1)
+      return args.sustain * (1 - (x - sustainEnd) / (1 - sustainEnd || 1));
+    return 0;
+  };
+  const curve = Float32Array.from({ length: CURVE_POINTS }, (_, i) =>
+    level(i / (CURVE_POINTS - 1)),
+  );
+  return {
+    kind: TelemetryKind.Envelope,
+    blockIndex: 1n,
+    attackEnd,
+    decayEnd,
+    sustainEnd,
+    sustain: args.sustain,
+    playhead:
+      args.playhead < 0 ? null : { x: args.playhead, y: level(args.playhead) },
+    stage: 2,
+    curve,
+  };
+}
+
+const EnvelopeStage = (args: EnvelopeArgs) => {
+  const theme = useThemeStore((s) => s.theme);
+  const build = useCallback(() => {
+    const geometry = composeFace(descriptor("env.adsr")).adsr;
+    if (geometry === null) throw new Error("the envelope has a picture");
+    const block = new AdsrBlock(
+      geometry,
+      blockStyle(theme.grid, hexToNumber(theme.grid.signal.cv)),
+    );
+    block.setEnvelope(envelopeReading(args));
+    block.view.position.set(12 - geometry.x, 12 - geometry.y);
+    const view = new Container();
+    view.addChild(block.view);
+    return { view, destroy: () => block.destroy() };
+  }, [args, theme]);
+  return (
+    <PixiStage
+      build={build}
+      width={(composeFace(descriptor("env.adsr")).adsr?.width ?? 192) + 24}
+      height={72}
+    />
+  );
+};
+
+/** The envelope picture: the shape, a dot on each corner, the sustain dashed, and the playhead. */
+export const Envelope: StoryObj<EnvelopeArgs> = {
+  args: { attack: 0.1, decay: 0.5, sustain: 0.5, release: 0.4, playhead: 0.3 },
+  argTypes: {
+    attack: { control: { type: "range", min: 0, max: 2, step: 0.01 } },
+    decay: { control: { type: "range", min: 0, max: 2, step: 0.01 } },
+    sustain: { control: { type: "range", min: 0, max: 1, step: 0.01 } },
+    release: { control: { type: "range", min: 0, max: 2, step: 0.01 } },
+    playhead: { control: { type: "range", min: -1, max: 1, step: 0.01 } },
+  },
+  render: (args) => <EnvelopeStage {...args} />,
+};
+
+interface SelectArgs {
+  value: number;
+  cols: number;
+}
+
+const SelectStage = ({ value, cols }: SelectArgs) => {
+  const theme = useThemeStore((s) => s.theme);
+  const build = useCallback(() => {
+    const declared = composeFace(descriptor("env.adsr")).selects[0];
+    if (declared === undefined) throw new Error("the envelope has a switch");
+    // Widened here rather than on the module: the point of the story is that one cell shows an
+    // initial and a wider block shows the whole word.
+    const geometry = { ...declared, cols, width: cols * CELL };
+    const block = new SelectBlock(
+      geometry,
+      blockStyle(theme.grid, hexToNumber(theme.grid.signal.cv)),
+    );
+    block.setValue(value);
+    block.view.position.set(12 - geometry.x, 12 - geometry.y);
+    const view = new Container();
+    view.addChild(block.view);
+    return { view, destroy: () => block.destroy() };
+  }, [value, cols, theme]);
+  return <PixiStage build={build} width={cols * CELL + 24} height={72} />;
+};
+
+/** The enum switch: an initial at one cell, the whole label from two across. */
+export const Select: StoryObj<SelectArgs> = {
+  args: { value: 0, cols: 1 },
+  argTypes: {
+    value: { control: { type: "range", min: 0, max: 2, step: 1 } },
+    cols: { control: { type: "range", min: 1, max: 5, step: 1 } },
+  },
+  render: (args) => <SelectStage {...args} />,
 };

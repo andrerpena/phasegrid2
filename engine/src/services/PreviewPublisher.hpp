@@ -38,9 +38,14 @@ private:
   /// What each instance (by serial) was last drawn with, and into which slot, so an unchanged module
   /// is not redrawn -- unless a resubscription has moved it, and the slot it now owns holds someone
   /// else's picture until it is drawn again.
+  ///
+  /// A module whose picture moves on its own -- an envelope, whose playhead travels while every knob
+  /// stands still -- is compared by the picture it produced rather than by the values it was given,
+  /// so `picture` carries the last published samples for those and `values` is left empty.
   struct Drawn {
     uint32_t slot;
     std::vector<float> values;
+    std::vector<float> picture;
   };
   std::map<uint64_t, Drawn> lastDrawn_;
   uint64_t index_ = 0;

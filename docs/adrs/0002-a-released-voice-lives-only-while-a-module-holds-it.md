@@ -48,6 +48,9 @@ Who claims, and whether they do by default, is Bitwig's table:
 | `io.audioOut` | what it hears from the voice is above `kVoiceSilence` | off |
 | `voices.sum` | the same | off |
 
+*The envelope is now `env.adsr`, which claims its voice by the same rule and for the same reason:
+[0008](0008-the-envelope-is-the-reference-instrument-s-adsr.md).*
+
 Each carries an `Affect voice lifetime` toggle, so a patch can take a holder out of the decision -- a
 long filter envelope that should not extend the note, an output that should. Claims only ever extend a
 voice: turning one on can make notes longer, never shorter, which is what makes the toggles safe to

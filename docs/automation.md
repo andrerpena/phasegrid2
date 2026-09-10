@@ -48,7 +48,10 @@ is. `pg.help()` lists them.
   (every block on the module, the title first and then the face's in reading order: kind, the name
   the engine gave it, its rect, its socket, a knob's centre and `live`, and a scope's `trace`: the
   engine's count of the last window drawn, its frames and its peak, and a readout's `reading`: the
-  same count and the value per channel, both null before the first) — where things
+  same count and the value per channel, both null before the first; an `adsr` block's `envelope`:
+  where each stage ends and the level it sustains at, as fractions of the drawn width, and the
+  `playhead` that moves along it while a note sounds; a `select` block's `choice`: the value it is
+  showing and its label) — where things
   are, in window CSS pixels, ready for a real pointer event. Null when there is no such thing.
 - **`workspace.openAt(root)`**, **`openProject(slug)`**, **`save()`**, **`saveAs(name)`**,
   **`closeProject(id?)`**, **`copyExample(moduleId)`** (copies a module's example into the workspace

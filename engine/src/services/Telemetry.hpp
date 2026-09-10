@@ -51,8 +51,12 @@ inline constexpr uint32_t kTelemetryMaxSlots = 128;
 /// `Keys` is which keys are down: one float per MIDI note number, 1 held and 0 up, `frames` of them.
 /// What a keyboard on a module's face lights. Per note rather than per voice, so a reader never has to
 /// know how many voices the program runs or which lane is which.
+/// `Envelope` is the picture an envelope draws of itself: where its stages end, its sustain level, its
+/// curve, and where it has got to. Written by `PreviewPublisher` like a `Preview`, and on the same
+/// channel, because both answer "what would this module draw for the values it is running with" and
+/// both have to keep answering while the patch is held and a knob is turned. See `kEnvelopePicture*`.
 enum class TelemetryKind : uint32_t {
-  None = 0, Meter = 1, Scope = 2, Params = 3, Preview = 4, Value = 5, Notes = 6, Keys = 7
+  None = 0, Meter = 1, Scope = 2, Params = 3, Preview = 4, Value = 5, Notes = 6, Keys = 7, Envelope = 8
 };
 
 /// "nobody is watching this module". Not a valid slot index, and the default for every instance.
@@ -182,6 +186,8 @@ public:
   /// Message thread (it is the preview publisher's), but built the same way so a reader cannot tell.
   /// One channel of `count` samples, capped at `kTelemetryScopeFrames`; `index` counts publishes.
   void writePreview(uint32_t slot, const float* samples, uint32_t count, uint64_t index) noexcept;
+  /// The same buffer, tagged `Envelope`: a header of `kEnvelopePictureHeader` floats and then the curve.
+  void writeEnvelope(uint32_t slot, const float* picture, uint32_t count, uint64_t index) noexcept;
   /// Audio thread. One increment per rendered block, so a reader can tell fresh data from stale.
   void beat() noexcept PG_RT_NONBLOCKING;
 

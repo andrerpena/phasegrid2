@@ -1,0 +1,78 @@
+{
+  "_about": "The three models are an interpretation of three one-line descriptions in the reference instrument's documentation (docs/adrs/0008), and this is where they get checked. Drop the reference's own export of a sine through its ADSR -- Analog, A 5 ms, D 400 ms, S 0, R 150 ms, four notes -- in here as reference.wav and `npm run compare:reference -- env.adsr` decides. Only the shape is compared, since the two are not time-aligned: crest says whether the notes are plucked or held, and maxStep whether the envelope is clean at both ends of each note.",
+  "patch": {
+    "schemaVersion": 1,
+    "feedbackMode": "sample",
+    "modules": [
+      {
+        "id": "pat",
+        "type": "notes.pattern",
+        "params": { "legato": 0.9, "cycle": 4 },
+        "data": { "pattern": "c3 e3 b3 c4" },
+        "x": 0,
+        "y": 0
+      },
+      {
+        "id": "poly",
+        "type": "note.toPoly",
+        "params": { "voices": 16 },
+        "x": 200,
+        "y": 0
+      },
+      { "id": "osc", "type": "osc.sine", "x": 400, "y": 0 },
+      {
+        "id": "env",
+        "type": "env.adsr",
+        "params": {
+          "attack": 0.005,
+          "decay": 0.4,
+          "sustain": 0,
+          "release": 0.15,
+          "model": 0
+        },
+        "x": 600,
+        "y": 0
+      },
+      {
+        "id": "out",
+        "type": "io.audioOut",
+        "params": { "gain": 1 },
+        "x": 800,
+        "y": 0
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1",
+        "from": { "module": "pat", "port": "notes" },
+        "to": { "module": "poly", "port": "notes" }
+      },
+      {
+        "id": "e2",
+        "from": { "module": "poly", "port": "pitch" },
+        "to": { "module": "osc", "port": "pitch" }
+      },
+      {
+        "id": "e3",
+        "from": { "module": "poly", "port": "gate" },
+        "to": { "module": "env", "port": "gate" }
+      },
+      {
+        "id": "e4",
+        "from": { "module": "osc", "port": "out" },
+        "to": { "module": "env", "port": "signal" }
+      },
+      {
+        "id": "e5",
+        "from": { "module": "env", "port": "signal" },
+        "to": { "module": "out", "port": "inL" }
+      }
+    ]
+  },
+  "tempo": 120,
+  "bars": 2,
+  "expect": {
+    "maxStep": { "max": 0.1 },
+    "crest": { "near": "reference", "tolerance": 0.25 }
+  }
+}

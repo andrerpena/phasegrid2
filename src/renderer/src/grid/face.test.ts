@@ -1,6 +1,7 @@
 import type { ModuleDescriptor } from "@shared/protocol/catalog";
 import { describe, expect, it } from "vitest";
 import {
+  ADSR_COLS,
   composeFace,
   defaultFace,
   type Face,
@@ -76,6 +77,7 @@ const vca: ModuleDescriptor = {
     needsTransport: false,
     writesTelemetry: false,
     previewsWave: false,
+    previewsEnvelope: false,
     publishesScope: false,
     publishesValue: false,
     publishesMeter: false,
@@ -95,6 +97,36 @@ const vca: ModuleDescriptor = {
 const simple: ModuleDescriptor = {
   ...vca,
   inputs: [port("in"), port("param:gain", true)],
+};
+
+/** An envelope-shaped module: a picture, a switch and a knob, which is the face `env.adsr` wears. */
+const envelope: ModuleDescriptor = {
+  ...vca,
+  id: "env.adsr",
+  flags: { ...vca.flags, previewsEnvelope: true },
+  inputs: [port("gate"), port("param:gain", true)],
+  outputs: [port("out")],
+  params: [
+    param("gain"),
+    param("model", {
+      flags: {
+        modulatable: false,
+        integer: true,
+        enum: true,
+        hidden: false,
+        noSmooth: true,
+        structural: false,
+        primary: false,
+      },
+      enumLabels: ["Analog", "Relative", "Digital"],
+    }),
+  ],
+  face: [
+    ["select:model", "adsr", "adsr", "adsr", "adsr", "out"],
+    ["gate", "adsr", "adsr", "adsr", "adsr", "."],
+    [".", "gain", "gain", ".", ".", "."],
+    [".", "gain", "gain", ".", ".", "."],
+  ],
 };
 
 /** Every block's cells, so overlap can be checked without trusting the geometry that made them. */
@@ -617,5 +649,61 @@ describe("hit testing", () => {
         face,
       ),
     ).toBe(face.wave);
+  });
+});
+
+describe("the envelope picture and the enum switch", () => {
+  it("places a picture, a switch and a knob from the declared face", () => {
+    const face = parseFace(envelope.face ?? [], envelope);
+    expect(face.adsr?.cols).toBe(4);
+    expect(face.adsr?.rows).toBe(2);
+    // A screen, like the scope: it has a panel to draw the picture on, inset by the gutter.
+    expect(face.adsr?.panel.width).toBe(
+      (face.adsr?.width ?? 0) - TILE_GUTTER * 2,
+    );
+    expect(face.selects.map((s) => s.param.id)).toEqual(["model"]);
+    expect(face.selects[0].cols).toBe(1);
+    expect(face.knobs.map((k) => k.param.id)).toEqual(["gain"]);
+  });
+
+  it("refuses an envelope picture with too little room to read", () => {
+    const cramped = {
+      ...envelope,
+      face: [
+        ["select:model", "adsr", "adsr", "out"],
+        ["gate", "gain", "gain", "."],
+        [".", "gain", "gain", "."],
+      ],
+    };
+    expect(() => parseFace(cramped.face, cramped)).toThrow(/adsr/);
+  });
+
+  it("refuses an envelope picture on a module that draws none", () => {
+    const plain = {
+      ...envelope,
+      flags: { ...envelope.flags, previewsEnvelope: false },
+    };
+    expect(() => parseFace(plain.face ?? [], plain)).toThrow(
+      /draws no envelope/,
+    );
+  });
+
+  it("refuses a switch on a param that is not an enum", () => {
+    const wrong = {
+      ...envelope,
+      face: [
+        ["select:gain", "adsr", "adsr", "adsr", "adsr", "out"],
+        ["gate", "adsr", "adsr", "adsr", "adsr", "."],
+      ],
+    };
+    expect(() => parseFace(wrong.face, wrong)).toThrow(
+      /only an enum param has/,
+    );
+  });
+
+  it("puts the picture and the switch on the face of a module that declares none", () => {
+    const composed = defaultFace({ ...envelope, face: null });
+    expect(composed.adsr).not.toBeNull();
+    expect(composed.adsr?.cols).toBe(ADSR_COLS);
   });
 });

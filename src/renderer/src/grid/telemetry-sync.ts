@@ -5,6 +5,7 @@ import { usePatchStore } from "@renderer/patch/patch-store";
 import type { ModuleDescriptor, ParamDesc } from "@shared/protocol/catalog";
 import type { PatchDoc } from "@shared/protocol/patch";
 import {
+  type EnvelopeReading,
   type NotesReading,
   type TelemetryChannel,
   TelemetryKind,
@@ -40,6 +41,8 @@ export interface TelemetryTarget {
   setLive(moduleId: string, paramId: string, fraction: number | null): void;
   /** A module's picture, one cycle -1..1, as the engine drew it for the values it is running with. */
   setWave(moduleId: string, samples: ArrayLike<number>): void;
+  /** An envelope's picture: its shape, its breakpoints and where it has got to. The same channel. */
+  setEnvelope(moduleId: string, reading: EnvelopeReading): void;
   /** The window on the wire into a scope module, one array per channel, and the engine's count of it. */
   setTrace(
     moduleId: string,
@@ -125,13 +128,22 @@ export function displayModules(
     .sort();
 }
 
-/** The modules whose face has a wave panel: every one of them is asked for its picture. */
+/**
+ * The modules that draw a picture of themselves: a wave panel or an envelope. Every one is asked.
+ *
+ * Both ride the preview channel, and for the same reason: the picture has to keep following the
+ * knobs while the patch is HELD, and a held patch runs no module, so nothing on the display channel
+ * would move. Which kind of picture it is, is the slot's own business.
+ */
 export function previewedModules(
   doc: PatchDoc,
   catalog: Map<string, ModuleDescriptor>,
 ): string[] {
   return doc.modules
-    .filter((m) => catalog.get(m.type)?.flags.previewsWave === true)
+    .filter((m) => {
+      const flags = catalog.get(m.type)?.flags;
+      return flags?.previewsWave === true || flags?.previewsEnvelope === true;
+    })
     .map((m) => m.id)
     .sort();
 }
@@ -258,12 +270,19 @@ export function startTelemetrySync(
     }
     for (const [moduleId, slot] of previewSlots) {
       const reading = window.telemetry.read(slot);
-      if (reading === null || reading.kind !== TelemetryKind.Preview) continue;
+      if (
+        reading === null ||
+        (reading.kind !== TelemetryKind.Preview &&
+          reading.kind !== TelemetryKind.Envelope)
+      )
+        continue;
       // The engine only publishes when the picture changed, and numbers each publish; a picture
       // already on the panel is not geometry worth rebuilding.
       if (drawn.get(moduleId) === reading.blockIndex) continue;
       drawn.set(moduleId, reading.blockIndex);
-      target.setWave(moduleId, reading.samples);
+      if (reading.kind === TelemetryKind.Envelope)
+        target.setEnvelope(moduleId, reading);
+      else target.setWave(moduleId, reading.samples);
     }
     // Held or running alike: a held patch publishes nothing new, so the last picture simply stays.
     for (const [moduleId, slot] of displaySlots) {

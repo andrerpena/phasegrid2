@@ -18,7 +18,14 @@ import { usePatchStore } from "@renderer/patch/patch-store";
  */
 
 export interface PreviewTarget {
-  /** Ids of the modules drawn right now that have a panel to fill. */
+  /**
+   * Ids of the modules drawn right now that have a WAVE panel to fill.
+   *
+   * Only a wave: this path answers `module.preview` with a plain array of samples, and an envelope's
+   * picture is a header and a curve that has to be decoded. An engine old enough to need this path is
+   * an engine with no telemetry segment at all, where the meters, the scopes and the modulated knobs
+   * are dead too, so an envelope drawn from the document there is not the thing to fix first.
+   */
   previewing(): string[];
   setPreview(moduleId: string, samples: ArrayLike<number>): void;
 }

@@ -2,22 +2,55 @@
   "schemaVersion": 1,
   "feedbackMode": "sample",
   "modules": [
-    { "id": "play", "type": "math.scaleOffset", "params": { "scale": 0, "offset": 1 }, "x": 0, "y": 0 },
+    {
+      "id": "play",
+      "type": "math.scaleOffset",
+      "params": {
+        "scale": 0,
+        "offset": 1
+      },
+      "x": 0,
+      "y": 0
+    },
     {
       "id": "clip",
       "type": "notes.clip",
-      "params": { "length": 8, "loop": 1, "transpose": 0 },
+      "params": {
+        "length": 8,
+        "loop": 1,
+        "transpose": 0
+      },
       "data": {
         "notes": [
-          { "start": 0, "length": 8, "pitch": 60, "velocity": 1 },
-          { "start": 0, "length": 8, "pitch": 64, "velocity": 1 },
-          { "start": 0, "length": 8, "pitch": 67, "velocity": 1 }
+          {
+            "start": 0,
+            "length": 8,
+            "pitch": 60,
+            "velocity": 1
+          },
+          {
+            "start": 0,
+            "length": 8,
+            "pitch": 64,
+            "velocity": 1
+          },
+          {
+            "start": 0,
+            "length": 8,
+            "pitch": 67,
+            "velocity": 1
+          }
         ]
       },
       "x": 220,
       "y": 0
     },
-    { "id": "poly", "type": "note.toPoly", "x": 440, "y": 0 },
+    {
+      "id": "poly",
+      "type": "note.toPoly",
+      "x": 440,
+      "y": 0
+    },
     {
       "id": "osc",
       "type": "osc.wavetable",
@@ -35,37 +68,163 @@
     {
       "id": "filter",
       "type": "filter.multi",
-      "params": { "model": 0, "style": 0, "blend": 0, "cutoff": 83, "resonance": 0.2, "mix": 1, "drive": 0, "keytrack": 0 },
+      "params": {
+        "model": 0,
+        "style": 0,
+        "blend": 0,
+        "cutoff": 83,
+        "resonance": 0.2,
+        "mix": 1,
+        "drive": 0,
+        "keytrack": 0
+      },
       "x": 880,
       "y": 0
     },
     {
       "id": "env",
-      "type": "env.dahdsr",
+      "type": "env.adsr",
       "params": {
-        "delay": 0,
-        "attack": 0.3,
-        "hold": 0,
-        "decay": 0.6,
-        "sustain": 0.8,
-        "release": 0.5
+        "attack": 0.0081,
+        "decay": 0.13,
+        "sustain": 80,
+        "release": 0.0625,
+        "model": 0,
+        "lifetime": 1
       },
       "x": 880,
       "y": 160
     },
-    { "id": "vca", "type": "amp.vca", "params": { "gain": 0, "curve": 0 }, "x": 1100, "y": 0 },
-    { "id": "out", "type": "io.audioOut", "params": { "gain": 0.5 }, "x": 1320, "y": 0 }
+    {
+      "id": "vca",
+      "type": "amp.vca",
+      "params": {
+        "gain": 0,
+        "curve": 0
+      },
+      "x": 1100,
+      "y": 0
+    },
+    {
+      "id": "out",
+      "type": "io.audioOut",
+      "params": {
+        "gain": 0.5
+      },
+      "x": 1320,
+      "y": 0
+    }
   ],
   "edges": [
-    { "id": "e1", "from": { "module": "play", "port": "out" }, "to": { "module": "clip", "port": "play" } },
-    { "id": "e2", "from": { "module": "clip", "port": "notes" }, "to": { "module": "poly", "port": "notes" } },
-    { "id": "e3", "from": { "module": "poly", "port": "pitch" }, "to": { "module": "osc", "port": "pitch" } },
-    { "id": "e4", "from": { "module": "poly", "port": "gate" }, "to": { "module": "osc", "port": "gate" } },
-    { "id": "e5", "from": { "module": "poly", "port": "gate" }, "to": { "module": "env", "port": "gate" } },
-    { "id": "e6", "from": { "module": "osc", "port": "out" }, "to": { "module": "filter", "port": "in" } },
-    { "id": "e7", "from": { "module": "filter", "port": "out" }, "to": { "module": "vca", "port": "in" } },
-    { "id": "e8", "from": { "module": "env", "port": "out" }, "to": { "module": "vca", "port": "gain" } },
-    { "id": "e9", "from": { "module": "vca", "port": "out" }, "to": { "module": "out", "port": "inL" } },
-    { "id": "e10", "from": { "module": "vca", "port": "out" }, "to": { "module": "out", "port": "inR" } }
+    {
+      "id": "e1",
+      "from": {
+        "module": "play",
+        "port": "out"
+      },
+      "to": {
+        "module": "clip",
+        "port": "play"
+      }
+    },
+    {
+      "id": "e2",
+      "from": {
+        "module": "clip",
+        "port": "notes"
+      },
+      "to": {
+        "module": "poly",
+        "port": "notes"
+      }
+    },
+    {
+      "id": "e3",
+      "from": {
+        "module": "poly",
+        "port": "pitch"
+      },
+      "to": {
+        "module": "osc",
+        "port": "pitch"
+      }
+    },
+    {
+      "id": "e4",
+      "from": {
+        "module": "poly",
+        "port": "gate"
+      },
+      "to": {
+        "module": "osc",
+        "port": "gate"
+      }
+    },
+    {
+      "id": "e5",
+      "from": {
+        "module": "poly",
+        "port": "gate"
+      },
+      "to": {
+        "module": "env",
+        "port": "gate"
+      }
+    },
+    {
+      "id": "e6",
+      "from": {
+        "module": "osc",
+        "port": "out"
+      },
+      "to": {
+        "module": "filter",
+        "port": "in"
+      }
+    },
+    {
+      "id": "e7",
+      "from": {
+        "module": "filter",
+        "port": "out"
+      },
+      "to": {
+        "module": "vca",
+        "port": "in"
+      }
+    },
+    {
+      "id": "e8",
+      "from": {
+        "module": "env",
+        "port": "env"
+      },
+      "to": {
+        "module": "vca",
+        "port": "gain"
+      }
+    },
+    {
+      "id": "e9",
+      "from": {
+        "module": "vca",
+        "port": "out"
+      },
+      "to": {
+        "module": "out",
+        "port": "inL"
+      }
+    },
+    {
+      "id": "e10",
+      "from": {
+        "module": "vca",
+        "port": "out"
+      },
+      "to": {
+        "module": "out",
+        "port": "inR"
+      }
+    }
   ]
 }

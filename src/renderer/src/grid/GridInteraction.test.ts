@@ -1,10 +1,12 @@
 import type { ModuleDescriptor } from "@shared/protocol/catalog";
+import { paramFractionOf, paramValueAt } from "@shared/protocol/param-curve";
 import type { PortRef } from "@shared/protocol/patch";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { composeFace, hitKnob, hitSocket, socketOf } from "./face";
 import { descriptor } from "./fixtures";
 import { GridInteraction } from "./GridInteraction";
 import type { GridRenderer } from "./GridRenderer";
+import { KNOB_DRAG_RANGE } from "./interaction";
 import { CELL } from "./layout";
 
 /**
@@ -140,7 +142,7 @@ let nodes: Map<string, FakeNode>;
 beforeEach(() => {
   nodes = new Map([
     ["vca", fakeNode("amp.vca", 240, 120)],
-    ["env", fakeNode("env.dahdsr", 480, 120)],
+    ["env", fakeNode("env.adsr", 480, 120)],
   ]);
   documentValues.clear();
 });
@@ -290,8 +292,15 @@ describe("dragging a knob", () => {
     d.down(knob.x, knob.y);
     d.move(knob.x, knob.y - 1); // the smallest move there is: the value must barely leave where it was
 
+    // One pixel of the turn, on the param's own taper. Measured rather than assumed: a quartic knob
+    // covers far more ground per pixel at the top of its range than at the bottom, and the point of
+    // this test is where the gesture STARTED, not how far a pixel goes.
+    const step = paramValueAt(
+      param,
+      paramFractionOf(param, moved) + 1 / KNOB_DRAG_RANGE,
+    );
     const first = changes(onParamChange)[0];
-    expect(first.value).toBeCloseTo(moved, 1);
+    expect(first.value).toBeCloseTo(step, 5);
     expect(first.previous).toBeCloseTo(moved, 5);
   });
 
@@ -341,7 +350,7 @@ describe("dragging a knob", () => {
       [coarse, false],
       [fine, true],
     ] as const) {
-      nodes = new Map([["env", fakeNode("env.dahdsr", 480, 120)]]);
+      nodes = new Map([["env", fakeNode("env.adsr", 480, 120)]]);
       const { renderer, canvas } = rig(nodes);
       const d = driver(
         new GridInteraction(renderer, canvas, { onParamChange, readParam }),
@@ -483,14 +492,14 @@ describe("patching a cable", () => {
     const d = driver(
       new GridInteraction(renderer, canvas, { onConnect, readEdgesInto }),
     );
-    const out = socket("env", "out", "output");
+    const out = socket("env", "env", "output");
     const gain = socket("vca", "gain", "input");
     d.down(out.x, out.y);
     d.move(gain.x - 40, gain.y + 20);
     expect(onConnect).not.toHaveBeenCalled();
     d.up(gain.x, gain.y);
     expect(onConnect).toHaveBeenCalledWith(
-      { module: "env", port: "out" },
+      { module: "env", port: "env" },
       { module: "vca", port: "gain" },
       {},
     );
@@ -502,12 +511,12 @@ describe("patching a cable", () => {
     const d = driver(
       new GridInteraction(renderer, canvas, { onConnect, readEdgesInto }),
     );
-    const out = socket("env", "out", "output");
+    const out = socket("env", "env", "output");
     const gain = socket("vca", "gain", "input");
     d.down(gain.x, gain.y);
     d.up(out.x, out.y);
     expect(onConnect).toHaveBeenCalledWith(
-      { module: "env", port: "out" },
+      { module: "env", port: "env" },
       { module: "vca", port: "gain" },
       {},
     );
@@ -519,12 +528,12 @@ describe("patching a cable", () => {
     const d = driver(
       new GridInteraction(renderer, canvas, { onConnect, readEdgesInto }),
     );
-    const out = socket("env", "out", "output");
+    const out = socket("env", "env", "output");
     const under = socket("vca", "param:gain", "input");
     d.down(out.x, out.y);
     d.up(under.x, under.y + 2); // a hair below the border: the socket sits on it
     expect(onConnect).toHaveBeenCalledWith(
-      { module: "env", port: "out" },
+      { module: "env", port: "env" },
       { module: "vca", port: "param:gain" },
       {},
     );
@@ -537,7 +546,7 @@ describe("patching a cable", () => {
     const d = driver(
       new GridInteraction(renderer, canvas, { onConnect, readEdgesInto }),
     );
-    const out = socket("env", "out", "output");
+    const out = socket("env", "env", "output");
     const node = nodes.get("vca");
     if (node === undefined) throw new Error("vca");
     const knob = node.face.knobs[0];
@@ -547,7 +556,7 @@ describe("patching a cable", () => {
       node.view.position.y + knob.centre.y,
     );
     expect(onConnect).toHaveBeenCalledWith(
-      { module: "env", port: "out" },
+      { module: "env", port: "env" },
       { module: "vca", port: "param:gain" },
       {},
     );
@@ -564,7 +573,7 @@ describe("patching a cable", () => {
         readEdgesInto,
       }),
     );
-    const out = socket("env", "out", "output");
+    const out = socket("env", "env", "output");
     d.down(out.x, out.y);
     d.up(30, 700);
     expect(onConnect).not.toHaveBeenCalled();
@@ -575,7 +584,7 @@ describe("patching a cable", () => {
     edges = [
       {
         id: "e1",
-        from: { module: "env", port: "out" },
+        from: { module: "env", port: "env" },
         to: { module: "vca", port: "gain" },
       },
     ];
@@ -600,7 +609,7 @@ describe("patching a cable", () => {
     edges = [
       {
         id: "e1",
-        from: { module: "env", port: "out" },
+        from: { module: "env", port: "env" },
         to: { module: "vca", port: "gain" },
       },
     ];
@@ -619,7 +628,7 @@ describe("patching a cable", () => {
     d.down(gain.x, gain.y);
     d.up(input.x, input.y);
     expect(onConnect).toHaveBeenCalledWith(
-      { module: "env", port: "out" },
+      { module: "env", port: "env" },
       { module: "vca", port: "in" },
       { replaces: "e1" },
     );
@@ -630,7 +639,7 @@ describe("patching a cable", () => {
     edges = [
       {
         id: "e1",
-        from: { module: "env", port: "out" },
+        from: { module: "env", port: "env" },
         to: { module: "vca", port: "gain" },
       },
     ];
@@ -655,7 +664,7 @@ describe("patching a cable", () => {
     edges = [
       {
         id: "e1",
-        from: { module: "env", port: "out" },
+        from: { module: "env", port: "env" },
         to: { module: "vca", port: "gain" },
       },
     ];
@@ -664,7 +673,7 @@ describe("patching a cable", () => {
     const d = driver(
       new GridInteraction(renderer, canvas, { onConnect, readEdgesInto }),
     );
-    const out = socket("env", "out", "output");
+    const out = socket("env", "env", "output");
     const gain = socket("vca", "gain", "input");
     d.down(out.x, out.y);
     d.up(gain.x, gain.y);
@@ -677,7 +686,7 @@ describe("patching a cable", () => {
     const d = driver(
       new GridInteraction(renderer, canvas, { onNodesMoved, readEdgesInto }),
     );
-    const out = socket("env", "out", "output");
+    const out = socket("env", "env", "output");
     d.down(out.x, out.y);
     d.move(out.x + 100, out.y + 100);
     d.up(out.x + 100, out.y + 100);

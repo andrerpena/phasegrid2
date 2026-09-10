@@ -58,6 +58,7 @@ const vca: ModuleDescriptor = {
     needsTransport: false,
     writesTelemetry: false,
     previewsWave: false,
+    previewsEnvelope: false,
     publishesScope: false,
     publishesValue: false,
     publishesMeter: false,

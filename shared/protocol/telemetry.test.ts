@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   decodeSlot,
+  ENVELOPE_PICTURE_HEADER,
   METER_FLOATS_PER_CHANNEL,
   readHeader,
   slotOffset,
@@ -209,6 +210,61 @@ describe("decoding a slot", () => {
     if (reading?.kind !== TelemetryKind.Preview) return;
     expect(Array.from(reading.samples)).toEqual([-1, 0, 1, 0]);
     expect(reading.blockIndex).toBe(3n);
+  });
+
+  it("reads an envelope slot as a shape with a playhead", () => {
+    const curve = [0, 0.5, 1, 0.75, 0.75, 0];
+    const bytes = buildSlot({
+      seq: 6,
+      kind: TelemetryKind.Envelope,
+      channels: 1,
+      frames: ENVELOPE_PICTURE_HEADER + curve.length,
+      blockIndex: 11n,
+      fill: (view, payload) => {
+        const header = [0.2, 0.4, 0.65, 0.75, 0.3, 0.9, 2, 0];
+        for (const [i, v] of [...header, ...curve].entries())
+          view.setFloat32(payload + i * 4, v, true);
+      },
+    });
+    const reading = decodeSlot(bytes);
+    expect(reading?.kind).toBe(TelemetryKind.Envelope);
+    if (reading?.kind !== TelemetryKind.Envelope) return;
+    expect(reading.attackEnd).toBeCloseTo(0.2, 5);
+    expect(reading.decayEnd).toBeCloseTo(0.4, 5);
+    expect(reading.sustainEnd).toBeCloseTo(0.65, 5);
+    expect(reading.sustain).toBeCloseTo(0.75, 5);
+    expect(reading.playhead?.x).toBeCloseTo(0.3, 5);
+    expect(reading.playhead?.y).toBeCloseTo(0.9, 5);
+    expect(reading.stage).toBe(2);
+    expect(Array.from(reading.curve)).toEqual(curve);
+    expect(reading.blockIndex).toBe(11n);
+  });
+
+  it("reads an envelope nothing is playing as having no playhead", () => {
+    // The engine writes -1 there, which is not a place on the picture and must not be drawn as one.
+    const bytes = buildSlot({
+      seq: 2,
+      kind: TelemetryKind.Envelope,
+      channels: 1,
+      frames: ENVELOPE_PICTURE_HEADER + 2,
+      fill: (view, payload) => {
+        view.setFloat32(payload + 4 * 4, -1, true);
+      },
+    });
+    const reading = decodeSlot(bytes);
+    expect(reading?.kind).toBe(TelemetryKind.Envelope);
+    if (reading?.kind !== TelemetryKind.Envelope) return;
+    expect(reading.playhead).toBeNull();
+  });
+
+  it("declines an envelope with no room for its own header", () => {
+    const bytes = buildSlot({
+      seq: 2,
+      kind: TelemetryKind.Envelope,
+      channels: 1,
+      frames: ENVELOPE_PICTURE_HEADER,
+    });
+    expect(decodeSlot(bytes)).toBeNull();
   });
 
   it("declines a preview longer than a slot can hold", () => {

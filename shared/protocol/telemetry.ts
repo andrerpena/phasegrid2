@@ -81,7 +81,24 @@ export enum TelemetryKind {
    * know how many voices the program runs.
    */
   Keys = 7,
+  /**
+   * The picture an envelope draws of itself: where each stage ends, the level it sustains at, the
+   * curve, and where it has got to. Written by the same publisher as `Preview` and on the same
+   * channel -- both answer "what would this module draw for the values it is running with", and both
+   * have to keep answering while the patch is held and a knob is being turned.
+   *
+   * Not samples alone, because an envelope is not one cycle of anything: without the breakpoints a
+   * reader could draw the curve but not say where the decay ends, so it could not dash the sustain
+   * or put a dot on a corner.
+   */
+  Envelope = 8,
 }
+
+/**
+ * The floats in front of an `Envelope` reading's curve, in order. The engine writes this layout in
+ * `engine/src/core/Module.hpp`; the two are one description in two languages.
+ */
+export const ENVELOPE_PICTURE_HEADER = 8;
 
 export interface TelemetryHeader {
   layoutVersion: number;
@@ -128,6 +145,27 @@ export interface PreviewReading {
   samples: Float32Array;
 }
 
+/**
+ * An envelope's picture. `x` is a fraction of the drawn width and `y` a level in 0..1, so a block
+ * scales it to its own rectangle and never has to know about seconds.
+ */
+export interface EnvelopeReading {
+  kind: TelemetryKind.Envelope;
+  blockIndex: bigint;
+  /** Where the attack reaches full scale, where the decay reaches the sustain, where the release begins. */
+  attackEnd: number;
+  decayEnd: number;
+  sustainEnd: number;
+  /** The level the decay ends at, 0..1: the height of the dashed run between the two breakpoints. */
+  sustain: number;
+  /** Where the envelope has got to, or null when it is not running. */
+  playhead: { x: number; y: number } | null;
+  /** The stage, as the engine's own numbering. Carried for a reader that wants to name it. */
+  stage: number;
+  /** The curve itself, 0..1, evenly spaced across the whole width. */
+  curve: Float32Array;
+}
+
 export interface ValueReading {
   kind: TelemetryKind.Value;
   blockIndex: bigint;
@@ -172,6 +210,7 @@ export type SlotReading =
   | ScopeReading
   | ParamsReading
   | PreviewReading
+  | EnvelopeReading
   | ValueReading
   | NotesReading
   | KeysReading;
@@ -271,6 +310,29 @@ export function decodeSlot(bytes: Uint8Array): SlotReading | null {
     for (let i = 0; i < frames; i++)
       samples[i] = view.getFloat32(payload + i * 4, true);
     return { kind, blockIndex, samples };
+  }
+
+  if (kind === TelemetryKind.Envelope) {
+    if (frames <= ENVELOPE_PICTURE_HEADER || frames > TELEMETRY_SCOPE_FRAMES)
+      return null;
+    if (payload + frames * 4 > bytes.byteLength) return null;
+    const at = (i: number) => view.getFloat32(payload + i * 4, true);
+    const points = frames - ENVELOPE_PICTURE_HEADER;
+    const curve = new Float32Array(points);
+    for (let i = 0; i < points; i++) curve[i] = at(ENVELOPE_PICTURE_HEADER + i);
+    const x = at(4);
+    return {
+      kind,
+      blockIndex,
+      attackEnd: at(0),
+      decayEnd: at(1),
+      sustainEnd: at(2),
+      sustain: at(3),
+      // The engine writes -1 for an envelope that is not running, which is not a place on the picture.
+      playhead: x < 0 ? null : { x, y: at(5) },
+      stage: at(6),
+      curve,
+    };
   }
 
   if (kind === TelemetryKind.Value) {

@@ -57,13 +57,13 @@ struct Rig {
     f.edge("e0", "pat.notes", "poly.notes");
     f.edge("e1", "poly.pitch", "osc.pitch");
     if (envelope) {
-      f.node("env", "env.dahdsr",
-             {{"attack", 0.f}, {"decay", 0.f}, {"sustain", 1.f}, {"release", release}, {"lifetime", envLifetime}});
-      f.node("vca", "amp.vca", {{"gain", 0.f}});
+      // The envelope is the amplifier too: the sine goes through its signal path rather than through a
+      // VCA beside it, which is the shape a patch actually takes.
+      f.node("env", "env.adsr",
+             {{"attack", 0.f}, {"decay", 0.f}, {"sustain", 100.f}, {"release", release}, {"lifetime", envLifetime}});
       f.edge("e2", "poly.gate", "env.gate");
-      f.edge("e3", "osc.out", "vca.in");
-      f.edge("e4", "env.out", "vca.gain");
-      f.edge("e5", "vca.out", "out.inL");
+      f.edge("e3", "osc.out", "env.signal");
+      f.edge("e5", "env.signal", "out.inL");
     } else {
       f.edge("e5", "osc.out", "out.inL");
     }

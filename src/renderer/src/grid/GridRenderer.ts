@@ -2,6 +2,7 @@ import { hexToNumber } from "@renderer/lib/color";
 import type { PhasegridTheme } from "@renderer/theming/theme";
 import type { ModuleDescriptor } from "@shared/protocol/catalog";
 import type { PatchDoc } from "@shared/protocol/patch";
+import type { EnvelopeReading } from "@shared/protocol/telemetry";
 import { type Application, Container, Graphics } from "pixi.js";
 import type { Level } from "./components/blocks/MeterBlock";
 import type { NotesView } from "./components/blocks/PianoRollBlock";
@@ -469,6 +470,11 @@ export class GridRenderer {
   /** Puts a cycle the engine drew onto a module's panel. Ignored for a module not drawn. */
   setPreview(moduleId: string, samples: ArrayLike<number>): void {
     this.nodes.get(moduleId)?.setWave(samples);
+  }
+
+  /** Puts the envelope the engine drew onto a module's picture. Ignored for a module not drawn. */
+  setEnvelope(moduleId: string, reading: EnvelopeReading): void {
+    this.nodes.get(moduleId)?.setEnvelope(reading);
   }
 
   /** Puts the window the engine published onto a module's scope. Ignored for a module not drawn. */

@@ -1,5 +1,6 @@
+import type { ParamDesc } from "@shared/protocol/catalog";
 import type { PortRef } from "@shared/protocol/patch";
-import { hitBlock, hitKnob, type Socket } from "./face";
+import { hitBlock, hitKnob, hitSelect, type Socket } from "./face";
 import type { GridRenderer } from "./GridRenderer";
 import {
   beginDragCable,
@@ -202,6 +203,8 @@ export class GridInteraction {
       this.callbacks.onEditText?.({ module: hit.id, text: block.name });
       return;
     }
+    // A switch has no reset gesture: a click already steps it, so a double click is two steps and
+    // putting it back on the second would undo what the first plainly did.
     const knob = hitKnob(point, origin, hit.node.face);
     if (knob === null) return;
     const previous =
@@ -211,6 +214,27 @@ export class GridInteraction {
       module: hit.id,
       param: knob.param.id,
       value: knob.param.default,
+      done: true,
+      previous,
+    });
+  }
+
+  /**
+   * The next value of an enum, wrapping at the end: what clicking its switch does.
+   *
+   * An ordinary parameter edit, so it goes to the document, reaches the engine and steps back under
+   * undo like a knob turn. A list of two is a toggle and a list of five is a rotary switch; both are
+   * the same gesture, which is why there is no separate control for either.
+   */
+  private cycleSelect(moduleId: string, param: ParamDesc): void {
+    const count = param.enumLabels?.length ?? 0;
+    if (count < 2) return;
+    const previous =
+      this.callbacks.readParam?.(moduleId, param.id) ?? param.default;
+    this.callbacks.onParamChange?.({
+      module: moduleId,
+      param: param.id,
+      value: (Math.round(previous) + 1) % count,
       done: true,
       previous,
     });
@@ -248,6 +272,13 @@ export class GridInteraction {
         x: hit.node.view.position.x,
         y: hit.node.view.position.y,
       };
+      // A switch is a button: clicking it steps to the next value. Checked with the knob and before
+      // the body, so choosing a model does not start dragging the module the switch sits on.
+      const select = hitSelect(point, origin, hit.node.face);
+      if (select !== null && event.button === 0) {
+        this.cycleSelect(hit.id, select.param);
+        return;
+      }
       // A knob before the body, so grabbing a control does not drag the module it sits on.
       const knob = hitKnob(point, origin, hit.node.face);
       if (knob !== null) {

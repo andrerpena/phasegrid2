@@ -196,21 +196,14 @@ async function runDemo(show, call, defaultArgs) {
     ["clip", "notes.clip", { params: { length: 4, loop: 1 }, data: { notes } }],
     ["voices", "note.toPoly", {}],
     ["osc", "osc.wavetable", {}],
-    // A plucked envelope, so the notes articulate instead of running together: the defaults sustain
-    // through the gap between one note and the next and the result is a drone.
-    //
-    // These numbers are NOT seconds, despite what the catalog's unit says. A vendored module's time
-    // params are exposed in the vendored pre-scale domain, where the real time is roughly the fourth
-    // power of the value: 0.25 is four milliseconds, 1.0 is about a second. `decay: 0.85` is the ~400 ms
-    // this wants. See the parameter-scaling note in docs/engine.md.
+    // A plucked envelope, so the notes articulate instead of running together: sustain at zero means
+    // each note falls away over its decay rather than holding until the gate drops. In seconds, and
+    // the oscillator runs through the envelope's own signal path, so there is no amplifier to place.
     [
       "env",
-      "env.dahdsr",
-      { params: { attack: 0.15, decay: 0.85, sustain: 0.0, release: 0.6 } },
+      "env.adsr",
+      { params: { attack: 0.005, decay: 0.4, sustain: 0, release: 0.15 } },
     ],
-    // The gain input ADDS to the gain knob, so the knob has to come down to zero or the envelope rides
-    // on top of an already-open amplifier and the result is a drone at full level.
-    ["vca", "amp.vca", { params: { gain: 0 } }],
     // Four voices sum into one bus, so unity gain per voice clips. Leave headroom.
     ["out", "io.audioOut", { params: { gain: 0.4 } }],
   ])
@@ -220,9 +213,8 @@ async function runDemo(show, call, defaultArgs) {
     ["clip", "notes", "voices", "notes"],
     ["voices", "pitch", "osc", "pitch"],
     ["voices", "gate", "env", "gate"],
-    ["osc", "out", "vca", "in"],
-    ["env", "out", "vca", "gain"],
-    ["vca", "out", "out", "inL"],
+    ["osc", "out", "env", "signal"],
+    ["env", "signal", "out", "inL"],
   ])
     await show("edge.add", {
       id: `${from}.${fromPort}->${to}.${toPort}`,

@@ -65,6 +65,8 @@ const char* const kFace[] = {
 | `value` | the readout, at least two cells across, on a module that `kModulePublishesValue`; it prints the value the module writes into its telemetry slot |
 | `meter` | the level meter, at least two by two, on a module that `kModulePublishesMeter`; it draws the level the module writes into its telemetry slot |
 | `piano` | the keyboard, at least four cells across by two, on a module that `kModulePublishesKeys`; it lights the keys the module writes into its telemetry slot |
+| `adsr` | the envelope picture, at least four by two, on a module that `kModulePreviewsEnvelope`; it draws the shape, the breakpoints and the playhead the module writes through `Module::preview` |
+| `select:<id>` | an enum param's switch, one cell or larger; a cell shows the value's initial, wider shows the label, and clicking cycles. The only block an enum may have -- a knob cannot show a list of names, and the registry refuses one |
 
 An oscillator gets a case in `engine/tests/test_osc_purity.cpp`, which asserts its harmonic series at the
 setting it ships with: a sine is one partial, a sawtooth the 1/n series, a pulse the odd harmonics. Level
@@ -83,13 +85,31 @@ free at the end of the block. See the instruments section of docs/engine.md.
 Implicit modulation ports (`param:<id>`) never appear: the socket for one sits at its knob's foot, and a cable dropped
 on the knob connects to it. A jack in the leftmost or rightmost column sits its socket on the module's border; one on
 the bottom row sits it on the bottom border; anywhere else the socket is the cell's centre. Short rows are padded
-with `.`. Hidden and enum params have no block yet.
+with `.`. Hidden params have no block.
 
 `Registry::add` rejects a face that names nothing, leaves a port out, names something twice, gives a knob, the wave,
-the scope, the readout or the meter too little room, or has a non-rectangular block -- so a wrong face is a module that does not register rather than a
+the scope, the readout, the meter or the envelope picture too little room, puts an enum on a knob or a switch on
+anything else, or has a non-rectangular block -- so a wrong face is a module that does not register rather than a
 node drawn wrong. `face = nullptr, faceRows = 0` is a module with no declared face: the interface composes one from
 its ports (down the sides) and its `kParamPrimary` params (knobs between them, the scope, the wave, the readout and the meter first). A vendored module
 declares its rows in `ModuleSpec::faceRows`, naming controls by suffix.
+
+## Owning a vendored processor directly
+
+`ModuleSpec` publishes the vendored library's own parameter table, so a module whose phasegrid-facing
+surface differs from the vendored one's does not fit it: the generated ranges are that library's, ports
+map one-to-one onto vendored ports, and there is nowhere to put a control the vendored module has no
+concept of. `env.adsr` is the case -- real seconds instead of a quartic pre-scale, a signal path and a
+bias output the vendored envelope has neither of, a model switch. It is an ordinary module
+(`engine/src/modules/EnvAdsr.cpp`) that holds a `vital::Envelope` per voice pair and plugs its own
+`vital::cr::Output`s into it, so every line of the actual DSP stays vendored and untouched.
+
+A bare `vital::Processor` runs standalone: it owns its inputs and outputs, its `router_` is null, and
+unplugged inputs read `null_source_`. Construct it, `plug()` an `Output` per input, `setSampleRate` in
+`prepare`, and call `process(n)`. `vital::kMaxBufferSize` is 128, the same as `kMaxBlockSize`. For a gate,
+reuse `pg::vendor::deriveTriggers` (`engine/src/vital/Triggers.hpp`) rather than writing the trigger
+fields by hand. Reach for this only when the spec genuinely does not fit -- it is more code, and the
+adapter's checklist below exists because each of its items was a bug.
 
 ## Wrapping a vendored module
 

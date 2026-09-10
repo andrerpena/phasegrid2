@@ -1,4 +1,5 @@
 import type { ModuleDescriptor, ParamDesc } from "@shared/protocol/catalog";
+import { paramFractionOf } from "@shared/protocol/param-curve";
 
 /**
  * The grid's units and the arithmetic everything on it shares.
@@ -111,9 +112,14 @@ export function rectFromPoints(a: Point, b: Point) {
   };
 }
 
-/** Where a parameter's value sits between its ends, 0 to 1, for drawing an arc. */
+/**
+ * Where a parameter's value sits on its knob, 0 to 1, for drawing an arc.
+ *
+ * On the param's own taper, not on a straight line between its ends: an envelope time runs to eight
+ * seconds and a filter's cutoff across ten octaves, and both would otherwise spend their whole knob
+ * in the first millimetre. `shared/protocol/param-curve.ts` is the same arithmetic the engine does,
+ * so a drag, a modulated knob and the value the engine ends up with all agree.
+ */
 export function paramFraction(param: ParamDesc, value: number): number {
-  const span = param.max - param.min;
-  if (span <= 0) return 0;
-  return Math.min(1, Math.max(0, (value - param.min) / span));
+  return paramFractionOf(param, value);
 }

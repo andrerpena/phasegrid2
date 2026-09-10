@@ -1,3 +1,7 @@
+import {
+  type Tapered,
+  paramValueAt as valueAt,
+} from "@shared/protocol/param-curve";
 import type { PortRef } from "@shared/protocol/patch";
 import type { Point } from "./layout";
 
@@ -81,12 +85,14 @@ export const KNOB_DRAG_RANGE = 180;
 /** With a modifier held. Slow enough to set a filter cutoff by ear rather than by luck. */
 export const KNOB_FINE_RANGE = 900;
 
-/** A fraction of a parameter's range as the number the parameter actually takes. */
-export function paramValueAt(
-  param: { min: number; max: number },
-  fraction: number,
-): number {
-  return param.min + fraction * (param.max - param.min);
+/**
+ * A fraction of a knob's turn as the number the parameter actually takes.
+ *
+ * On the param's own taper: `paramFraction` is the same arithmetic in the other direction, and both
+ * are the engine's (`shared/protocol/param-curve.ts`), so what a drag sets is what the engine gets.
+ */
+export function paramValueAt(param: Tapered, fraction: number): number {
+  return valueAt(param, fraction);
 }
 
 export function beginDragParam(

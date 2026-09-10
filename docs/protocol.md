@@ -33,8 +33,11 @@ shapes; this is the map, not the territory.
 - **Session:** `hello`, `engine.ping`, `engine.shutdown`.
 - **Catalog:** `catalog.get`, which returns every module descriptor including each port's signal role and
   the module's `face` (rows of tokens naming its blocks, or null; docs/adding-a-module.md).
-- **Pictures:** `module.preview`, one cycle of a module's waveform at its current values, for the module's
-  face to draw. Only modules whose descriptor has `previewsWave` answer; the rest return `E_UNSUPPORTED`.
+- **Pictures:** `module.preview`, what a module would draw at its current values, for its face. A
+  `previewsWave` module answers with one cycle of its waveform; a `previewsEnvelope` module with its
+  envelope picture instead -- the same array of floats, read by the layout in `core/Module.hpp` rather
+  than as samples -- and the rest return `E_UNSUPPORTED`. This is the fallback path: an engine with a
+  telemetry segment publishes every picture itself (docs/telemetry.md) and says so in `hello`.
   The picture is computed by the module from the same parameters the sound is, on the message thread.
 - **Patch:** `patch.load`, `patch.clear`, `patch.batch`, `module.add`, `module.remove`, `edge.add`,
   `edge.remove`, `param.set`, `patch.setFeedbackMode`. Every answer that committed, and the `patch.revision`

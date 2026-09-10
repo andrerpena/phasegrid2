@@ -193,6 +193,14 @@ void TelemetryWriter::writePreview(uint32_t slot, const float* samples, uint32_t
   });
 }
 
+void TelemetryWriter::writeEnvelope(uint32_t slot, const float* picture, uint32_t count,
+                                    uint64_t index) noexcept {
+  const uint32_t n = std::min(count, kTelemetryScopeFrames);
+  publish(slot, TelemetryKind::Envelope, 1, n, index, [&](float* out) noexcept {
+    for (uint32_t i = 0; i < n; ++i) out[i] = picture[i];
+  });
+}
+
 void TelemetryWriter::beat() noexcept PG_RT_NONBLOCKING {
   if (base_ == nullptr) return;
   header()->heartbeat.fetch_add(1, std::memory_order_relaxed);

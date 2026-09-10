@@ -3,6 +3,7 @@ import { useEngineStore } from "@renderer/engine/engine-store";
 import { usePatchStore } from "@renderer/patch/patch-store";
 import { EMPTY_PATCH, type PatchDoc } from "@shared/protocol/patch";
 import {
+  type EnvelopeReading,
   type NotesReading,
   type SlotReading,
   TELEMETRY_CHANNELS,
@@ -126,11 +127,15 @@ beforeEach(() => {
 const noteReadings: [string, string, number][] = [];
 const keyReadings: [string, string, number[]][] = [];
 
+const envelopeReadings: [string, EnvelopeReading][] = [];
+
 const target = {
   setLive: (module: string, param: string, fraction: number | null) =>
     live.push([module, param, fraction]),
   setWave: (module: string, samples: ArrayLike<number>) =>
     waves.push([module, Array.from(samples)]),
+  setEnvelope: (module: string, reading: EnvelopeReading) =>
+    envelopeReadings.push([module, reading]),
   setTrace: (module: string, index: bigint, channels: ArrayLike<number>[]) =>
     traces.push([module, index.toString(), channels.map((c) => Array.from(c))]),
   setValue: (module: string, index: bigint, values: number[]) =>

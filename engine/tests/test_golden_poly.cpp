@@ -34,7 +34,7 @@ constexpr double kValleyHz[2][2] = {{275.0, 315.0}, {345.0, 378.0}};
 /// the CLI registers, so this is a patch `--render` can play:
 ///
 ///   play (constant 1) -> notes.clip -> note.toPoly -> osc.wavetable -> filter.multi -> amp.vca -> io.audioOut
-///                                                  \-> env.dahdsr --------------------^
+///                                                  \-> env.adsr   --------------------^
 ///
 /// with the clip's three notes in its node data. Three voices, so two voice pairs: the odd count also leaves
 /// one empty lane, which the terminal has to mask away.

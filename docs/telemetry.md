@@ -40,12 +40,24 @@ trips per second per meter.
   frame, so no module knows it is being watched. It is what lets a knob on the interface turn when
   something modulates it. Inside a sample-level feedback cluster the write happens once per sample
   rather than once per block, which is correct and merely busier.
+- A module that draws an **envelope** (`previewsEnvelope`) writes the same buffer through the same
+  `Module::preview` and publishes it as `TelemetryKind::Envelope`: a header of `kEnvelopePictureHeader`
+  floats -- where each stage ends and the level it sustains at, all fractions of the drawn width, plus
+  the playhead and the stage -- and then the curve. Not samples alone, because an envelope is not one
+  cycle of anything: without the breakpoints a reader could draw the curve but not say where the decay
+  ends, so it could not dash the sustain or put a dot on a corner. The playhead is a relaxed read of what
+  the audio thread left on the module, so the picture animates at the publisher's rate rather than the
+  block rate. It rides the *preview* channel and not `display` on purpose: a held patch runs no module,
+  and the shape still has to follow a knob turned in the silence.
 - A module with a wave panel (`previewsWave`) can be asked for its picture as well. The engine's message
   thread (`PreviewPublisher`, ticked from the command loop about thirty times a second) reads the values
   the audio thread left on the instance, asks `Module::preview` when they have moved, and writes one cycle
   into a `Preview` slot. That is how a face follows the sound under modulation, under a hand, and while a
   smoother is still ramping. `hello` lists `previews` among the capabilities when this is on; a renderer
-  falls back to `module.preview` over the socket when it is not. A held patch (`audio.setRunning`) runs no
+  falls back to `module.preview` over the socket when it is not. An envelope's publisher is asked on
+  every tick rather than only when its values move -- its playhead travels while every knob stands still
+  -- and publishes only when the picture it produced differs from the last one, so a resting envelope
+  costs one comparison and no write. A held patch (`audio.setRunning`) runs no
   module, so nothing publishes `Params` and the knobs rest where the document has them; the pictures keep
   coming, drawn from the model's values, so a face still follows a knob turned while the patch is stopped.
 
@@ -57,7 +69,7 @@ two are not the same axis -- `display` carries four kinds depending on the modul
 
 - `params`: the scheduler, after `process`. Any module with parameters.
 - `display`: the module itself, on the audio thread. A `kModuleWritesTelemetry` module only.
-- `preview`: `PreviewPublisher`, on the message thread. A `previewsWave` module only.
+- `preview`: `PreviewPublisher`, on the message thread. A `previewsWave` or `previewsEnvelope` module only.
 
 `telemetry.subscribe` takes `watch`, a module id to the channels wanted of it, and answers the slot for
 each pair; that map is the only place the module-to-slot mapping exists. The list lives once, in

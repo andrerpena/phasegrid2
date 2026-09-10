@@ -585,28 +585,22 @@ function noteExample(args: {
       y: col(2),
       params: { level: 0.7 },
     },
-    {
-      id: "vca",
-      type: "amp.vca",
-      x: col(28 + shift),
-      y: col(2),
-      params: { gain: 0 },
-    },
+    // The envelope is the amplifier: the oscillator goes through its signal path and comes back out
+    // shaped, so a note needs one module rather than an envelope and a VCA beside it.
     {
       id: "env",
-      type: "env.dahdsr",
-      x: col(15 + shift),
-      y: col(9),
-      params: { attack: 0.15, decay: 0.85, sustain: 0, release: 0.6 },
+      type: "env.adsr",
+      x: col(28 + shift),
+      y: col(2),
+      params: { attack: 0.005, decay: 0.4, sustain: 0, release: 0.15 },
     },
-    { ...OUT, x: col(34 + shift) },
+    { ...OUT, x: col(40 + shift) },
   ];
   const edges = [
     edge("e2", ["voices", "pitch"], ["osc", "pitch"]),
     edge("e3", ["voices", "gate"], ["env", "gate"]),
-    edge("e4", ["osc", "out"], ["vca", "in"]),
-    edge("e5", ["env", "out"], ["vca", "gain"]),
-    edge("e6", ["vca", "out"], ["out", "inL"]),
+    edge("e4", ["osc", "out"], ["env", "signal"]),
+    edge("e6", ["env", "signal"], ["out", "inL"]),
   ];
   if (args.through === undefined) {
     edges.unshift(edge("e1", ["clip", "notes"], ["voices", "notes"]));
@@ -747,13 +741,14 @@ register(
 );
 
 register({
-  moduleId: "env.dahdsr",
-  name: "Envelope",
+  moduleId: "env.adsr",
+  name: "ADSR",
   description:
-    "An envelope shaping each note. Turn Attack, Decay, Sustain and Release and hear the shape " +
-    "change. The amplifier's own knob is at zero, so what you hear is entirely the envelope.",
+    "An envelope shaping each note. The oscillator runs through the envelope's own signal path, so " +
+    "what you hear is entirely the envelope: turn Attack, Decay, Sustain and Release and watch the " +
+    "picture on its face change with them. Model chooses the curves.",
   patch: noteExample({
-    moduleId: "env.dahdsr",
+    moduleId: "env.adsr",
     name: "",
     description: "",
     converter: "note.toPoly",
@@ -912,23 +907,23 @@ register({
   if (example !== undefined) {
     const { modules, edges } = example.patch;
     const out = modules.find((m) => m.id === "out");
-    if (out !== undefined) out.x = col(46);
+    if (out !== undefined) out.x = col(52);
     modules.push(
-      { id: "sum", type: "voices.sum", x: col(34), y: col(2) },
+      { id: "sum", type: "voices.sum", x: col(40), y: col(2) },
       {
         id: "verb",
         type: "fx.reverb",
-        x: col(38),
+        x: col(44),
         y: col(2),
         params: { dry_wet: 0.4 },
       },
     );
     const direct = edges.findIndex(
-      (e) => e.from.module === "vca" && e.to.module === "out",
+      (e) => e.from.module === "env" && e.to.module === "out",
     );
     if (direct >= 0) edges.splice(direct, 1);
     edges.push(
-      edge("e7", ["vca", "out"], ["sum", "in"]),
+      edge("e7", ["env", "signal"], ["sum", "in"]),
       edge("e8", ["sum", "out"], ["verb", "in"]),
       edge("e9", ["verb", "out"], ["out", "inL"]),
     );

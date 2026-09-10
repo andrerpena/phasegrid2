@@ -167,6 +167,25 @@ export interface PianoBlock extends BlockBase {
   kind: "piano";
 }
 
+/**
+ * The envelope picture: a screen like the scope's, showing the shape the module's own knobs describe
+ * and where it has got to. The engine draws it (`TelemetryKind.Envelope`), so nothing here knows what
+ * an attack is; the block is handed breakpoints on a 0..1 axis and a curve, and scales them.
+ */
+export interface AdsrBlock extends BlockBase {
+  kind: "adsr";
+  panel: Panel;
+}
+
+/**
+ * An enum param's switch: the one block that can show a list of names, which is why a knob refuses
+ * one. A cell wide it shows the value's initial; wider, the whole label. Clicking cycles it.
+ */
+export interface SelectBlock extends BlockBase {
+  kind: "select";
+  param: ParamDesc;
+}
+
 export interface TextBlock extends BlockBase {
   kind: "text";
   text: TextDesc;
@@ -182,7 +201,9 @@ export type Block =
   | MeterBlock
   | TextBlock
   | PianoRollBlock
-  | PianoBlock;
+  | PianoBlock
+  | AdsrBlock
+  | SelectBlock;
 
 export interface Face {
   /** Size in grid cells, the title's row included. The pixel size is these times `CELL` and nothing else. */
@@ -203,6 +224,8 @@ export interface Face {
   texts: TextBlock[];
   pianoRoll: PianoRollBlock | null;
   piano: PianoBlock | null;
+  adsr: AdsrBlock | null;
+  selects: SelectBlock[];
   /** Every place a cable can plug in: the jacks, and the sockets at the knobs' feet. */
   sockets: Socket[];
 }
@@ -224,6 +247,11 @@ export const PIANO_ROLL_MIN_ROWS = 2;
 /** A keyboard is read across: an octave is seven keys, and below four cells they are slivers. */
 export const PIANO_MIN_COLS = 4;
 export const PIANO_MIN_ROWS = 2;
+/** An envelope is four segments side by side: narrower than this and the stages run together. */
+export const ADSR_MIN_COLS = 4;
+export const ADSR_MIN_ROWS = 2;
+/** A switch fits one cell, where it shows an initial. It is the only block that can. */
+export const SELECT_MIN_CELLS = 1;
 /** The wave block a composed face gives a module: wider than tall, the shape of a scope screen. */
 export const WAVE_COLS = 3;
 export const WAVE_ROWS = 2;
@@ -239,6 +267,9 @@ export const METER_ROWS = 2;
 /** The keyboard a composed face gives a module: wide, since the keys are the whole point. */
 export const PIANO_COLS = 6;
 export const PIANO_ROWS = 2;
+/** The envelope picture a composed face gives a module: the scope's screen, since it is one. */
+export const ADSR_COLS = 4;
+export const ADSR_ROWS = 2;
 /** The face token the title block answers to, so a script can ask for it like any other. */
 export const TITLE_NAME = "title";
 
@@ -282,7 +313,9 @@ type Cell =
   | { kind: "param"; param: ParamDesc }
   | { kind: "text"; text: TextDesc }
   | { kind: "pianoRoll" }
-  | { kind: "piano" };
+  | { kind: "piano" }
+  | { kind: "adsr" }
+  | { kind: "select"; param: ParamDesc };
 
 /** The token that would have placed a cell: what a block is called, and what a script asks for. */
 function nameOf(cell: Exclude<Cell, { kind: "empty" }>): string {
@@ -299,6 +332,7 @@ function nameOf(cell: Exclude<Cell, { kind: "empty" }>): string {
     case "output":
       return cell.port.id;
     case "param":
+    case "select":
       return cell.param.id;
     case "text":
       return cell.text.id;
@@ -306,12 +340,17 @@ function nameOf(cell: Exclude<Cell, { kind: "empty" }>): string {
       return "pianoRoll";
     case "piano":
       return "piano";
+    case "adsr":
+      return "adsr";
   }
 }
 
 /** Identity of a cell for the areas algorithm: two cells of one block share this. */
 function keyOf(cell: Exclude<Cell, { kind: "empty" }>): string {
-  return `${cell.kind}:${nameOf(cell)}`;
+  // A select and a knob are two spellings of one param, so they share a key: a face that used both
+  // is a block that is not a rectangle rather than one param drawn twice.
+  const kind = cell.kind === "select" ? "param" : cell.kind;
+  return `${kind}:${nameOf(cell)}`;
 }
 
 /**
@@ -368,6 +407,23 @@ function cellOf(token: string, descriptor: ModuleDescriptor): Cell {
       );
     return { kind: "piano" };
   }
+  if (resolved.kind === "adsr") {
+    if (!descriptor.flags.previewsEnvelope)
+      throw new Error(
+        `${descriptor.id}: face names \`adsr\` but the module draws no envelope`,
+      );
+    return { kind: "adsr" };
+  }
+  if (resolved.kind === "select") {
+    const param = descriptor.params.find((p) => p.id === resolved.id);
+    if (param === undefined)
+      throw new Error(`${descriptor.id}: no param ${resolved.id}`);
+    if (!param.flags.enum)
+      throw new Error(
+        `${descriptor.id}: face gives \`${param.id}\` a switch, which only an enum param has`,
+      );
+    return { kind: "select", param };
+  }
   if (resolved.kind === "text") {
     const text = descriptor.texts.find((t) => t.id === resolved.id);
     if (text === undefined)
@@ -411,12 +467,14 @@ function defaultCells(descriptor: ModuleDescriptor): Cell[][] {
   const readout = descriptor.flags.publishesValue;
   const meter = descriptor.flags.publishesMeter;
   const piano = descriptor.flags.publishesKeys;
+  const adsr = descriptor.flags.previewsEnvelope;
   const screens =
     Number(wave) +
     Number(scope) +
     Number(readout) +
     Number(meter) +
-    Number(piano);
+    Number(piano) +
+    Number(adsr);
   const knobs = faceParams(descriptor, MAX_FACE_CONTROLS - screens);
 
   const middleCols =
@@ -425,7 +483,8 @@ function defaultCells(descriptor: ModuleDescriptor): Cell[][] {
     (scope ? SCOPE_COLS : 0) +
     (readout ? VALUE_COLS : 0) +
     (meter ? METER_COLS : 0) +
-    (piano ? PIANO_COLS : 0);
+    (piano ? PIANO_COLS : 0) +
+    (adsr ? ADSR_COLS : 0);
   const cols = Math.max(MIN_COLS, middleCols + 2);
   const portRows = Math.max(inputs.length, outputs.length);
   const middleRows = knobs.length > 0 || screens > 0 ? KNOB_ROWS : 0;
@@ -454,6 +513,7 @@ function defaultCells(descriptor: ModuleDescriptor): Cell[][] {
   if (readout) fill({ kind: "value" }, VALUE_COLS, VALUE_ROWS);
   if (meter) fill({ kind: "meter" }, METER_COLS, METER_ROWS);
   if (piano) fill({ kind: "piano" }, PIANO_COLS, PIANO_ROWS);
+  if (adsr) fill({ kind: "adsr" }, ADSR_COLS, ADSR_ROWS);
   for (const param of knobs)
     fill({ kind: "param", param }, KNOB_COLS, KNOB_ROWS);
   return grid;
@@ -632,6 +692,16 @@ function placeBlocks(cells: Cell[][], descriptor: ModuleDescriptor): Face {
           );
         blocks.push({ ...base, kind: "piano" });
         break;
+      case "adsr":
+        if (blockRows < ADSR_MIN_ROWS || blockCols < ADSR_MIN_COLS)
+          throw new Error(
+            `${descriptor.id}: face gives \`adsr\` less than four cells by two`,
+          );
+        blocks.push({ ...base, kind: "adsr", panel: panelOf(base) });
+        break;
+      case "select":
+        blocks.push({ ...base, kind: "select", param: area.cell.param });
+        break;
       case "text":
         if (blockCols < TEXT_MIN_COLS)
           throw new Error(
@@ -657,6 +727,8 @@ function placeBlocks(cells: Cell[][], descriptor: ModuleDescriptor): Face {
     (b): b is PianoRollBlock => b.kind === "pianoRoll",
   );
   const pianos = blocks.filter((b): b is PianoBlock => b.kind === "piano");
+  const adsrs = blocks.filter((b): b is AdsrBlock => b.kind === "adsr");
+  const selects = blocks.filter((b): b is SelectBlock => b.kind === "select");
   const declared = descriptor.inputs.filter((p) => !p.implicit);
   for (const port of [...declared, ...descriptor.outputs])
     if (!jacks.some((j) => j.socket.port === port))
@@ -678,6 +750,8 @@ function placeBlocks(cells: Cell[][], descriptor: ModuleDescriptor): Face {
     texts,
     pianoRoll: rolls[0] ?? null,
     piano: pianos[0] ?? null,
+    adsr: adsrs[0] ?? null,
+    selects,
     sockets: [
       ...jacks.map((j) => j.socket),
       ...knobs.flatMap((k) => (k.socket === null ? [] : [k.socket])),
@@ -799,6 +873,31 @@ export function hitKnob(
     const grab = knob.radius + (KNOB_HIT_RADIUS - KNOB_RADIUS);
     if (dx * dx + dy * dy <= grab * grab) return knob;
   }
+  return null;
+}
+
+/**
+ * The enum switch under a point, or null.
+ *
+ * Checked before the node body, like a knob, so clicking a switch changes the value instead of
+ * starting to drag the module it sits on. Its whole tile is the target -- it is a button, not a
+ * control with a grab point.
+ */
+export function hitSelect(
+  point: Point,
+  origin: Point,
+  face: Face,
+): SelectBlock | null {
+  const x = point.x - origin.x;
+  const y = point.y - origin.y;
+  for (const select of face.selects)
+    if (
+      x >= select.x &&
+      x < select.x + select.width &&
+      y >= select.y &&
+      y < select.y + select.height
+    )
+      return select;
   return null;
 }
 

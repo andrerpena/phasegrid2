@@ -93,6 +93,7 @@ export const GridView = () => {
         {
           setLive: (id, param, fraction) => view.setLive(id, param, fraction),
           setWave: (id, samples) => view.setPreview(id, samples),
+          setEnvelope: (id, reading) => view.setEnvelope(id, reading),
           setTrace: (id, index, channels) => view.setTrace(id, index, channels),
           setValue: (id, index, values) => view.setValue(id, index, values),
           setLevel: (id, index, level) => view.setLevel(id, index, level),

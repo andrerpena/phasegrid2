@@ -21,11 +21,14 @@ bool hasImplicitPort(const ParamDesc& p) {
 }
 
 /// What one face token names, once resolved against the descriptor.
-enum class Cell : uint8_t { Empty, Input, Output, Param, Text, Wave, Scope, Value, Meter, PianoRoll, Piano };
+enum class Cell : uint8_t { Empty, Input, Output, Param, Text, Wave, Scope, Value, Meter, PianoRoll, Piano, Adsr };
 
 struct Resolved {
   Cell cell = Cell::Empty;
   int32_t index = -1;   // into the descriptor's inputs, outputs or params
+  /// The param is drawn as an enum switch (`select:<id>`) rather than as a knob. Still `Cell::Param`,
+  /// so the duplicate check sees the two spellings as one thing: a param gets one block, not two.
+  bool asSelect = false;
 };
 
 int32_t indexOf(const PortDesc* ports, uint32_t count, const std::string& id) {
@@ -76,6 +79,11 @@ std::optional<std::string> resolveToken(const ModuleDescriptor& d, const std::st
     out = {Cell::Piano, -1};
     return std::nullopt;
   }
+  if (token == "adsr") {
+    if (!(d.flags & kModulePreviewsEnvelope)) return "face names `adsr` but the module draws no envelope";
+    out = {Cell::Adsr, -1};
+    return std::nullopt;
+  }
   // A text property is always written `text:<id>`, never bare. Unlike a port or a param it is
   // not something the face could plausibly mean by a bare name, and spelling it out keeps a
   // module that has a `pattern` param and a `pattern` string from being ambiguous.
@@ -106,6 +114,12 @@ std::optional<std::string> resolveToken(const ModuleDescriptor& d, const std::st
     const int32_t i = paramIndexOf(d, *id);
     if (i < 0) return "face names param `" + *id + "`, which the module does not declare";
     out = {Cell::Param, i};
+    return std::nullopt;
+  }
+  if (auto id = prefixed("select:")) {
+    const int32_t i = paramIndexOf(d, *id);
+    if (i < 0) return "face names param `" + *id + "`, which the module does not declare";
+    out = {Cell::Param, i, /*asSelect=*/true};
     return std::nullopt;
   }
   const int32_t in = indexOf(d.inputs, d.numInputs, token);
@@ -184,8 +198,15 @@ std::optional<std::string> validateFace(const ModuleDescriptor& d, std::vector<s
     if (a.what.cell == Cell::Param) {
       const ParamDesc& p = d.params[a.what.index];
       if (p.flags & kParamHidden) return "face shows hidden param `" + token + "`";
-      if (p.flags & kParamEnum) return "face shows enum param `" + token + "`, which has no block yet";
-      if (h < 2 || w < 2) return "face gives `" + token + "` less than two cells by two";
+      // An enum is a list of names, which a knob cannot show and a switch can; so each takes the one
+      // it can draw, and a face that asks for the other is refused rather than drawn wrong.
+      if (a.what.asSelect) {
+        if (!(p.flags & kParamEnum)) return "face gives `" + token + "` a switch, which only an enum param has";
+      } else {
+        if (p.flags & kParamEnum) return "face shows enum param `" + token + "` as a knob; write `select:" +
+                                        std::string(p.id) + "`";
+        if (h < 2 || w < 2) return "face gives `" + token + "` less than two cells by two";
+      }
     }
     if (a.what.cell == Cell::Wave && (h < 2 || w < 2)) return "face gives `wave` less than two cells by two";
     if (a.what.cell == Cell::Scope && (h < 2 || w < 2)) return "face gives `scope` less than two cells by two";
@@ -201,6 +222,10 @@ std::optional<std::string> validateFace(const ModuleDescriptor& d, std::vector<s
     // A keyboard is read across: an octave is seven keys, and below four cells they are slivers.
     if (a.what.cell == Cell::Piano && (h < 2 || w < 4))
       return "face gives `piano` less than four cells by two";
+    // An envelope picture is four segments side by side with a dashed sustain between them: narrower
+    // than four cells and the stages are indistinguishable.
+    if (a.what.cell == Cell::Adsr && (h < 2 || w < 4))
+      return "face gives `adsr` less than four cells by two";
   }
   for (uint32_t i = 0; i < d.numInputs; ++i)
     if (!seen.contains({Cell::Input, static_cast<int32_t>(i)})) return std::string("face leaves out input `") + d.inputs[i].id + "`";
@@ -245,6 +270,10 @@ std::optional<std::string> Registry::add(const ModuleDescriptor& d) {
     return id + ": publishes notes but does not write telemetry";
   if ((d.flags & kModulePublishesKeys) && !(d.flags & kModuleWritesTelemetry))
     return id + ": publishes keys but does not write telemetry";
+  // `Module::preview` fills one buffer, and the kind it is published as says how to read it, so a
+  // module draws one picture: a wave or an envelope, never both.
+  if ((d.flags & kModulePreviewsWave) && (d.flags & kModulePreviewsEnvelope))
+    return id + ": previews both a wave and an envelope";
   // An instrument's entry makes voices and its exit folds them; one module cannot be both ends.
   if ((d.flags & kModuleVoiceEntry) && (d.flags & kModuleVoiceExit))
     return id + ": a module cannot be both a voice entry and a voice exit";

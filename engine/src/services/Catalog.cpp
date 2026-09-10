@@ -38,9 +38,10 @@ const char* unitName(ParamUnit u) {
 
 const char* curveName(ParamCurve c) {
   switch (c) {
-    case ParamCurve::Linear: return "linear";
-    case ParamCurve::Log:    return "log";
-    case ParamCurve::Exp:    return "exp";
+    case ParamCurve::Linear:  return "linear";
+    case ParamCurve::Log:     return "log";
+    case ParamCurve::Exp:     return "exp";
+    case ParamCurve::Quartic: return "quartic";
   }
   return "linear";
 }
@@ -121,6 +122,7 @@ nlohmann::json moduleJson(const RegisteredModule& m) {
     {"needsTransport", (d.flags & kModuleNeedsTransport) != 0},
     {"writesTelemetry", (d.flags & kModuleWritesTelemetry) != 0},
     {"previewsWave", (d.flags & kModulePreviewsWave) != 0},
+    {"previewsEnvelope", (d.flags & kModulePreviewsEnvelope) != 0},
     {"publishesScope", (d.flags & kModulePublishesScope) != 0},
     {"publishesValue", (d.flags & kModulePublishesValue) != 0},
     {"publishesMeter", (d.flags & kModulePublishesMeter) != 0},

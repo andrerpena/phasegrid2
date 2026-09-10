@@ -16,7 +16,11 @@ void PreviewPublisher::tick() {
     const uint32_t slot = inst.slot(TelemetryChannel::Preview);
     if (slot == kNoTelemetrySlotCtx) return;
     const ModuleDescriptor& d = *inst.type->desc;
-    if ((d.flags & kModulePreviewsWave) == 0) return;
+    // An envelope draws a picture too; the kind it is published as says how to read it. Its playhead
+    // travels while every knob stands still, so it is asked on every tick and the ANSWER decides
+    // whether to publish -- a resting envelope still costs one comparison and no write.
+    const bool envelope = (d.flags & kModulePreviewsEnvelope) != 0;
+    if ((d.flags & kModulePreviewsWave) == 0 && !envelope) return;
     seen.insert(inst.serial);
 
     // The values the sound is made with, when the module has run under this subscription; the
@@ -35,13 +39,20 @@ void PreviewPublisher::tick() {
       }
     }
     auto last = lastDrawn_.find(inst.serial);
-    if (last != lastDrawn_.end() && last->second.slot == slot && last->second.values == values) return;
+    const bool sameSlot = last != lastDrawn_.end() && last->second.slot == slot;
+    if (!envelope && sameSlot && last->second.values == values) return;
 
     ParamValues named;
     for (uint32_t i = 0; i < d.numParams; ++i) named[d.params[i].id] = values[i];
     if (!inst.module->preview(named, samples_.data(), kPreviewFrames)) return;
+    if (envelope) {
+      if (sameSlot && last->second.picture == samples_) return;
+      writer_.writeEnvelope(slot, samples_.data(), kPreviewFrames, ++index_);
+      lastDrawn_[inst.serial] = Drawn{slot, {}, samples_};
+      return;
+    }
     writer_.writePreview(slot, samples_.data(), kPreviewFrames, ++index_);
-    lastDrawn_[inst.serial] = Drawn{slot, std::move(values)};
+    lastDrawn_[inst.serial] = Drawn{slot, std::move(values), {}};
   });
   // A module that left the patch, or lost its slot, is forgotten so a later instance with the same
   // serial (there is none, serials only grow) or a resubscribed one is drawn afresh.

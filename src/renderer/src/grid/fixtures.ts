@@ -43,7 +43,7 @@ export const DEMO_PATCH: PatchDoc = {
     moduleNode("clip", "notes.clip", { x: 24, y: 120 }),
     moduleNode("voices", "note.toPoly", { x: 168, y: 120 }),
     moduleNode("osc", "osc.wavetable", { x: 336, y: 24 }),
-    moduleNode("env", "env.dahdsr", { x: 336, y: 240 }),
+    moduleNode("env", "env.adsr", { x: 336, y: 240 }),
     moduleNode("flt", "filter.multi", { x: 624, y: 24 }),
     moduleNode("vca", "amp.vca", { x: 624, y: 240 }),
     moduleNode("out", "io.audioOut", { x: 936, y: 240 }),
@@ -76,7 +76,7 @@ export const DEMO_PATCH: PatchDoc = {
     },
     {
       id: "e6",
-      from: { module: "env", port: "out" },
+      from: { module: "env", port: "env" },
       to: { module: "vca", port: "gain" },
     },
     {

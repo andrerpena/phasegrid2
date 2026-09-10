@@ -21,9 +21,9 @@ extern const ModuleDescriptor kScope;
 extern const ModuleDescriptor kValue;
 extern const ModuleDescriptor kPiano;
 extern const ModuleDescriptor kVoiceSum;
+extern const ModuleDescriptor kEnvAdsr;
 const ModuleDescriptor& filterMulti();   // generated at first call; process lifetime
 const ModuleDescriptor& oscWavetable();
-const ModuleDescriptor& envDahdsr();
 const ModuleDescriptor& modRandom();
 const ModuleDescriptor& fxReverb();
 const ModuleDescriptor& fxDelay();
@@ -45,7 +45,8 @@ void registerBuiltinModules(Registry& r) {
     &modules::kAudioOut, &modules::kNoteToCv, &modules::kNoteToPoly, &modules::kNotesClip, &modules::kNotesPattern,
     &modules::kPhaseClock, &modules::kOscSawtooth, &modules::kOscPulse, &modules::kOscSine, &modules::kModLfo, &modules::kScaleOffset, &modules::kMixer, &modules::kVca,
     &modules::kMeter, &modules::kScope, &modules::kValue, &modules::kPiano, &modules::kVoiceSum,
-    &modules::filterMulti(), &modules::oscWavetable(), &modules::envDahdsr(),
+    &modules::kEnvAdsr,
+    &modules::filterMulti(), &modules::oscWavetable(),
     &modules::modRandom(),
     &modules::fxReverb(), &modules::fxDelay(), &modules::fxChorus(), &modules::fxFlanger(),
     &modules::fxPhaser(), &modules::fxDistortion(), &modules::fxCompressor(), &modules::fxEq(),

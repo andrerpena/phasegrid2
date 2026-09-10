@@ -277,6 +277,21 @@ in the inspector -- read from the document the way a knob's value is, so turning
 keys at once; the keyboard fills its block whatever the range, since the face is the engine's to
 declare and does not change with a knob.
 
+The envelope picture (`blocks/AdsrBlock.ts`) is the fifth, and the one that shows a module's own
+knobs rather than its input: the curve an envelope's settings describe, its sustain drawn dashed
+because that stretch lasts as long as the note and not a moment of its own, a dot on each corner, and
+a playhead that travels while a note sounds. It works nothing out. The shape, the three breakpoints
+and the playhead all arrive on a 0..1 axis from the module that makes the sound
+(`TelemetryKind.Envelope`, docs/telemetry.md), so the picture cannot drift away from what is heard and
+the block has no idea what an attack is. It rides the *preview* channel rather than `display`, which
+is what lets it keep following a knob turned while the patch is held and nothing is running.
+
+The switch (`blocks/SelectBlock.ts`) is the one block that shows a name: an enum's current label on a
+tile in the module's accent, the initial alone at one cell (the envelope's `A`, `R`, `D`) and the whole
+word from two across. Clicking it steps to the next value as an ordinary undoable edit. A knob cannot
+draw a list of names, which is why the face language refuses an enum on one and `select:<id>` on a
+face is how an enum gets a block at all.
+
 A cable leaving a module inside an instrument through a continuous port is drawn heavier
 (`CABLE_POLY_EXTRA` in `grid/components/Cable.ts`), the way a polyphonic wire is in a modular that has
 them: it carries one signal per voice. Which modules those are is the engine's knowledge — every commit

@@ -1,5 +1,5 @@
 {
-  "catalogHash": "b50604d1651074dd",
+  "catalogHash": "fbdb9ac0040d0f7e",
   "conventions": {
     "blockSize": 128,
     "gateThreshold": 0,
@@ -19,6 +19,7 @@
       "face": null,
       "flags": {
         "needsTransport": false,
+        "previewsEnvelope": false,
         "previewsWave": false,
         "publishesKeys": false,
         "publishesMeter": false,
@@ -136,6 +137,7 @@
       ],
       "flags": {
         "needsTransport": false,
+        "previewsEnvelope": false,
         "previewsWave": false,
         "publishesKeys": false,
         "publishesMeter": true,
@@ -194,6 +196,7 @@
       ],
       "flags": {
         "needsTransport": false,
+        "previewsEnvelope": false,
         "previewsWave": false,
         "publishesKeys": true,
         "publishesMeter": false,
@@ -304,6 +307,7 @@
       ],
       "flags": {
         "needsTransport": false,
+        "previewsEnvelope": false,
         "previewsWave": false,
         "publishesKeys": false,
         "publishesMeter": false,
@@ -371,6 +375,7 @@
       ],
       "flags": {
         "needsTransport": false,
+        "previewsEnvelope": false,
         "previewsWave": false,
         "publishesKeys": false,
         "publishesMeter": false,
@@ -400,10 +405,60 @@
     },
     {
       "category": "Modulation",
-      "doc": "Delay/attack/hold/decay/sustain/release envelope. The gate holds it at the sustain level; a falling edge starts the release. Times are in seconds after the stage curve is applied.",
-      "face": null,
+      "doc": "A gated four-stage envelope. A high gate starts the attack, which rises to full scale and decays to the sustain level; a low gate starts the release. Signal In comes back out of Signal Out with the envelope applied, so a note needs no separate amplifier, and Envelope Out drives anything else. Bias Out is the envelope less its sustain, so it rests at zero while a note is held. Model chooses the curves and the timing.",
+      "face": [
+        [
+          "select:model",
+          "adsr",
+          "adsr",
+          "adsr",
+          "adsr",
+          "adsr",
+          "adsr",
+          "adsr",
+          "adsr",
+          "out:signal"
+        ],
+        [
+          "in:signal",
+          "adsr",
+          "adsr",
+          "adsr",
+          "adsr",
+          "adsr",
+          "adsr",
+          "adsr",
+          "adsr",
+          "env"
+        ],
+        [
+          "gate",
+          "attack",
+          "attack",
+          "decay",
+          "decay",
+          "sustain",
+          "sustain",
+          "release",
+          "release",
+          "bias"
+        ],
+        [
+          ".",
+          "attack",
+          "attack",
+          "decay",
+          "decay",
+          "sustain",
+          "sustain",
+          "release",
+          "release",
+          "."
+        ]
+      ],
       "flags": {
         "needsTransport": false,
+        "previewsEnvelope": true,
         "previewsWave": false,
         "publishesKeys": false,
         "publishesMeter": false,
@@ -415,10 +470,18 @@
         "voiceExit": false,
         "writesTelemetry": false
       },
-      "id": "env.dahdsr",
+      "id": "env.adsr",
       "inputs": [
         {
-          "doc": "Gate: a rising edge starts the envelope, a falling edge starts the release",
+          "doc": "Signal to be scaled by the envelope. Leave it unconnected to use the module as a modulator alone",
+          "id": "signal",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "In",
+          "role": "any"
+        },
+        {
+          "doc": "High starts the attack stage; low starts the release. Inside an instrument the voices already know this, so leaving it unconnected follows the note each voice is playing; connect it for an envelope that opens on something else, or for edges placed to the sample",
           "id": "gate",
           "implicit": false,
           "kind": "continuous",
@@ -426,7 +489,7 @@
           "role": "gate"
         },
         {
-          "doc": "Envelope 1 Attack",
+          "doc": "Rise time from the envelope's current value to full scale",
           "id": "param:attack",
           "implicit": true,
           "kind": "continuous",
@@ -435,7 +498,7 @@
           "role": "cv"
         },
         {
-          "doc": "Envelope 1 Decay",
+          "doc": "Fall time after the attack stage, down to the sustain level",
           "id": "param:decay",
           "implicit": true,
           "kind": "continuous",
@@ -444,62 +507,157 @@
           "role": "cv"
         },
         {
-          "doc": "Envelope 1 Delay",
-          "id": "param:delay",
-          "implicit": true,
-          "kind": "continuous",
-          "name": "Delay",
-          "param": "delay",
-          "role": "cv"
-        },
-        {
-          "doc": "Envelope 1 Hold",
-          "id": "param:hold",
-          "implicit": true,
-          "kind": "continuous",
-          "name": "Hold",
-          "param": "hold",
-          "role": "cv"
-        },
-        {
-          "doc": "Envelope 1 Release",
-          "id": "param:release",
-          "implicit": true,
-          "kind": "continuous",
-          "name": "Release",
-          "param": "release",
-          "role": "cv"
-        },
-        {
-          "doc": "Envelope 1 Sustain",
+          "doc": "The level where the decay stage ends, and where the envelope stays while the gate is high",
           "id": "param:sustain",
           "implicit": true,
           "kind": "continuous",
           "name": "Sustain",
           "param": "sustain",
           "role": "cv"
+        },
+        {
+          "doc": "Fall time from the envelope's current value to zero, once the gate drops",
+          "id": "param:release",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Release",
+          "param": "release",
+          "role": "cv"
         }
       ],
-      "name": "Envelope",
+      "name": "ADSR",
       "outputs": [
         {
-          "doc": "Envelope level, 0..1",
-          "id": "out",
+          "doc": "The input signal with the envelope applied",
+          "id": "signal",
           "implicit": false,
           "kind": "continuous",
           "name": "Out",
+          "role": "any"
+        },
+        {
+          "doc": "The envelope itself, 0 to 1",
+          "id": "env",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Env",
           "role": "cv"
         },
         {
-          "doc": "Which stage the envelope is in, plus how far through it: 2.0 is the start of the attack, 2.5 halfway",
-          "id": "phase",
+          "doc": "The envelope less its sustain level, so it approaches zero while a note is held: with Sustain at 75%, this runs from -0.75 to +0.25",
+          "id": "bias",
           "implicit": false,
           "kind": "continuous",
-          "name": "Phase",
-          "role": "phase"
+          "name": "Bias",
+          "role": "cv"
         }
       ],
       "params": [
+        {
+          "curve": "quartic",
+          "default": 0.0010000000474974513,
+          "doc": "Rise time from the envelope's current value to full scale",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "id": "attack",
+          "max": 8.0,
+          "min": 0.0,
+          "name": "Attack",
+          "uiWidget": "knob",
+          "unit": "seconds"
+        },
+        {
+          "curve": "quartic",
+          "default": 1.0,
+          "doc": "Fall time after the attack stage, down to the sustain level",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "id": "decay",
+          "max": 8.0,
+          "min": 0.0,
+          "name": "Decay",
+          "uiWidget": "knob",
+          "unit": "seconds"
+        },
+        {
+          "curve": "linear",
+          "default": 100.0,
+          "doc": "The level where the decay stage ends, and where the envelope stays while the gate is high",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "id": "sustain",
+          "max": 100.0,
+          "min": 0.0,
+          "name": "Sustain",
+          "uiWidget": "knob",
+          "unit": "percent"
+        },
+        {
+          "curve": "quartic",
+          "default": 0.10000000149011612,
+          "doc": "Fall time from the envelope's current value to zero, once the gate drops",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "id": "release",
+          "max": 8.0,
+          "min": 0.0,
+          "name": "Release",
+          "uiWidget": "knob",
+          "unit": "seconds"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Analog: set curves, and a non-linear amplifier on Signal Out. Relative: the same curves, but each knob is the time to cross the WHOLE range, so a shorter move takes proportionally less time. Digital: straight lines and exact timing",
+          "enumLabels": [
+            "Analog",
+            "Relative",
+            "Digital"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "primary": false,
+            "structural": false
+          },
+          "id": "model",
+          "max": 2.0,
+          "min": 0.0,
+          "name": "Model",
+          "uiWidget": "select",
+          "unit": "none"
+        },
         {
           "curve": "linear",
           "default": 1.0,
@@ -519,186 +677,6 @@
           "name": "Affect voice lifetime",
           "uiWidget": "toggle",
           "unit": "none"
-        },
-        {
-          "curve": "linear",
-          "default": 0.14949999749660492,
-          "doc": "Envelope 1 Attack",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": true,
-            "structural": false
-          },
-          "id": "attack",
-          "max": 2.378420114517212,
-          "min": 0.0,
-          "name": "Attack",
-          "uiWidget": "slider",
-          "unit": "seconds"
-        },
-        {
-          "curve": "linear",
-          "default": 0.0,
-          "doc": "Envelope 1 Attack Power",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": false,
-            "noSmooth": false,
-            "primary": false,
-            "structural": false
-          },
-          "id": "attack_power",
-          "max": 20.0,
-          "min": -20.0,
-          "name": "Attack Power",
-          "uiWidget": "slider",
-          "unit": "none"
-        },
-        {
-          "curve": "linear",
-          "default": 1.0,
-          "doc": "Envelope 1 Decay",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": true,
-            "structural": false
-          },
-          "id": "decay",
-          "max": 2.378420114517212,
-          "min": 0.0,
-          "name": "Decay",
-          "uiWidget": "slider",
-          "unit": "seconds"
-        },
-        {
-          "curve": "linear",
-          "default": -2.0,
-          "doc": "Envelope 1 Decay Power",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": false,
-            "noSmooth": false,
-            "primary": false,
-            "structural": false
-          },
-          "id": "decay_power",
-          "max": 20.0,
-          "min": -20.0,
-          "name": "Decay Power",
-          "uiWidget": "slider",
-          "unit": "none"
-        },
-        {
-          "curve": "linear",
-          "default": 0.0,
-          "doc": "Envelope 1 Delay",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": false,
-            "structural": false
-          },
-          "id": "delay",
-          "max": 1.4142135381698608,
-          "min": 0.0,
-          "name": "Delay",
-          "uiWidget": "slider",
-          "unit": "seconds"
-        },
-        {
-          "curve": "linear",
-          "default": 0.0,
-          "doc": "Envelope 1 Hold",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": false,
-            "structural": false
-          },
-          "id": "hold",
-          "max": 1.4142135381698608,
-          "min": 0.0,
-          "name": "Hold",
-          "uiWidget": "slider",
-          "unit": "seconds"
-        },
-        {
-          "curve": "linear",
-          "default": 0.5475999712944031,
-          "doc": "Envelope 1 Release",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": true,
-            "structural": false
-          },
-          "id": "release",
-          "max": 2.378420114517212,
-          "min": 0.0,
-          "name": "Release",
-          "uiWidget": "slider",
-          "unit": "seconds"
-        },
-        {
-          "curve": "linear",
-          "default": -2.0,
-          "doc": "Envelope 1 Release Power",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": false,
-            "noSmooth": false,
-            "primary": false,
-            "structural": false
-          },
-          "id": "release_power",
-          "max": 20.0,
-          "min": -20.0,
-          "name": "Release Power",
-          "uiWidget": "slider",
-          "unit": "none"
-        },
-        {
-          "curve": "linear",
-          "default": 1.0,
-          "doc": "Envelope 1 Sustain",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": true,
-            "structural": false
-          },
-          "id": "sustain",
-          "max": 1.0,
-          "min": 0.0,
-          "name": "Sustain",
-          "uiWidget": "slider",
-          "unit": "none"
         }
       ],
       "texts": []
@@ -709,6 +687,7 @@
       "face": null,
       "flags": {
         "needsTransport": false,
+        "previewsEnvelope": false,
         "previewsWave": false,
         "publishesKeys": false,
         "publishesMeter": false,
@@ -1174,6 +1153,7 @@
       "face": null,
       "flags": {
         "needsTransport": false,
+        "previewsEnvelope": false,
         "previewsWave": false,
         "publishesKeys": false,
         "publishesMeter": false,
@@ -1528,6 +1508,7 @@
       "face": null,
       "flags": {
         "needsTransport": false,
+        "previewsEnvelope": false,
         "previewsWave": false,
         "publishesKeys": false,
         "publishesMeter": false,
@@ -2059,6 +2040,7 @@
       "face": null,
       "flags": {
         "needsTransport": false,
+        "previewsEnvelope": false,
         "previewsWave": false,
         "publishesKeys": false,
         "publishesMeter": false,
@@ -2416,6 +2398,7 @@
       "face": null,
       "flags": {
         "needsTransport": false,
+        "previewsEnvelope": false,
         "previewsWave": false,
         "publishesKeys": false,
         "publishesMeter": false,
@@ -2657,6 +2640,7 @@
       "face": null,
       "flags": {
         "needsTransport": false,
+        "previewsEnvelope": false,
         "previewsWave": false,
         "publishesKeys": false,
         "publishesMeter": false,
@@ -3033,6 +3017,7 @@
       "face": null,
       "flags": {
         "needsTransport": false,
+        "previewsEnvelope": false,
         "previewsWave": false,
         "publishesKeys": false,
         "publishesMeter": false,
@@ -3317,6 +3302,7 @@
       "face": null,
       "flags": {
         "needsTransport": false,
+        "previewsEnvelope": false,
         "previewsWave": false,
         "publishesKeys": false,
         "publishesMeter": false,
@@ -3630,6 +3616,7 @@
       "face": null,
       "flags": {
         "needsTransport": false,
+        "previewsEnvelope": false,
         "previewsWave": false,
         "publishesKeys": false,
         "publishesMeter": false,
@@ -4036,6 +4023,7 @@
       ],
       "flags": {
         "needsTransport": false,
+        "previewsEnvelope": false,
         "previewsWave": false,
         "publishesKeys": false,
         "publishesMeter": true,
@@ -4218,6 +4206,7 @@
       "face": null,
       "flags": {
         "needsTransport": false,
+        "previewsEnvelope": false,
         "previewsWave": false,
         "publishesKeys": false,
         "publishesMeter": false,
@@ -4319,6 +4308,7 @@
       "face": null,
       "flags": {
         "needsTransport": false,
+        "previewsEnvelope": false,
         "previewsWave": false,
         "publishesKeys": false,
         "publishesMeter": false,
@@ -4529,6 +4519,7 @@
       ],
       "flags": {
         "needsTransport": false,
+        "previewsEnvelope": false,
         "previewsWave": true,
         "publishesKeys": false,
         "publishesMeter": false,
@@ -4659,6 +4650,7 @@
       "face": null,
       "flags": {
         "needsTransport": false,
+        "previewsEnvelope": false,
         "previewsWave": false,
         "publishesKeys": false,
         "publishesMeter": false,
@@ -4924,6 +4916,7 @@
       "face": null,
       "flags": {
         "needsTransport": false,
+        "previewsEnvelope": false,
         "previewsWave": false,
         "publishesKeys": false,
         "publishesMeter": false,
@@ -5037,6 +5030,7 @@
       "face": null,
       "flags": {
         "needsTransport": false,
+        "previewsEnvelope": false,
         "previewsWave": false,
         "publishesKeys": false,
         "publishesMeter": false,
@@ -5133,6 +5127,7 @@
       ],
       "flags": {
         "needsTransport": true,
+        "previewsEnvelope": false,
         "previewsWave": false,
         "publishesKeys": false,
         "publishesMeter": false,
@@ -5281,6 +5276,7 @@
       "face": null,
       "flags": {
         "needsTransport": false,
+        "previewsEnvelope": false,
         "previewsWave": false,
         "publishesKeys": false,
         "publishesMeter": false,
@@ -5372,6 +5368,7 @@
       ],
       "flags": {
         "needsTransport": true,
+        "previewsEnvelope": false,
         "previewsWave": false,
         "publishesKeys": false,
         "publishesMeter": false,
@@ -5473,6 +5470,7 @@
       "face": null,
       "flags": {
         "needsTransport": true,
+        "previewsEnvelope": false,
         "previewsWave": false,
         "publishesKeys": false,
         "publishesMeter": false,
@@ -5541,6 +5539,7 @@
       "face": null,
       "flags": {
         "needsTransport": true,
+        "previewsEnvelope": false,
         "previewsWave": false,
         "publishesKeys": false,
         "publishesMeter": false,
@@ -5713,6 +5712,7 @@
       ],
       "flags": {
         "needsTransport": true,
+        "previewsEnvelope": false,
         "previewsWave": false,
         "publishesKeys": false,
         "publishesMeter": false,
@@ -5922,6 +5922,7 @@
       ],
       "flags": {
         "needsTransport": false,
+        "previewsEnvelope": false,
         "previewsWave": true,
         "publishesKeys": false,
         "publishesMeter": false,
@@ -6038,6 +6039,7 @@
       ],
       "flags": {
         "needsTransport": false,
+        "previewsEnvelope": false,
         "previewsWave": true,
         "publishesKeys": false,
         "publishesMeter": false,
@@ -6154,6 +6156,7 @@
       ],
       "flags": {
         "needsTransport": false,
+        "previewsEnvelope": false,
         "previewsWave": true,
         "publishesKeys": false,
         "publishesMeter": false,
@@ -6242,6 +6245,7 @@
       "face": null,
       "flags": {
         "needsTransport": false,
+        "previewsEnvelope": false,
         "previewsWave": true,
         "publishesKeys": false,
         "publishesMeter": false,
@@ -7073,6 +7077,7 @@
       "face": null,
       "flags": {
         "needsTransport": true,
+        "previewsEnvelope": false,
         "previewsWave": false,
         "publishesKeys": false,
         "publishesMeter": false,
@@ -7174,6 +7179,7 @@
       "face": null,
       "flags": {
         "needsTransport": false,
+        "previewsEnvelope": false,
         "previewsWave": false,
         "publishesKeys": false,
         "publishesMeter": false,
@@ -7469,6 +7475,7 @@
       ],
       "flags": {
         "needsTransport": false,
+        "previewsEnvelope": false,
         "previewsWave": false,
         "publishesKeys": false,
         "publishesMeter": false,

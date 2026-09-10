@@ -59,7 +59,7 @@ export interface FaceBlock {
   kind: Block["kind"];
   /**
    * The face token: the port id, the param id, the text property's id, `wave`, `scope`, `value`,
-   * `meter`, `pianoRoll`, `piano`, or `title`.
+   * `meter`, `pianoRoll`, `piano`, `adsr`, or `title`. A switch answers to its param's id, like a knob.
    */
   name: string;
   rect: Rect;
@@ -109,6 +109,20 @@ export interface FaceBlock {
   } | null;
   /** What a text property holds: the value from the document, or the module's default. */
   text?: string | null;
+  /**
+   * What an envelope picture shows: where each stage ends and the level it sustains at, all as
+   * fractions of the drawn width, and where the playhead is, or null while it is not running. Null
+   * until the engine has published a picture. `playhead` is what a scenario watches move.
+   */
+  envelope?: {
+    attackEnd: number;
+    decayEnd: number;
+    sustainEnd: number;
+    sustain: number;
+    playhead: { x: number; y: number } | null;
+  } | null;
+  /** Which value a switch is showing, and the label it is showing for it. */
+  choice?: { value: number; label: string } | null;
 }
 
 export function createGridApi(source: GridSource = fromRegistry) {
@@ -263,6 +277,8 @@ export function createGridApi(source: GridSource = fromRegistry) {
           out.range = node.keyRangeOf();
         }
         if (block.kind === "text") out.text = node.textOf(block.name);
+        if (block.kind === "adsr") out.envelope = node.envelopeOf();
+        if (block.kind === "select") out.choice = node.choiceOf(block.name);
         return out;
       });
     },

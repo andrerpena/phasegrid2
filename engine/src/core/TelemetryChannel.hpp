@@ -25,8 +25,8 @@ enum class TelemetryChannel : uint32_t {
   /// What the module publishes about itself onto its own face -- a meter's level, a scope's window, a
   /// readout's value, a note source's notes. Written by the module, on the audio thread.
   Display = 1,
-  /// One cycle of the picture a module would draw for the values it is running with, written by
-  /// `PreviewPublisher` on the message thread.
+  /// The picture a module would draw for the values it is running with -- one cycle of a wave, or an
+  /// envelope's shape and playhead -- written by `PreviewPublisher` on the message thread.
   Preview = 2,
 };
 inline constexpr uint32_t kTelemetryChannelCount = 3;
@@ -68,7 +68,8 @@ inline bool moduleServes(const ModuleDescriptor& d, TelemetryChannel c) {
   switch (c) {
     case TelemetryChannel::Params: return d.numParams > 0;
     case TelemetryChannel::Display: return (d.flags & kModuleWritesTelemetry) != 0;
-    case TelemetryChannel::Preview: return (d.flags & kModulePreviewsWave) != 0;
+    case TelemetryChannel::Preview:
+      return (d.flags & (kModulePreviewsWave | kModulePreviewsEnvelope)) != 0;
   }
   return false;
 }

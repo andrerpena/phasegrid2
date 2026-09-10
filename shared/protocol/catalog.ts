@@ -40,7 +40,12 @@ export const ParamUnitSchema = z.enum([
   "ratio",
 ]);
 
-export const ParamCurveSchema = z.enum(["linear", "log", "exp"]);
+/**
+ * The taper between a knob's turn and its value. `quartic` is the fourth power: a range of eight
+ * seconds spends most of the turn under a second, where every musical setting is, and unlike `log`
+ * it can start at zero -- which "0.00 ms" has to.
+ */
+export const ParamCurveSchema = z.enum(["linear", "log", "exp", "quartic"]);
 
 export const UiWidgetSchema = z.enum(["slider", "knob", "toggle", "select"]);
 
@@ -146,6 +151,11 @@ export const ModuleFlagsSchema = z
      */
     previewsWave: z.boolean(),
     /**
+     * Draws its own envelope instead of a wave: `Module::preview` fills the shape, the breakpoints and
+     * the playhead (`TelemetryKind.Envelope`), and the editor gives such a module the `adsr` block.
+     */
+    previewsEnvelope: z.boolean(),
+    /**
      * Its telemetry slot carries a rolling window of the signal it is fed (`TelemetryKind.Scope`).
      * The editor gives such a module a scope panel on its face and draws the window there, read from
      * the engine's segment at frame rate.
@@ -182,7 +192,8 @@ export const ModuleFlagsSchema = z
  * A module's face: rows of tokens, one per grid cell, as the engine padded them (every row the same
  * length). Equal neighbouring tokens form one rectangular block, as CSS `grid-template-areas`. `.` is
  * an empty cell, `wave` the wave panel, `scope` the scope panel, `value` the readout, `meter` the
- * level meter, `piano` the keyboard, `text:<id>` a text property, anything else names a port (`in:`/`out:` when the two
+ * level meter, `piano` the keyboard, `adsr` the envelope picture, `text:<id>` a text property,
+ * `select:<id>` an enum param's switch, anything else names a port (`in:`/`out:` when the two
  * sides share an id) or a param (`param:` when it collides with a port). The engine's registry has already
  * checked the geometry; the check here is only that every token still names something on the
  * module, which is what `composeFace` needs to be true.
@@ -206,7 +217,8 @@ export function resolveFaceToken(
   | { kind: "meter" }
   | { kind: "pianoRoll" }
   | { kind: "piano" }
-  | { kind: "input" | "output" | "param" | "text"; id: string }
+  | { kind: "adsr" }
+  | { kind: "input" | "output" | "param" | "select" | "text"; id: string }
   | null {
   if (token === ".") return { kind: "empty" };
   if (token === "wave") return { kind: "wave" };
@@ -215,6 +227,7 @@ export function resolveFaceToken(
   if (token === "meter") return { kind: "meter" };
   if (token === "pianoRoll") return { kind: "pianoRoll" };
   if (token === "piano") return { kind: "piano" };
+  if (token === "adsr") return { kind: "adsr" };
   // Implicit modulation ports never sit on a face; they ride on their param's control, so only a
   // declared input is a jack.
   const declared = module.inputs.filter(
@@ -226,6 +239,9 @@ export function resolveFaceToken(
     ["in:", "input", declared],
     ["out:", "output", module.outputs],
     ["param:", "param", module.params],
+    // An enum is a list of names, which a knob cannot show, so it is drawn as a switch and asked
+    // for by name -- never by the bare id, which would be ambiguous with a knob.
+    ["select:", "select", module.params],
     // A text property is always written out in full. Unlike a port or a param it is not something
     // a bare name could plausibly mean, and spelling it keeps a module with a `pattern` param and
     // a `pattern` string from being ambiguous.

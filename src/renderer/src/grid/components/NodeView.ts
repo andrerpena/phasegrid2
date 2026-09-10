@@ -3,9 +3,11 @@ import { paramValue } from "@renderer/patch/params";
 import type { GridColors } from "@renderer/theming/theme";
 import type { ModuleDescriptor } from "@shared/protocol/catalog";
 import type { PatchModule } from "@shared/protocol/patch";
+import type { EnvelopeReading } from "@shared/protocol/telemetry";
 import { Container, Graphics } from "pixi.js";
 import { type Block as BlockGeometry, composeFace, type Face } from "../face";
 import { paramFraction } from "../layout";
+import { AdsrBlock } from "./blocks/AdsrBlock";
 import { type Block, type BlockStyle, blockStyle } from "./blocks/Block";
 import { JackBlock } from "./blocks/JackBlock";
 import { KnobBlock } from "./blocks/KnobBlock";
@@ -13,6 +15,7 @@ import { type Level, MeterBlock } from "./blocks/MeterBlock";
 import { type KeyRange, PianoBlock } from "./blocks/PianoBlock";
 import { type NotesView, PianoRollBlock } from "./blocks/PianoRollBlock";
 import { ScopeBlock } from "./blocks/ScopeBlock";
+import { SelectBlock } from "./blocks/SelectBlock";
 import { TextBlock } from "./blocks/TextBlock";
 import { TitleBlock } from "./blocks/TitleBlock";
 import { ValueBlock } from "./blocks/ValueBlock";
@@ -106,6 +109,10 @@ function buildBlock(
       return new PianoRollBlock(geometry, style);
     case "piano":
       return new PianoBlock(geometry, style);
+    case "adsr":
+      return new AdsrBlock(geometry, style);
+    case "select":
+      return new SelectBlock(geometry, style);
   }
 }
 
@@ -124,6 +131,8 @@ export class NodeView {
   private readonly texts = new Map<string, TextBlock>();
   private readonly pianoRoll: PianoRollBlock | null = null;
   private readonly piano: PianoBlock | null = null;
+  private readonly adsr: AdsrBlock | null = null;
+  private readonly selects = new Map<string, SelectBlock>();
   /** The last notes put on the roll, by the engine's count: what a script asks about. */
   private notes: NotesSummary | null = null;
   /** The last keys lit on the keyboard, the same way. */
@@ -174,6 +183,9 @@ export class NodeView {
       else if (block instanceof TextBlock) this.texts.set(geometry.name, block);
       else if (block instanceof PianoRollBlock) this.pianoRoll = block;
       else if (block instanceof PianoBlock) this.piano = block;
+      else if (block instanceof AdsrBlock) this.adsr = block;
+      else if (block instanceof SelectBlock)
+        this.selects.set(geometry.name, block);
     }
     this.applyValues(module);
     this.view.position.set(module.x ?? 0, module.y ?? 0);
@@ -188,6 +200,28 @@ export class NodeView {
    */
   setWave(samples: ArrayLike<number>): void {
     this.wave?.setWave(samples);
+  }
+
+  /**
+   * The envelope to show: its shape, its breakpoints and where it has got to, as the engine drew it.
+   * The same channel as the wave and for the same reason -- the module that makes the sound is the
+   * only thing that can say what its own curve looks like. A node with no picture ignores it.
+   */
+  setEnvelope(reading: EnvelopeReading): void {
+    this.adsr?.setEnvelope(reading);
+  }
+
+  /** What is on the envelope picture right now, as a script sees it. */
+  envelopeOf(): ReturnType<AdsrBlock["summary"]> {
+    return this.adsr?.summary() ?? null;
+  }
+
+  /** Which value a switch is showing, and the label on it: how a script reads an enum off a face. */
+  choiceOf(paramId: string): { value: number; label: string } | null {
+    const select = this.selects.get(paramId);
+    return select === undefined
+      ? null
+      : { value: select.value, label: select.text };
   }
 
   /**
@@ -339,6 +373,9 @@ export class NodeView {
     });
     // A text property's value lives in the node's `data`, keyed by its id, and falls back to the
     // default the module declared -- exactly the rule `configure` follows in the engine.
+    // A switch shows a name, so it takes the value itself rather than a fraction of a range.
+    for (const [paramId, select] of this.selects)
+      select.setValue(paramValue(module, this.descriptor, paramId));
     for (const [textId, block] of this.texts) {
       const value = module.data?.[textId];
       const declared = this.descriptor.texts.find((t) => t.id === textId);

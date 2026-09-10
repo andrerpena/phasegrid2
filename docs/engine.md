@@ -54,8 +54,11 @@ plays.
 **When a released voice ends** is the reference instrument's rule, not a measurement (docs/adrs/0002).
 After its note off a voice lives only while something in the instrument *holds* it, and each holder says
 so per pass, per block, through `VoiceActivity::hold(voice)`. An envelope holds its voice until its
-release stage is over (`env.dahdsr` reads the vendored envelope's stage; its `lifetime` toggle, on by
-default, takes it out of the decision). An exit -- `io.audioOut`, `voices.sum` -- holds a voice while
+release stage is over (`env.adsr` reads its envelope's own stage; its `lifetime` toggle, on by
+default, takes it out of the decision). The same pool answers the other direction too: an `env.adsr`
+with nothing plugged into its Gate follows the note its voice is holding, so the first patch anyone
+builds makes sound rather than silence -- block-accurate, where a cable from the converter's Gate is
+exact (docs/adrs/0008). An exit -- `io.audioOut`, `voices.sum` -- holds a voice while
 what it hears from it is above `kVoiceSilence`, but only with its own `lifetime` toggle on, which is off
 by default. So a voice with an envelope rings out; a voice with none ends with its note -- a bare
 oscillator stops rather than droning, and a run of single notes into it plays one voice instead of
@@ -182,8 +185,8 @@ Built-ins are registered in `engine/src/modules/builtin.cpp`, one line each. Own
 
 - own: `io.audioOut`, `note.toCv`, `note.toPoly`, `notes.clip`, `notes.pattern`, `phase.clock`, `math.scaleOffset`,
   `mix.mixer`, `amp.vca`, `osc.sawtooth`, `osc.pulse`, `osc.sine`, `mod.lfo`, `display.meter`, `display.scope`,
-  `display.value`, `display.piano`, `voices.sum`, and the four note effects `notefx.chord`, `notefx.quantize`, `notefx.arp`, `notefx.humanize`
-- vendored-backed: `osc.wavetable`, `sampler.player`, `filter.multi`, `env.dahdsr`, `mod.random`, and the
+  `display.value`, `display.piano`, `voices.sum`, `env.adsr`, and the four note effects `notefx.chord`, `notefx.quantize`, `notefx.arp`, `notefx.humanize`
+- vendored-backed: `osc.wavetable`, `sampler.player`, `filter.multi`, `mod.random`, and the
   eight audio effects `fx.reverb`, `fx.delay`, `fx.chorus`, `fx.flanger`, `fx.phaser`, `fx.distortion`,
   `fx.compressor`, `fx.eq`.
 
@@ -342,7 +345,13 @@ grid param ids `level`, `loop`, `pan` rather than `sample_level` and friends.
 
 ## Params
 
-`ParamDesc` has min/max/default in display units and a curve. `ParamState` stores the normalized target and a 5 ms smoother.
+`ParamDesc` has min/max/default in display units and a curve -- `Linear`, `Log`, `Exp` or `Quartic` --
+and the curve is the taper between a knob's turn and the number, not a display detail: a param crosses
+the protocol in display units, `Param.cpp` normalizes it with the curve, and modulation is summed in that
+normalized space. `shared/protocol/param-curve.ts` is the same arithmetic, and is what the canvas drags a
+knob along, so what a hand sets is what the engine gets. `Quartic` is for a range whose useful part is at
+the bottom and whose bottom is zero -- an envelope time to eight seconds -- where `Log` cannot start.
+`ParamState` stores the normalized target and a 5 ms smoother.
 Modulatable params get an implicit input port `param:<id>`; effective value = `denormalize(clamp(knobNorm + signal))`, lane-wise.
 Modules read `ctx.param(i).at(frame)` as a `Sample`. `ParamView::knob` carries the *unmodulated* value for the block,
 so a module that has to hand the knob and the modulation to a downstream engine separately recovers the modulation
@@ -371,17 +380,14 @@ reached through the inspector.
 Descriptors for vendored modules are generated from the vendored parameter table, taking min, max, default
 and unit straight from it, with a linear curve because the vendored code applies its own scaling
 internally. For a param whose scaling is not linear, the number is therefore not in the unit the label
-names. The envelope's times are the sharpest case: `decay` says "seconds" and runs 0 to 2.378, but the
-real time is close to the fourth power of the value, so `0.25` is about four milliseconds and `1.0` is
-about a second. The range makes sense once you see that 2.378 to the fourth is roughly the 32 seconds the
-vendored envelope actually offers.
+names -- and a knob is drawn and dragged on the descriptor's curve, so it will be wrong in the same way.
+Check the vendored `ValueDetails::value_scale` of any generated param whose unit matters.
 
-Nothing is wrong with the audio; it is the metadata that lies, and it will mislead a user interface that
-renders "seconds" beside the number and a person who types what they mean. Fixing it properly is a choice
-between two options that have not been made yet: keep the pre-scale value and carry the real curve in the
-descriptor so the display can transform it, or expose display units and have the adapter invert the
-vendored scaling, which also moves what "knob plus modulation" means into display units. Until then, set
-these params by ear or by measurement, not by reading the unit.
+The envelope used to be the sharpest case: its times said "seconds" and ran 0 to 2.378, while the real
+time was the fourth power of the value, so 0.25 was four milliseconds. That is what `env.adsr` was
+written to end -- it owns the vendored `Envelope` processor directly and declares its own params in real
+seconds on a `Quartic` taper (docs/adrs/0008). A generated descriptor whose scaling is not linear needs
+the same treatment: a spec cannot fix it, because the scaling lives in the vendored control chain.
 
 ## Node data
 
@@ -529,7 +535,7 @@ Headless render, using a patch built from builtin modules only:
 
 `engine/tests/golden/synth_voice.json` is one whole synth voice: gate and pitch (constants from `math.scaleOffset`
 nodes with nothing plugged in) into `osc.wavetable` (saw), into `filter.multi` (12 dB low pass at MIDI 83), into
-`amp.vca` whose gain is `env.dahdsr` on the same gate, into `io.audioOut`. `engine/tests/test_golden_synth.cpp`
+`amp.vca` whose gain is `env.adsr` on the same gate, into `io.audioOut`. `engine/tests/test_golden_synth.cpp`
 renders it and asserts on the signal rather than the file size: it is audible (RMS), it is a *note* (near-silent
 through the 62 ms attack, decayed to the sustain level by 450 ms and flat from there), it is *pitched* (the strongest
 partial of the settled note is within 15 Hz of 523.25 Hz, the pitch the patch asks for), it is *filtered* (a thousand
@@ -539,7 +545,7 @@ a hundredfold — which a source that simply had no harmonics could not do), and
 The voice has no note path in it: it predates `notes.clip`, and it stays as the monophonic reference.
 
 `engine/tests/golden/poly_chord.json` is the polyphonic one: `notes.clip` holding a C major triad into
-`note.toPoly`, its pitch into `osc.wavetable` and its gate into `env.dahdsr`, through `filter.multi` and
+`note.toPoly`, its pitch into `osc.wavetable` and its gate into `env.adsr`, through `filter.multi` and
 `amp.vca` into `io.audioOut`, at three voices -- so it also renders an odd voice count's empty lane.
 `engine/tests/test_golden_poly.cpp` asserts the three fundamentals are *individually identifiable* rather
 than that the render is loud: each peak lands within 3 Hz of its note and stands a hundred times above the

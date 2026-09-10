@@ -167,6 +167,30 @@ public:
   virtual bool preview(const ParamValues& /*params*/, float* /*out*/, uint32_t /*count*/) { return false; }
 };
 
+/**
+ * The envelope picture: what a `kModulePreviewsEnvelope` module writes through `Module::preview`
+ * instead of a cycle of a wave, and what the `adsr` block on its face draws.
+ *
+ * Same call, same buffer, different kind on the wire (`TelemetryKind::Envelope`), because an envelope
+ * is not one cycle of anything: it is four segments whose widths are its own times, a level to hold at,
+ * and a place it has got to. A reader that only had samples could draw the curve but not say where the
+ * decay ends, so it could not dash the sustain or put a dot on a corner.
+ *
+ * `x` is a fraction of the drawn width and `y` a level in 0..1, so the block scales the picture to its
+ * own rectangle and knows nothing about seconds. The curve is evenly spaced across the whole width.
+ */
+inline constexpr uint32_t kEnvelopePictureHeader = 8;
+enum EnvelopePictureField : uint32_t {
+  kEnvelopeAttackEnd = 0,   ///< x where the attack reaches full scale
+  kEnvelopeDecayEnd,        ///< x where the decay reaches the sustain level; the dashed run starts here
+  kEnvelopeSustainEnd,      ///< x where the release begins; the dashed run ends here
+  kEnvelopeSustainLevel,    ///< the sustain level, 0..1
+  kEnvelopePlayheadX,       ///< where the envelope has got to, or -1 when it is not running
+  kEnvelopePlayheadY,       ///< the level it is at
+  kEnvelopeStage,           ///< which stage it is in, as `vital::VoiceEvent`
+  kEnvelopeReserved,
+};
+
 /// Keeps all mutable DSP state in one State struct per voice pair.
 template <class State>
 class VoicedModule : public Module {

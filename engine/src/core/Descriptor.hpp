@@ -13,7 +13,16 @@ enum class PortKind : uint8_t { Continuous = 0, Event = 1 };
 /// the value crosses the descriptor ABI.
 enum class SignalRole : uint8_t { Any = 0, Audio, Cv, Gate, Pitch, Phase, Note };
 enum class ParamUnit : uint8_t { None = 0, Hz, Seconds, Db, Semitones, Percent, Ratio };
-enum class ParamCurve : uint8_t { Linear = 0, Log, Exp };
+/**
+ * How a knob's turn maps onto the value: the taper.
+ *
+ * `Quartic` is the fourth power, which is the taper an envelope time wants -- a range of eight
+ * seconds spends most of its turn under a second, where every musical setting is, and unlike `Log`
+ * it starts at zero, which "0.00 ms" has to. It is what the vendored DSP's own parameter table uses
+ * for the same controls (`ValueDetails::kQuartic`) and what the reference instrument's time knobs
+ * feel like. Append new curves at the end: the value crosses the descriptor ABI.
+ */
+enum class ParamCurve : uint8_t { Linear = 0, Log, Exp, Quartic };
 
 inline constexpr uint32_t kParamModulatable = 1u << 0;
 inline constexpr uint32_t kParamInteger     = 1u << 1;
@@ -70,6 +79,11 @@ inline constexpr uint32_t kModuleVoiceEntry     = 1u << 9;
 /// reports to the instrument's `VoiceActivity` which voices it still hears, so a released voice can
 /// ring out and then be freed. `io.audioOut` and `voices.sum` are the two. Never also an entry.
 inline constexpr uint32_t kModuleVoiceExit      = 1u << 10;
+/// The module draws its own envelope: `Module::preview` fills the layout in `kEnvelopePicture*` rather
+/// than a cycle of a wave, and the picture is published as `TelemetryKind::Envelope` on the preview
+/// channel. An interface gives such a module the `adsr` block on its face. Mutually exclusive with
+/// `kModulePreviewsWave` -- one module, one picture -- which the registry checks.
+inline constexpr uint32_t kModulePreviewsEnvelope = 1u << 11;
 
 // C-layout so descriptors can cross a dlopen boundary unchanged.
 struct PortDesc {
@@ -174,7 +188,9 @@ struct ModuleDescriptor {
    * two, on a module that `kModulePublishesScope`; `value` is the readout, at least two cells by one,
    * on a module that `kModulePublishesValue`; `meter` is the level meter, at least two by two, on a
    * module that `kModulePublishesMeter`; `piano` is the keyboard, at least four cells across by two,
-   * on a module that `kModulePublishesKeys`. Every declared port appears exactly once.
+   * on a module that `kModulePublishesKeys`; `adsr` is the envelope picture, at least four by two, on a
+   * module that `kModulePreviewsEnvelope`; `select:<id>` is an enum param's switch, a cell or larger, and
+   * is the only block an enum param may have. Every declared port appears exactly once.
    * Implicit modulation ports never appear: they ride on their param's control. A short row is
    * padded with `.`. `Registry::add` rejects anything else, so a face that is wrong is a module
    * that does not register rather than a node drawn wrong.
