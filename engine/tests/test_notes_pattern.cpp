@@ -123,6 +123,15 @@ struct Rig {
   void runBlocks(uint32_t n) { for (uint32_t i = 0; i < n; ++i) run(); }
   float phase(uint32_t frame) { return f.out(*program, "pat", "phase", frame); }
 
+  /// Installs a new pattern the way an edit does: node data is structural, so the compile builds a
+  /// new instance, and the swap hands it the old one to adopt from, as `Engine::swapIfPending` does.
+  void edit(const nlohmann::json& data) {
+    REQUIRE(f.model.setNodeData("pat", data));
+    auto next = f.compile(kSampleRate, 64);
+    next->adoptFrom(*program);
+    program = std::move(next);
+  }
+
   std::vector<Timed> onsets() const {
     std::vector<Timed> out;
     for (const Timed& t : log) if (t.on()) out.push_back(t);
@@ -316,9 +325,7 @@ TEST_CASE("editing the pattern resumes where the old one was", "[pattern]") {
   // instance has to land where the old one was rather than restarting the cycle.
   Rig rig(patternData("c4 e4 g4 b4"));
   rig.runBlocks(2);
-  REQUIRE(rig.f.model.setNodeData("pat", patternData("d4 f4 a4 c5")));
-  auto next = rig.f.compile(kSampleRate, 64);
-  rig.program = std::move(next);
+  rig.edit(patternData("d4 f4 a4 c5"));
   rig.log.clear();
   rig.run();
   const auto onsets = rig.onsets();
@@ -328,20 +335,42 @@ TEST_CASE("editing the pattern resumes where the old one was", "[pattern]") {
   CHECK(onsets[3].frame == 176);
 }
 
-TEST_CASE("every voice pair sees the same notes", "[pattern]") {
-  Rig rig(patternData("c4 e4"), {});
-  REQUIRE(rig.f.model.setVoiceCount(4));
-  rig.program = rig.f.compile(kSampleRate, 64);
-  Recorder::perPair = {};
-  rig.f.transport.samplePos = 0;
-  rig.f.run(*rig.program, 64);
-  REQUIRE(Recorder::perPair[0].count > 0);
-  for (uint32_t pair = 1; pair < 2; ++pair) {
-    INFO("pair " << pair);
-    REQUIRE(Recorder::perPair[pair].count == Recorder::perPair[0].count);
-    for (uint32_t i = 0; i < Recorder::perPair[0].count; ++i)
-      CHECK(Recorder::perPair[pair].events[i].a == Recorder::perPair[0].events[i].a);
-  }
+TEST_CASE("editing the pattern releases the note the old instance was holding", "[pattern]") {
+  // The rebuilt instance adopts the old one's held set. Without that the note on the playhead was
+  // inside at the edit has no note off anywhere, and whatever is downstream holds it for ever.
+  Rig rig(patternData("c4 e4 g4 b4"), {{"legato", 1.f}});
+  rig.run(40);   // inside the third step: c4 and e4 have come and gone, g4 is sounding
+  REQUIRE(rig.log.size() == 5);
+  rig.edit(patternData("d4 f4 a4 c5"));
+  rig.run(24);
+  rig.runBlocks(1);
+  requireBalanced(rig.log);
+  // The step under the playhead changed, so g4 was released and a4 started, both at the edit.
+  REQUIRE(rig.log.size() >= 7);
+  CHECK_FALSE(rig.log[5].on());
+  CHECK(rig.log[5].e.a == 67.f);
+  CHECK(rig.log[5].frame == 40);
+  CHECK(rig.log[6].on());
+  CHECK(rig.log[6].e.a == 69.f);
+  CHECK(rig.log[6].frame == 40);
+}
+
+TEST_CASE("editing the pattern keeps a step it did not touch sounding", "[pattern]") {
+  Rig rig(patternData("c4 e4 g4 b4"), {{"legato", 1.f}});
+  rig.run(40);
+  REQUIRE(rig.log.size() == 5);
+  rig.edit(patternData("c4 e4 g4 c5"));   // g4 is still the third step
+  rig.run(24);
+  requireBalanced(rig.log);
+  // Nothing happened at the edit: g4 ran on to the end of its step and c5 took over there.
+  REQUIRE(rig.log.size() == 7);
+  CHECK_FALSE(rig.log[5].on());
+  CHECK(rig.log[5].e.a == 67.f);
+  CHECK(rig.log[5].frame == 48);
+  CHECK(rig.log[5].e.noteId == rig.log[4].e.noteId);   // the off carries the id the old instance's on used
+  CHECK(rig.log[6].on());
+  CHECK(rig.log[6].e.a == 72.f);
+  CHECK(rig.log[6].frame == 48);
 }
 
 TEST_CASE("running the pattern allocates nothing", "[pattern][rt]") {

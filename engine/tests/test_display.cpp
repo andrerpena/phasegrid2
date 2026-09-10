@@ -30,13 +30,12 @@ struct Rig {
   TelemetryWriter writer;
   std::vector<float> left = std::vector<float>(64), right = std::vector<float>(64);
 
-  explicit Rig(const char* tag, float value, uint32_t voiceCount = 1) {
+  explicit Rig(const char* tag, float value) {
     registerBuiltinModules(registry);
     std::string error;
     REQUIRE(writer.create(uniqueName(tag), 4, 48000.0, 64, error));
     engine.setTelemetry(&writer);
 
-    REQUIRE(engine.model().setVoiceCount(voiceCount));
     REQUIRE(engine.model().addNode(registry, {"src", "math.scaleOffset", {{"offset", value}}}));
     REQUIRE(engine.model().addNode(registry, {"meter", "display.meter", {}}));
     REQUIRE(engine.model().addNode(registry, {"out", "io.audioOut", {}}));
@@ -118,14 +117,18 @@ TEST_CASE("a meter holds a peak so a reader at frame rate cannot miss it", "[dis
 
 TEST_CASE("a meter latches a clip so a reader cannot miss it either", "[display]") {
   // Clipping is the one thing a meter exists to report and it can last a single sample.
-  // Three voices, so the patch can be pushed past full scale: the offset alone tops out at 1.0, and
-  // it is the sum at the output that clips, which is the thing being metered.
-  Rig rig{"clip", 0.2f, 3};
+  // A second constant summed into the same wire, so the patch can be pushed past full scale: one
+  // offset alone tops out at 1.0, and it is the sum on the wire that clips, which is the thing metered.
+  Rig rig{"clip", 0.2f};
+  REQUIRE(rig.engine.model().addNode(rig.registry, {"src2", "math.scaleOffset", {{"offset", 0.2f}}}));
+  REQUIRE(rig.engine.model().addEdge(rig.registry, {"e3", "src2", "out", "meter", "in"}));
+  REQUIRE(rig.engine.model().addEdge(rig.registry, {"e4", "src2", "out", "out", "inL"}));
+  REQUIRE(rig.engine.commit());
   REQUIRE(rig.engine.setSlot("meter", TelemetryChannel::Display, 0));
   rig.render();
   REQUIRE(rig.writer.payload(0)[2] == 0.f);
 
-  REQUIRE(rig.engine.setParam("src", "offset", 0.5f));
+  REQUIRE(rig.engine.setParam("src", "offset", 0.9f));
   rig.render(30);
   REQUIRE(rig.writer.payload(0)[2] == 1.f);
 
@@ -137,15 +140,31 @@ TEST_CASE("a meter latches a clip so a reader cannot miss it either", "[display]
   REQUIRE(rig.writer.payload(0)[2] == 0.f);
 }
 
-TEST_CASE("a meter sums every voice, not just the first pair", "[display]") {
-  // Three voices of 0.5 each. A meter that published from pair 0 alone would report 1.0; the whole
-  // patch is 1.5, and that difference is the entire point of accumulating across pairs.
-  Rig rig{"poly", 0.5f, 3};
-  REQUIRE(rig.engine.setSlot("meter", TelemetryChannel::Display, 0));
-  rig.render();
-
-  const float* p = rig.writer.payload(0);
-  REQUIRE_THAT(p[0], WithinAbs(1.5f, 1e-5f));
+TEST_CASE("a meter inside an instrument sums every live voice, not just the first pair", "[display]") {
+  // Three held notes on three voices, the gate of each read by the meter: a meter that published from
+  // pair 0 alone would report 2.0; the whole instrument is 3.0, and that difference is the entire point
+  // of accumulating across the passes.
+  Registry registry;
+  registerBuiltinModules(registry);
+  Engine engine{registry, EngineConfig{48000.0, 64}};
+  TelemetryWriter writer;
+  std::string error;
+  REQUIRE(writer.create(uniqueName("poly"), 2, 48000.0, 64, error));
+  engine.setTelemetry(&writer);
+  REQUIRE(engine.model().addNode(registry, {"pat", "notes.pattern", {{"legato", 1.f}}}));
+  REQUIRE(engine.model().setNodeData("pat", nlohmann::json{{"pattern", "[c3,e3,g3]"}}));
+  REQUIRE(engine.model().addNode(registry, {"voices", "note.toPoly", {{"voices", 4.f}}}));
+  REQUIRE(engine.model().addNode(registry, {"meter", "display.meter", {}}));
+  REQUIRE(engine.model().addEdge(registry, {"e1", "pat", "notes", "voices", "notes"}));
+  REQUIRE(engine.model().addEdge(registry, {"e2", "voices", "gate", "meter", "in"}));
+  REQUIRE(engine.commit());
+  REQUIRE(engine.setSlot("meter", TelemetryChannel::Display, 0));
+  std::vector<float> l(64), r(64);
+  float* planar[2] = {l.data(), r.data()};
+  TransportSnapshot t;
+  engine.renderBlock(planar, 2, 64, t);
+  const float* p = writer.payload(0);
+  REQUIRE_THAT(p[0], WithinAbs(3.f, 1e-5f));
 }
 
 TEST_CASE("unsubscribing stops a meter publishing", "[display]") {
@@ -313,8 +332,8 @@ TEST_CASE("a readout publishes the signed value on the wire, not its magnitude",
   REQUIRE_THAT(writer.payload(0)[1], WithinAbs(-0.75f, 1e-6f));
 }
 
-TEST_CASE("a readout reads the end of the block, and every voice of it", "[display]") {
-  // Three voices of the same constant sum, as they do at the output and on the meter.
+TEST_CASE("a readout reads the end of the block, and a global signal once", "[display]") {
+  // A constant outside any instrument is global: it is counted once, as it is at the output.
   Registry registry;
   registerBuiltinModules(registry);
   Engine engine{registry, EngineConfig{48000.0, 64}};
@@ -323,7 +342,6 @@ TEST_CASE("a readout reads the end of the block, and every voice of it", "[displ
   REQUIRE(writer.create(uniqueName("valpoly"), 2, 48000.0, 64, error));
   engine.setTelemetry(&writer);
 
-  REQUIRE(engine.model().setVoiceCount(3));
   REQUIRE(engine.model().addNode(registry, {"src", "math.scaleOffset", {{"offset", 0.25f}}}));
   REQUIRE(engine.model().addNode(registry, {"readout", "display.value", {}}));
   REQUIRE(engine.model().addEdge(registry, {"e1", "src", "out", "readout", "in"}));
@@ -334,7 +352,7 @@ TEST_CASE("a readout reads the end of the block, and every voice of it", "[displ
   float* planar[2] = {l.data(), r.data()};
   TransportSnapshot t;
   engine.renderBlock(planar, 2, 64, t);
-  REQUIRE_THAT(writer.payload(1)[0], WithinAbs(0.75f, 1e-5f));
+  REQUIRE_THAT(writer.payload(1)[0], WithinAbs(0.25f, 1e-5f));
 
   // A moving signal: what the readout publishes is exactly the last frame the engine produced, which
   // is the claim worth pinning. A readout that took the block's first frame, or its average, passes
@@ -392,10 +410,9 @@ TEST_CASE("a piano lights one key per voice, whatever pair the voice is in", "[d
   engine.setTelemetry(&writer);
 
   // Three voices is two pairs, with the second pair half empty: the mask has to be honoured.
-  REQUIRE(engine.model().setVoiceCount(3));
   REQUIRE(engine.model().addNode(registry, {"clip", "notes.clip", {{"length", 4.f}}}));
   REQUIRE(engine.model().setNodeData("clip", triadClip()));
-  REQUIRE(engine.model().addNode(registry, {"voices", "note.toPoly", {}}));
+  REQUIRE(engine.model().addNode(registry, {"voices", "note.toPoly", {{"voices", 3.f}}}));
   REQUIRE(engine.model().addNode(registry, {"piano", "display.piano", {}}));
   REQUIRE(engine.model().addEdge(registry, {"e1", "clip", "notes", "voices", "notes"}));
   REQUIRE(engine.model().addEdge(registry, {"e2", "voices", "pitch", "piano", "pitch"}));
@@ -456,7 +473,7 @@ TEST_CASE("a piano shows every tone of a chord the chord module built, across th
   REQUIRE(writer.create(uniqueName("pianochord"), 2, 48000.0, 64, error));
   engine.setTelemetry(&writer);
 
-  REQUIRE(engine.model().setVoiceCount(4));
+  // No voice count anywhere: the converter's default pool is what plays the chord.
   REQUIRE(engine.model().addNode(registry, {"pat", "notes.pattern", {{"legato", 1.f}}}));
   REQUIRE(engine.model().setNodeData("pat", nlohmann::json{{"pattern", "c4"}}));
   REQUIRE(engine.model().addNode(registry, {"chord", "notefx.chord", {}}));
@@ -476,6 +493,26 @@ TEST_CASE("a piano shows every tone of a chord the chord module built, across th
   REQUIRE(heldKeys(writer, 0) == std::vector<int>{60, 64, 67});
 }
 
+TEST_CASE("a piano with nothing cabled into its pitch lights no key", "[display]") {
+  // An unconnected input reads as zero, and zero is middle C: an idle keyboard must not light C4.
+  Registry registry;
+  registerBuiltinModules(registry);
+  Engine engine{registry, EngineConfig{48000.0, 64}};
+  TelemetryWriter writer;
+  std::string error;
+  REQUIRE(writer.create(uniqueName("pianoidle"), 1, 48000.0, 64, error));
+  engine.setTelemetry(&writer);
+  REQUIRE(engine.model().addNode(registry, {"piano", "display.piano", {}}));
+  REQUIRE(engine.commit());
+  REQUIRE(engine.setSlot("piano", TelemetryChannel::Display, 0));
+  std::vector<float> l(64), r(64);
+  float* planar[2] = {l.data(), r.data()};
+  TransportSnapshot t;
+  engine.renderBlock(planar, 2, 64, t);
+  REQUIRE(writer.slot(0)->seq.load() > 0);   // it still publishes, so a face shows an empty keyboard, not a stale one
+  REQUIRE(heldKeys(writer, 0).empty());
+}
+
 TEST_CASE("a subscribed piano allocates nothing while rendering", "[display][rt]") {
   Registry registry;
   registerBuiltinModules(registry);
@@ -484,10 +521,9 @@ TEST_CASE("a subscribed piano allocates nothing while rendering", "[display][rt]
   std::string error;
   REQUIRE(writer.create(uniqueName("pianort"), 2, 48000.0, 64, error));
   engine.setTelemetry(&writer);
-  REQUIRE(engine.model().setVoiceCount(4));
   REQUIRE(engine.model().addNode(registry, {"clip", "notes.clip", {{"length", 4.f}}}));
   REQUIRE(engine.model().setNodeData("clip", triadClip()));
-  REQUIRE(engine.model().addNode(registry, {"voices", "note.toPoly", {}}));
+  REQUIRE(engine.model().addNode(registry, {"voices", "note.toPoly", {{"voices", 4.f}}}));
   REQUIRE(engine.model().addNode(registry, {"piano", "display.piano", {}}));
   REQUIRE(engine.model().addEdge(registry, {"e1", "clip", "notes", "voices", "notes"}));
   REQUIRE(engine.model().addEdge(registry, {"e2", "voices", "pitch", "piano", "pitch"}));

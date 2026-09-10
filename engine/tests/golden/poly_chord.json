@@ -1,6 +1,5 @@
 {
   "schemaVersion": 1,
-  "voiceCount": 3,
   "feedbackMode": "sample",
   "modules": [
     { "id": "play", "type": "math.scaleOffset", "params": { "scale": 0, "offset": 1 }, "x": 0, "y": 0 },

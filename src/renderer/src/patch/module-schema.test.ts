@@ -109,14 +109,15 @@ describe("the form a module gets", () => {
     );
   });
 
-  it("does not offer to edit a structural parameter", () => {
+  it("offers to edit a structural parameter, and says that it rebuilds the module", () => {
     const structural = inspectableParams(osc).find((p) => p.flags.structural);
     expect(structural, "the fixture has no structural parameter").toBeDefined();
     if (structural === undefined) return;
     const field = buildModuleSchema(osc).getFieldSchema(
       `${PARAM_PREFIX}${structural.id}`,
     );
-    expect(field._meta.editable).toBe(false);
+    expect(field._meta.editable).toBe(true);
+    expect(field._meta.description).toContain("rebuilds the module");
   });
 });
 

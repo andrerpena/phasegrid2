@@ -47,7 +47,6 @@ CompileOutput compileGraph(const GraphModel& model, const Registry& registry, In
                            uint64_t revision, double sampleRate, uint32_t blockSize) {
   auto fail = [](const std::string& code, const std::string& msg) { return CompileOutput{nullptr, code + ": " + msg}; };
   if (blockSize == 0 || blockSize > kMaxBlockSize) return fail("E_BLOCK", "bad block size");
-  if (model.voiceCount > kMaxVoices) return fail("E_VOICES", "at most " + std::to_string(kMaxVoices) + " voices");
 
   // 1. Nodes in id order, resolve types, acquire instances.
   std::vector<const NodeModel*> nodes;
@@ -60,7 +59,6 @@ CompileOutput compileGraph(const GraphModel& model, const Registry& registry, In
     nodes.push_back(&n); types.push_back(t);
   }
   const uint32_t N = static_cast<uint32_t>(nodes.size());
-  PrepareInfo info{sampleRate, kMaxBlockSize, model.voiceCount};
 
   // 2. Resolve edges.
   std::vector<EdgeRef> edges;
@@ -108,24 +106,86 @@ CompileOutput compileGraph(const GraphModel& model, const Registry& registry, In
     }
   }
 
+  // 3b. Instruments: which nodes run on whose voices.
+  //
+  // An instrument is everything a continuous signal path reaches from a voice entry's outputs without
+  // crossing a voice exit. The exit itself belongs to the instrument (it folds the voices); what comes
+  // out of it is global. A node two entries reach is an error rather than a guess, and so is a loop that
+  // straddles domains, because a pass over one instrument's pairs cannot also be a pass over another's.
+  std::vector<int32_t> nodeInstrument(N, -1);
+  std::vector<Instrument> instruments;
+  {
+    std::vector<std::vector<uint32_t>> contAdj(N);
+    for (const EdgeRef& e : edges)
+      if (types[e.from]->desc->outputs[e.fromPort].kind == PortKind::Continuous) contAdj[e.from].push_back(e.to);
+    for (uint32_t i = 0; i < N; ++i) {
+      if (!(types[i]->desc->flags & kModuleVoiceEntry)) continue;
+      const int32_t k = static_cast<int32_t>(instruments.size());
+      Instrument inst;
+      inst.entryNode = i;
+      const int32_t voicesParam = types[i]->findParam("voices");
+      float voices = 1.f;
+      if (voicesParam >= 0) {
+        const ParamDesc& d = types[i]->desc->params[voicesParam];
+        const auto pv = nodes[i]->params.find(d.id);
+        voices = pv == nodes[i]->params.end() ? d.def : pv->second;
+      }
+      if (!(voices >= 1.f) || voices > static_cast<float>(kMaxVoices))
+        return fail("E_VOICES", nodes[i]->id + ": voices must be 1.." + std::to_string(kMaxVoices));
+      inst.voices = static_cast<uint32_t>(voices);
+      inst.pairs = (inst.voices + 1) / 2;
+      instruments.push_back(std::move(inst));
+      if (nodeInstrument[i] >= 0) return fail("E_INSTRUMENT_MIX", nodes[i]->id + " is inside another instrument");
+      nodeInstrument[i] = k;
+      std::vector<uint32_t> stack{i};
+      while (!stack.empty()) {
+        const uint32_t v = stack.back(); stack.pop_back();
+        if (v != i && (types[v]->desc->flags & kModuleVoiceExit)) continue;   // the fold ends the region
+        for (uint32_t w : contAdj[v]) {
+          if (nodeInstrument[w] == k) continue;
+          if (nodeInstrument[w] >= 0 || (types[w]->desc->flags & kModuleVoiceEntry))
+            return fail("E_INSTRUMENT_MIX", nodes[w]->id + " is reached by two instruments; sum one of them first");
+          nodeInstrument[w] = k;
+          stack.push_back(w);
+        }
+      }
+    }
+    for (uint32_t i = 0; i < N; ++i)
+      if (nodeInstrument[i] >= 0) instruments[static_cast<size_t>(nodeInstrument[i])].nodes.push_back(i);
+    for (const Group& g : groups) {
+      if (!g.cluster) continue;
+      for (uint32_t v : g.nodes)
+        if (nodeInstrument[v] != nodeInstrument[g.nodes[0]])
+          return fail("E_FEEDBACK_DOMAIN", nodes[v]->id + ": a feedback loop cannot cross an instrument's edge");
+    }
+  }
+  auto pairsOf = [&](uint32_t node) {
+    return nodeInstrument[node] < 0 ? 1u : instruments[static_cast<size_t>(nodeInstrument[node])].pairs;
+  };
+  auto voicesOf = [&](uint32_t node) {
+    return nodeInstrument[node] < 0 ? 1u : instruments[static_cast<size_t>(nodeInstrument[node])].voices;
+  };
+
   // 4. Program skeleton and output buffers.
   auto p = std::make_unique<Program>();
-  p->revision = revision; p->voiceCount = model.voiceCount; p->voicePairs = (model.voiceCount + 1) / 2;
-  for (uint32_t pair = 0; pair < p->voicePairs; ++pair) p->activeVoiceMask.push_back(Program::voiceMaskFor(model.voiceCount, pair));
+  p->revision = revision;
   p->blockSize = blockSize; p->sampleRate = sampleRate; p->feedbackMode = model.feedbackMode;
   p->allocBuffer();        // kSilentBuffer
   p->allocEventBuffer();   // kEmptyEvents
   p->nodes.resize(N);
+  p->nodeInstrument = nodeInstrument;
   for (uint32_t i = 0; i < N; ++i) {
     NodeSlot& s = p->nodes[i];
     const ModuleDescriptor& d = *types[i]->desc;
+    // A node is prepared for ITS voices: the instrument's, or one when it is global. `acquire`
+    // rebuilds a node whose count moved and reuses the rest, so joining an instrument resets only the
+    // modules that joined.
+    const PrepareInfo info{sampleRate, kMaxBlockSize, voicesOf(i)};
     // NOTE: this mutates the caller's InstanceTable before compilation is known to succeed, and
-    // failures still lie ahead (E_FAN_IN below). The consequence is not a leak but a state reset:
-    // when `info` differs from the table's last one (a sample-rate or voiceCount change) `acquire`
-    // clears the instance map on its first call, so a commit that *fails* after that point has
-    // already thrown away every module's DSP state, and the next successful commit silently starts
-    // from fresh instances. Left as is deliberately; restructuring would mean compiling into a
-    // scratch table and merging on success.
+    // failures still lie ahead (E_FAN_IN below). A commit that fails after this point has already
+    // rebuilt any node whose voices changed, and the next successful commit starts it from fresh
+    // state. Left as is deliberately; restructuring would mean compiling into a scratch table and
+    // merging on success.
     s.inst = instances.acquire(nodes[i]->id, *types[i], info, nodes[i]->params, nodes[i]->data);
     s.inBuf.assign(d.numInputs, kNone); s.inEvt.assign(d.numInputs, kNone);
     s.outBuf.assign(d.numOutputs, kNone); s.outEvt.assign(d.numOutputs, kNone);
@@ -136,13 +196,15 @@ CompileOutput compileGraph(const GraphModel& model, const Registry& registry, In
     for (uint32_t k = 0; k < d.numInputs; ++k)
       if (d.inputs[k].kind == PortKind::Continuous) s.inBuf[k] = kSilentBuffer; else s.inEvt[k] = kEmptyEvents;
   }
+  for (Instrument& inst : instruments) inst.activity = instances.acquireActivity(nodes[inst.entryNode]->id, inst.voices);
+  p->instruments = instruments;   // a copy: `pairsOf` and `voicesOf` still read the local list below
 
   // 5. Feedback states and read buffers per back edge, then per-group emission.
   std::map<size_t, uint32_t> fbIndexOfEdge, fbBufOfEdge;
   for (size_t ei = 0; ei < edges.size(); ++ei) {
     if (!edges[ei].back) continue;
     fbIndexOfEdge[ei] = static_cast<uint32_t>(p->feedback.size());
-    p->feedback.push_back(instances.acquireFeedback(edges[ei].model->id, p->voicePairs));
+    p->feedback.push_back(instances.acquireFeedback(edges[ei].model->id, pairsOf(edges[ei].from)));
     fbBufOfEdge[ei] = p->allocBuffer();
   }
 
@@ -190,7 +252,84 @@ CompileOutput compileGraph(const GraphModel& model, const Registry& registry, In
         p->ops.push_back(Op{Op::FeedbackWrite, fbIndexOfEdge.at(ei), p->nodes[ni].outBuf[edges[ei].fromPort]});
   };
 
-  for (const Group& g : groups) {
+  // 6. The order the groups run in. Topological, as before, with one constraint on top: an instrument's
+  // groups are emitted as one contiguous run, because its pairs share the program's buffers and a pass
+  // must see the whole instrument's work for its own pair. Globals an instrument needs go before it
+  // opens (a ready global is always taken first), an instrument that needs another instrument's summed
+  // output waits for it to close, and while an instrument is open only its own groups are taken.
+  const size_t G = groups.size();
+  std::vector<int32_t> groupOf(N);
+  for (size_t gi = 0; gi < G; ++gi) for (uint32_t v : groups[gi].nodes) groupOf[v] = static_cast<int32_t>(gi);
+  std::vector<int32_t> groupDomain(G);
+  for (size_t gi = 0; gi < G; ++gi) groupDomain[gi] = nodeInstrument[groups[gi].nodes[0]];
+  std::vector<std::set<size_t>> groupSucc(G), groupPred(G);
+  for (const EdgeRef& e : edges) {
+    const size_t a = static_cast<size_t>(groupOf[e.from]), b = static_cast<size_t>(groupOf[e.to]);
+    if (a == b) continue;
+    groupSucc[a].insert(b); groupPred[b].insert(a);
+  }
+  // Which instruments each instrument needs finished first: any instrument among the ancestors of its groups.
+  std::vector<std::set<int32_t>> instrumentDeps(p->instruments.size());
+  for (size_t gi = 0; gi < G; ++gi) {
+    if (groupDomain[gi] < 0) continue;
+    std::vector<size_t> stack{gi};
+    std::set<size_t> seen{gi};
+    while (!stack.empty()) {
+      const size_t g = stack.back(); stack.pop_back();
+      for (size_t pr : groupPred[g]) {
+        if (!seen.insert(pr).second) continue;
+        if (groupDomain[pr] >= 0 && groupDomain[pr] != groupDomain[gi]) instrumentDeps[static_cast<size_t>(groupDomain[gi])].insert(groupDomain[pr]);
+        stack.push_back(pr);
+      }
+    }
+  }
+  std::vector<size_t> indeg(G);
+  for (size_t gi = 0; gi < G; ++gi) indeg[gi] = groupPred[gi].size();
+  std::set<size_t> ready;
+  for (size_t gi = 0; gi < G; ++gi) if (indeg[gi] == 0) ready.insert(gi);
+  std::vector<bool> instrumentDone(p->instruments.size(), false);
+  std::vector<size_t> instrumentLeft(p->instruments.size(), 0);
+  for (size_t gi = 0; gi < G; ++gi) if (groupDomain[gi] >= 0) ++instrumentLeft[static_cast<size_t>(groupDomain[gi])];
+  std::vector<size_t> order;
+  int32_t open = -1;
+  while (order.size() < G) {
+    size_t pick = G;
+    if (open >= 0) {
+      for (size_t gi : ready) if (groupDomain[gi] == open) { pick = gi; break; }
+    } else {
+      for (size_t gi : ready) if (groupDomain[gi] < 0) { pick = gi; break; }
+      if (pick == G)
+        for (size_t gi : ready) {
+          const auto& deps = instrumentDeps[static_cast<size_t>(groupDomain[gi])];
+          bool waiting = false;
+          for (int32_t dep : deps) waiting = waiting || !instrumentDone[static_cast<size_t>(dep)];
+          if (!waiting) { pick = gi; break; }
+        }
+    }
+    if (pick == G) return fail("E_INTERNAL", "could not order the instruments");
+    ready.erase(pick);
+    order.push_back(pick);
+    for (size_t nx : groupSucc[pick]) if (--indeg[nx] == 0) ready.insert(nx);
+    if (groupDomain[pick] >= 0) {
+      open = groupDomain[pick];
+      if (--instrumentLeft[static_cast<size_t>(open)] == 0) { instrumentDone[static_cast<size_t>(open)] = true; open = -1; }
+    }
+  }
+
+  auto beginSegment = [&](int32_t domain) {
+    p->segments.push_back(Segment{domain, p->ops.size(), 0});
+    if (domain >= 0) p->ops.push_back(Op{Op::Allocate, p->instruments[static_cast<size_t>(domain)].entryNode});
+  };
+  auto closeSegment = [&]() {
+    if (!p->segments.empty()) p->segments.back().count = p->ops.size() - p->segments.back().firstOp;
+  };
+  for (size_t gi : order) {
+    const Group& g = groups[gi];
+    const int32_t domain = groupDomain[gi];
+    if (p->segments.empty() || p->segments.back().instrument != domain) {
+      closeSegment();
+      beginSegment(domain);
+    }
     if (!g.cluster) {
       emitNode(g.nodes[0]);
       if (!fanInError.empty()) return fail("E_FAN_IN", fanInError);
@@ -208,6 +347,7 @@ CompileOutput compileGraph(const GraphModel& model, const Registry& registry, In
     p->ops[beginAt].a = static_cast<uint32_t>(p->ops.size() - beginAt - 1);
     p->ops.push_back(Op{Op::ClusterEnd});
   }
+  closeSegment();
 
   p->buildSerialIndex();
   std::set<std::string> liveNodes, liveEdges;

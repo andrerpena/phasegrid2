@@ -1,5 +1,6 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <nlohmann/json.hpp>
 #include <map>
 #include <memory>
 #include <string>
@@ -34,15 +35,17 @@ struct Rig {
   float phase(uint32_t frame) { return f.out(*program, "env", "phase", frame); }
 };
 
-/// A gate that is high on voice pair 0 and low on every other pair.
+/// A gate that is high on voice pair 0 and low on every other pair. Its input is only there to put it
+/// inside an instrument, so that it runs once per live pair.
 struct PairGate : pg::VoicedModule<int> {
   void process(pg::ProcessContext& c) override {
     for (uint32_t i = 0; i < c.numFrames; ++i) c.out(0).data[i] = pg::Sample(c.voice == 0 ? 1.f : 0.f);
   }
 };
+const pg::PortDesc kPairGateIn[] = {{"in", "In", pg::PortKind::Continuous, 1, pg::SignalRole::Any, ""}};
 const pg::PortDesc kPairGateOut[] = {{"out", "Out", pg::PortKind::Continuous, 1, pg::SignalRole::Gate, ""}};
 const pg::ModuleDescriptor kPairGate{pg::kModuleAbiVersion, "test.pairGate", "PairGate", "test", "",
-  nullptr, 0, kPairGateOut, 1, nullptr, 0, 0, 0, [] () -> pg::Module* { return new PairGate(); }, nullptr, 0};
+  kPairGateIn, 1, kPairGateOut, 1, nullptr, 0, 0, 0, [] () -> pg::Module* { return new PairGate(); }, nullptr, 0};
 
 /// Captures the last frame of one input per voice pair, WHILE that pair runs: the buffers are shared, so
 /// once a block is over only the last pair's values are still in them.
@@ -73,7 +76,8 @@ TEST_CASE("env.dahdsr descriptor is generated from the vendored parameter table"
   for (const char* id : {"delay", "attack", "hold", "decay", "sustain", "release",
                          "attack_power", "decay_power", "release_power"})
     REQUIRE(e->findParam(id) >= 0);
-  REQUIRE(e->desc->numParams == 9);
+  REQUIRE(e->findParam("lifetime") == 0);   // the adapter's own toggle, ahead of the generated params
+  REQUIRE(e->desc->numParams == 10);
 
   const int32_t attack = e->findParam("attack");
   REQUIRE(e->desc->params[attack].min == Catch::Approx(0.f));
@@ -144,11 +148,16 @@ TEST_CASE("a vendored module keeps one DSP state per voice pair", "[vital]") {
   REQUIRE_FALSE(f.reg.add(kPairGate).has_value());
   REQUIRE_FALSE(f.reg.add(kPairProbe).has_value());
   PairProbe::last = {};
-  REQUIRE(f.model.setVoiceCount(4));   // two pairs
+  // Four notes held on a four-voice instrument: two live pairs, so the envelope runs twice per block.
+  f.node("pat", "notes.pattern", {{"legato", 1.f}});
+  REQUIRE(f.model.setNodeData("pat", nlohmann::json{{"pattern", "[c3,e3,g3,bb3]"}}));
+  f.node("poly", "note.toPoly", {{"voices", 4.f}});
   f.node("gate", "test.pairGate");
   f.node("env", "env.dahdsr",
          {{"delay", 0.f}, {"attack", 0.5f}, {"hold", 0.f}, {"decay", 0.f}, {"sustain", 1.f}, {"release", 0.f}});
   f.node("probe", "test.pairProbe");
+  f.edge("n0", "pat.notes", "poly.notes");
+  f.edge("n1", "poly.gate", "gate.in");
   f.edge("e0", "gate.out", "env.gate");
   f.edge("e1", "env.out", "probe.in");
   auto program = f.compile();

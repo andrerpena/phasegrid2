@@ -168,6 +168,12 @@ struct ModuleSpec {
   /// thread against the first voice pair's vendored module, which has been through `onConfigure` and `init`.
   /// A spec that sets this also sets `kModulePreviewsWave` in `moduleFlags`.
   std::function<bool(vital::SynthModule&, const ParamValues&, float*, uint32_t)> preview;
+  /// Optional: which lanes the module is still busy with after a block -- an envelope that has not
+  /// reached the end of its release, 1 on those lanes and 0 elsewhere. A spec that sets this takes part
+  /// in voice lifetime (`VoiceActivity::hold`): while the module says a voice is going, the voice stays
+  /// alive after its note off. Gated by the spec's `lifetime` param when it declares one in
+  /// `extraParams`, on by default there, so a patch can take one envelope out of the decision.
+  std::function<Sample(vital::SynthModule&)> alive;
   bool processWithInput = false;   // effects: audio via processWithInput(buffer, n); input 0 must be Audio with vendorInput -1
   bool needsBeatsPerSecond = false;
   uint32_t moduleFlags = 0;

@@ -18,7 +18,6 @@ struct NoteGen : pg::VoicedModule<int> {
   static inline std::vector<pg::Event> script;
   static inline int block = 0;
   void process(pg::ProcessContext& c) override {
-    if (c.voice != 0) return;   // the event buffer is shared by every pair; filling it once is enough
     if (block++ != 0) return;
     for (const pg::Event& e : script) c.eventOut(0).push(e);
   }
@@ -60,7 +59,9 @@ pg::Event noteOff(uint32_t frame, float note) {
   return e;
 }
 
-/// gen -> note.toPoly -> probe, with the script installed and the voice count set.
+/// gen -> note.toPoly -> probe, with the script installed and the converter's pool sized. The gate also
+/// goes to a Voice Sum, so the instrument has an exit: a released voice stays alive until the exit has
+/// heard it quiet, which is what lets the probe see the gate fall on the block the release lands in.
 struct Rig {
   pg::test::GraphFixture f;
   std::unique_ptr<pg::Program> program;
@@ -72,14 +73,15 @@ struct Rig {
     NoteGen::block = 0;
     NoteGen::script = std::move(script);
     Probe::captured = {};
-    REQUIRE(f.model.setVoiceCount(voices));
     f.node("gen", "test.noteGen");
-    f.node("poly", "note.toPoly");
+    f.node("poly", "note.toPoly", {{"voices", static_cast<float>(voices)}});
     f.node("probe", "test.voiceProbe");
+    f.node("sum", "voices.sum");
     f.edge("e0", "gen.notes", "poly.notes");
     f.edge("e1", "poly.pitch", "probe.pitch");
     f.edge("e2", "poly.gate", "probe.gate");
     f.edge("e3", "poly.velocity", "probe.velocity");
+    f.edge("e4", "poly.gate", "sum.in");
     program = f.compile();
   }
   void run(uint32_t frames = 64) { f.run(*program, frames); }

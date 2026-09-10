@@ -245,6 +245,9 @@ std::optional<std::string> Registry::add(const ModuleDescriptor& d) {
     return id + ": publishes notes but does not write telemetry";
   if ((d.flags & kModulePublishesKeys) && !(d.flags & kModuleWritesTelemetry))
     return id + ": publishes keys but does not write telemetry";
+  // An instrument's entry makes voices and its exit folds them; one module cannot be both ends.
+  if ((d.flags & kModuleVoiceEntry) && (d.flags & kModuleVoiceExit))
+    return id + ": a module cannot be both a voice entry and a voice exit";
 
   std::set<std::string> ids;
   for (uint32_t i = 0; i < d.numInputs; ++i)

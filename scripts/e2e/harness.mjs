@@ -98,7 +98,6 @@ export function projectDoc(overrides = {}) {
     kind: "user",
     patch: overrides.patch ?? {
       schemaVersion: 1,
-      voiceCount: 1,
       feedbackMode: "sample",
       modules: [],
       edges: [],

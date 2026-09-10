@@ -33,6 +33,12 @@ export interface EngineState {
    */
   running: boolean;
   revision: number;
+  /**
+   * Which instrument each module of the compiled patch belongs to, from the engine's last commit: the
+   * id of the converter that starts the instrument, or "global". The compiler's knowledge, not the
+   * editor's; the canvas draws a per-voice cable from it and the inspector names the instrument.
+   */
+  domains: Record<string, "global" | { instrument: string }>;
 }
 
 export interface EngineActions {
@@ -55,6 +61,7 @@ export const useEngineStore = create<EngineState & EngineActions>(
     capabilities: [],
     running: true,
     revision: 0,
+    domains: {},
 
     connect: async () => {
       try {
@@ -113,9 +120,15 @@ export function watchEngine(): () => void {
       });
     }
     if (event.event === "patch.revision") {
-      const data = event.data as { revision?: number };
+      const data = event.data as {
+        revision?: number;
+        domains?: Record<string, "global" | { instrument: string }>;
+      };
       if (typeof data.revision === "number")
-        useEngineStore.setState({ revision: data.revision });
+        useEngineStore.setState({
+          revision: data.revision,
+          ...(data.domains === undefined ? {} : { domains: data.domains }),
+        });
     }
   });
 }

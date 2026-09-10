@@ -1,12 +1,13 @@
 #include <cstdint>
 #include <vector>
 #include "core/Module.hpp"
+#include "core/Voices.hpp"
 
 namespace pg::modules {
 namespace {
 
 const PortDesc kIn[] = {
-  {"notes", "Notes", PortKind::Event, 0, SignalRole::Note, "Note events to spread across the program's voices"},
+  {"notes", "Notes", PortKind::Event, 0, SignalRole::Note, "Note events to spread across the instrument's voices"},
 };
 const PortDesc kOut[] = {
   {"pitch", "Pitch", PortKind::Continuous, 1, SignalRole::Pitch, "Pitch of each voice's note, 0.1 per octave from middle C"},
@@ -14,15 +15,22 @@ const PortDesc kOut[] = {
   {"velocity", "Velocity", PortKind::Continuous, 1, SignalRole::Cv, "Velocity of the note each voice is playing, 0..1"},
 };
 
-/// The allocator's view of one voice. Written only while pair 0 assigns the block's events, so it ends a
-/// block in the state the next block's allocation must start from.
+const ParamDesc kParams[] = {
+  {"voices", "Voices", 1.f, static_cast<float>(kMaxVoices), 16.f, ParamUnit::None, ParamCurve::Linear,
+   kParamInteger | kParamNoSmooth | kParamStructural, nullptr, 0, "slider", nullptr,
+   "How many notes this instrument can play at once. A voice costs nothing while it is silent, so the default is generous; "
+   "past it, the note that has sounded longest is stolen"},
+};
+
+/// The allocator's view of one voice. Written only during the allocation pass, so it ends a block in
+/// the state the next block's allocation must start from.
 struct Slot {
   float note = kMiddleCMidi;
   bool sounding = false;
   uint64_t age = 0;   // note-on order; the oldest sounding voice is the one a steal takes
 };
 
-/// One assignment the allocator made, replayed by the pair that owns the voice.
+/// One assignment the allocator made, replayed by the pass that owns the voice.
 struct Change {
   uint32_t frame = 0;
   uint32_t voice = 0;
@@ -32,24 +40,29 @@ struct Change {
   bool retrigger = false;   // gate low for exactly this frame, so a downstream envelope sees an edge
 };
 
-/// What a voice is emitting right now. Touched only by the pair that owns the voice, which is what lets it
-/// survive pair 0 having already run the whole block's allocation ahead of the later pairs.
+/// What a voice is emitting right now. Touched only by the pass that owns the voice's pair.
 struct Out {
   float pitch = 0.f;
   float velocity = 0.f;
   bool gate = false;
 };
 
-/// Voice allocation for a whole program. The voice table is per *program*, not per pair, so it is built here
-/// rather than in a `VoicedModule` state: pair 0 runs the block's allocation and every pair then replays the
-/// resulting change list for the two voices its lanes carry (see the scheduler contract in docs/engine.md).
+/// The entry of an instrument: turns a note stream into one pitch, gate and velocity per voice, and owns
+/// the pool those voices come from.
+///
+/// The voice table is per INSTRUMENT, not per pair, so this is not a `VoicedModule`: `allocate` runs
+/// once per block, ahead of the passes, and records a change list; every pass then replays the list for
+/// the two voices its lanes carry. Allocation talks to the instrument's `VoiceActivity`, which is what
+/// the scheduler reads to run only the pairs with something in them: a note on makes a voice held, a
+/// note off lets it release, and the exits report when it has gone quiet. A free voice is taken first;
+/// failing that the voice that has been releasing longest, then the one held longest, and a steal drops
+/// that voice's gate for one frame so a downstream envelope retriggers.
 class NoteToPoly final : public Module {
 public:
   void prepare(const PrepareInfo& p) override {
     voices_ = p.voiceCount;
-    // 2 * voicePairs entries: an odd voice count leaves the top lane of the last pair without a voice, and
-    // sizing to the lanes keeps every index the pairs use in range. Allocation still stops at `voices_`, so
-    // that lane never gets a note the terminal would only mask away again.
+    // 2 * pairs entries: an odd voice count leaves the top lane of the last pair without a voice, and
+    // sizing to the lanes keeps every index the passes use in range. Allocation still stops at `voices_`.
     slots_.assign(2 * ((p.voiceCount + 1) / 2), Slot{});
     out_.assign(slots_.size(), Out{});
     changes_.assign(kMaxEventsPerBlock, Change{});   // one input event produces at most one change
@@ -57,17 +70,34 @@ public:
     nextAge_ = 1;
   }
 
-  void reset(uint32_t voicePair) override {
-    for (uint32_t v = 2 * voicePair; v < 2 * voicePair + 2 && v < slots_.size(); ++v) {
-      slots_[v] = Slot{};
-      out_[v] = Out{};
-    }
+  /// The pool's memory is the activity's; a revived pair has nothing of its own to clear. The change
+  /// list is this block's and must survive the reset that precedes the pair's first pass.
+  void reset(uint32_t) override {}
+
+  void allocate(ProcessContext& c) override {
     changeCount_ = 0;
+    VoiceActivity* activity = c.activity;
+    for (const Event& e : c.eventIn(0)) {
+      if (e.frame >= c.numFrames || changeCount_ == changes_.size()) continue;
+      if (e.type == EventType::NoteOn) {
+        const uint32_t v = pickVoice(activity);
+        // Taking a voice that is still sounding drops its gate for exactly this frame, so a downstream
+        // envelope retriggers instead of gliding the stolen voice to the new pitch at its sustain level.
+        changes_[changeCount_++] = Change{e.frame, v, e.a, e.b, true, slots_[v].sounding};
+        slots_[v] = Slot{e.a, true, nextAge_++};
+        if (activity) activity->noteOn(v);
+      } else if (e.type == EventType::NoteOff) {
+        const int32_t v = findSounding(e.a);
+        if (v < 0) continue;   // the note was stolen while it was held: its voice belongs to someone else now
+        const uint32_t voice = static_cast<uint32_t>(v);
+        changes_[changeCount_++] = Change{e.frame, voice, slots_[voice].note, 0.f, false, false};
+        slots_[voice].sounding = false;
+        if (activity) activity->noteOff(voice);
+      }
+    }
   }
 
   void process(ProcessContext& c) override {
-    if (c.voice == 0) allocate(c);   // per-block work runs on pair 0; the events are the same for every pair
-
     const uint32_t first = 2 * c.voice;
     Sample* pitchOut = c.out(0).data;
     Sample* gateOut = c.out(1).data;
@@ -97,31 +127,16 @@ public:
   }
 
 private:
-  /// Turns the block's note events into voice assignments. Runs once per block, on pair 0.
-  void allocate(const ProcessContext& c) {
-    changeCount_ = 0;
-    for (const Event& e : c.eventIn(0)) {
-      if (e.frame >= c.numFrames || changeCount_ == changes_.size()) continue;
-      if (e.type == EventType::NoteOn) {
-        const uint32_t v = pickVoice();
-        // Taking a voice that is still sounding drops its gate for exactly this frame, so a downstream
-        // envelope retriggers instead of gliding the stolen voice to the new pitch at its sustain level.
-        changes_[changeCount_++] = Change{e.frame, v, e.a, e.b, true, slots_[v].sounding};
-        slots_[v] = Slot{e.a, true, nextAge_++};
-      } else if (e.type == EventType::NoteOff) {
-        const int32_t v = findSounding(e.a);
-        if (v < 0) continue;   // the note was stolen while it was held: its voice belongs to someone else now
-        const uint32_t voice = static_cast<uint32_t>(v);
-        changes_[changeCount_++] = Change{e.frame, voice, slots_[voice].note, 0.f, false, false};
-        slots_[voice].sounding = false;
-      }
-    }
-  }
-
-  /// The lowest-numbered free voice, or, with all of them sounding, the one that started longest ago.
-  uint32_t pickVoice() const {
+  /// A free voice, lowest first; else the voice that has been releasing longest; else the one held longest.
+  uint32_t pickVoice(const VoiceActivity* activity) const {
     for (uint32_t v = 0; v < voices_; ++v)
-      if (!slots_[v].sounding) return v;
+      if (!slots_[v].sounding && (activity == nullptr || activity->state(v) == VoiceState::Free)) return v;
+    uint32_t releasing = voices_;
+    for (uint32_t v = 0; v < voices_; ++v) {
+      if (slots_[v].sounding) continue;
+      if (releasing == voices_ || slots_[v].age < slots_[releasing].age) releasing = v;
+    }
+    if (releasing < voices_) return releasing;
     uint32_t oldest = 0;
     for (uint32_t v = 1; v < voices_; ++v)
       if (slots_[v].age < slots_[oldest].age) oldest = v;
@@ -151,10 +166,11 @@ private:
 
 // Explicit `extern` (see AudioOut.cpp): a namespace-scope `const` is internal linkage by default.
 extern const ModuleDescriptor kNoteToPoly{kModuleAbiVersion, "note.toPoly", "Note to Poly", "Notes",
-  "Spreads note events across the program's voices: each output carries a different value per voice lane. A "
-  "note takes a free voice, or steals the one that has been sounding longest, and releases its voice on the "
-  "matching note off.",
-  kIn, countOf(kIn), kOut, countOf(kOut), nullptr, 0, 0, 0,
+  "The start of an instrument: spreads note events across its own pool of voices, and everything its "
+  "pitch, gate and velocity reach plays once per voice until the voices are summed again. Voices sets "
+  "the pool; a voice costs nothing while it is silent. A note takes a free voice, or steals the one that "
+  "has been sounding longest, and releases its voice on the matching note off.",
+  kIn, countOf(kIn), kOut, countOf(kOut), kParams, countOf(kParams), kModuleVoiceEntry, 0,
   [] () -> Module* { return new NoteToPoly(); }, nullptr, 0};
 
 }  // namespace pg::modules

@@ -80,15 +80,112 @@ const pg::ModuleDescriptor kProbe{pg::kModuleAbiVersion, "test.maskProbe", "P", 
                                   kProbeOut, 1, nullptr, 0, 0, 0, []() -> pg::Module* { return new MaskProbe(); }, nullptr, 0};
 }  // namespace
 
-TEST_CASE("Scheduler passes the pair's voice mask", "[scheduler]") {
+TEST_CASE("Scheduler passes a global module voice 0's lanes", "[scheduler]") {
   pg::Registry reg; REQUIRE_FALSE(reg.add(kProbe).has_value());
   pg::InstanceTable table; pg::PrepareInfo info{48000.0, pg::kMaxBlockSize, 1};
   pg::Program p; p.allocBuffer(); p.allocEventBuffer();
-  p.activeVoiceMask = {pg::Program::voiceMaskFor(1, 0)};
   pg::NodeSlot n; n.inst = table.acquire("m", *reg.find("test.maskProbe"), info, {});
   n.outBuf = {p.allocBuffer()}; n.outEvt = {pg::kNone}; n.paramBuf = {};
   p.nodes = {n}; p.ops = {pg::Op{pg::Op::Process, 0}}; p.buildSerialIndex();
   pg::Scheduler s; s.run(p, 64, pg::TransportSnapshot{}, nullptr);
   REQUIRE(pg::lanes::lane(pg::Sample(1.f) & MaskProbe::seen, 0) == 1.f);
   REQUIRE(pg::lanes::lane(pg::Sample(1.f) & MaskProbe::seen, 2) == 0.f);
+}
+
+// ------------------------------------------------------------------------------ instruments
+
+#include <nlohmann/json.hpp>
+#include "modules/builtin.hpp"
+#include "util/GraphFixture.hpp"
+
+namespace {
+/// Counts how many times it runs, and which pairs were reset: the two questions live-voice scheduling raises.
+struct Counter : pg::VoicedModule<int> {
+  static inline int runs = 0;
+  static inline std::vector<uint32_t> resets;
+  static inline std::vector<std::pair<bool, bool>> passes;   // first, last per run
+  void reset(uint32_t pair) override { resets.push_back(pair); }
+  void process(pg::ProcessContext& c) override {
+    ++runs;
+    passes.emplace_back(c.firstPass, c.lastPass);
+    const pg::Sample* in = c.in(0).readOr();
+    for (uint32_t i = 0; i < c.numFrames; ++i) c.out(0).data[i] = in[i];
+  }
+  static void clear() { runs = 0; resets.clear(); passes.clear(); }
+};
+const pg::PortDesc kCounterIn[] = {{"in", "In", pg::PortKind::Continuous, 1, pg::SignalRole::Any, ""}};
+const pg::PortDesc kCounterOut[] = {{"out", "Out", pg::PortKind::Continuous, 1, pg::SignalRole::Any, ""}};
+const pg::ModuleDescriptor kCounter{pg::kModuleAbiVersion, "test.counter", "Counter", "test", "", kCounterIn, 1,
+                                    kCounterOut, 1, nullptr, 0, 0, 0, []() -> pg::Module* { return new Counter(); }, nullptr, 0};
+
+/// pattern -> converter (`voices`) -> counter -> sink. The pattern is a chord held for `legato` of a
+/// cycle of two bars -- eight 64-frame blocks at this tempo -- so the voices come and go on block edges.
+struct InstrumentRig {
+  pg::test::GraphFixture f;
+  std::unique_ptr<pg::Program> program;
+  InstrumentRig(float voices, const char* pattern, float legato = 1.f) {
+    pg::registerBuiltinModules(f.reg);
+    REQUIRE_FALSE(f.reg.add(kCounter).has_value());
+    Counter::clear();
+    f.node("pat", "notes.pattern", {{"legato", legato}, {"cycle", 5.f}});   // two bars: eight blocks per cycle
+    REQUIRE(f.model.setNodeData("pat", nlohmann::json{{"pattern", pattern}}));
+    f.node("poly", "note.toPoly", {{"voices", voices}});
+    f.node("count", "test.counter");
+    f.node("s", "test.sink");
+    f.edge("e0", "pat.notes", "poly.notes");
+    f.edge("e1", "poly.gate", "count.in");
+    f.edge("e2", "count.out", "s.in");
+    f.transport.tempo = 45000.0;   // one beat is exactly one 64-frame block at 48 kHz
+    program = f.compile(48000.0, 64);
+  }
+  void run(uint64_t at) { f.transport.samplePos = at; f.run(*program, 64); }
+};
+}  // namespace
+
+TEST_CASE("Scheduler runs a global module once per block and an instrument's module once per live pair", "[scheduler]") {
+  // Six notes on a sixteen-voice pool: three live pairs out of eight, so three passes, not eight.
+  InstrumentRig rig(16.f, "[c3,e3,g3,bb3,d4,f4]");
+  rig.run(0);
+  REQUIRE(Counter::runs == 3);
+  REQUIRE(Counter::passes.front() == std::pair{true, false});
+  REQUIRE(Counter::passes.back() == std::pair{false, true});
+  REQUIRE(Counter::passes[1] == std::pair{false, false});
+  // The three pairs came alive this block, so each was reset before it ran.
+  REQUIRE(Counter::resets == std::vector<uint32_t>{0, 1, 2});
+  Counter::clear();
+  rig.run(64);
+  REQUIRE(Counter::runs == 3);
+  REQUIRE(Counter::resets.empty());   // still alive: no reset
+}
+
+TEST_CASE("Scheduler leaves a silent instrument entirely alone", "[scheduler]") {
+  // A rest: nothing is held, so no pair is live and the per-voice module never runs at all.
+  InstrumentRig rig(16.f, "~");
+  rig.run(0);
+  rig.run(64);
+  REQUIRE(Counter::runs == 0);
+}
+
+TEST_CASE("Scheduler frees a released voice nobody holds at the end of its block, then resets it on the next note", "[scheduler]") {
+  // One note held for an eighth of the cycle: one block, so its gate falls at the start of block 1.
+  InstrumentRig rig(4.f, "c3", 0.125f);
+  rig.run(0);
+  REQUIRE(Counter::runs == 1);
+  REQUIRE(Counter::resets == std::vector<uint32_t>{0});
+  const pg::VoiceActivity& activity = *rig.program->instruments[0].activity;
+  REQUIRE(activity.state(0) == pg::VoiceState::Held);
+  // The release lands: the voice is releasing through that block, so its pair still runs and anything
+  // that wanted to hold it could. Nothing here does -- the sink only folds -- so it is free when the block
+  // settles, and its pair stops running.
+  rig.run(64);
+  REQUIRE(activity.state(0) == pg::VoiceState::Free);
+  REQUIRE(Counter::runs == 2);
+  Counter::clear();
+  rig.run(128);
+  REQUIRE(Counter::runs == 0);
+  // The next cycle's note revives the pair, and the module is reset before it plays.
+  Counter::clear();
+  rig.run(64 * 8);   // the second cycle's first block
+  REQUIRE(Counter::runs == 1);
+  REQUIRE(Counter::resets == std::vector<uint32_t>{0});
 }

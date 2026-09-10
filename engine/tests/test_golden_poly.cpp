@@ -153,7 +153,7 @@ TEST_CASE("the polyphonic golden patch's three peaks need three voices", "[golde
   // it, so only the last one to steal it survives -- and the other two peaks have to vanish.
   Chord chord;
   const std::vector<float> three = settledSpectrum(chord.render());
-  REQUIRE(chord.engine.model().setVoiceCount(1));
+  REQUIRE(chord.engine.setParam("poly", "voices", 1.f));   // structural: the next commit rebuilds the instrument
   REQUIRE(chord.engine.commit());
   const std::vector<float> one = settledSpectrum(chord.render());
 

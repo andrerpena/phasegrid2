@@ -29,6 +29,9 @@ using NodeData = nlohmann::json;
 /// what `notes.pattern` does with a pattern it cannot parse.
 std::string textProperty(const NodeData& data, const char* key, const char* fallback);
 
+/// What one node is prepared for. `voiceCount` is the NODE's: the voices of the instrument it belongs
+/// to, or 1 for a global node, which is why a global LFO holds one state and an oscillator inside a
+/// sixteen-voice instrument holds eight pairs of it.
 struct PrepareInfo {
   double sampleRate = 48000.0;
   uint32_t maxBlock = kMaxBlockSize;
@@ -79,13 +82,23 @@ struct AudioBus {
 };
 
 class TelemetryWriter;
+class VoiceActivity;
 
 /// Built by the scheduler per Process op. Port indices are the descriptor's declared indices.
+///
+/// A global module runs once per block: `voice` is 0, `firstPass` and `lastPass` are both true, the
+/// mask is voice 0's lanes and `activity` is null. A module inside an instrument runs once per LIVE
+/// voice pair, in ascending pair order: `voice` is the pair, the mask has the lanes of the pair's
+/// voices that are not free, `firstPass` marks the first pair run this block and `lastPass` the last,
+/// and `activity` is the instrument's pool. Work that is the same for every voice belongs on the first
+/// pass; a fold that sums the voices clears on the first and publishes on the last.
 struct ProcessContext {
   uint32_t numFrames = 0;
   uint32_t voice = 0;                 // voice PAIR index
-  uint32_t voicePairs = 1;            // how many pairs this program runs, so a module can tell it is last
+  bool firstPass = true;
+  bool lastPass = true;
   Mask voiceMask = Mask(static_cast<uint32_t>(-1));   // lanes of voices that exist in this pair
+  VoiceActivity* activity = nullptr;
   /// Where a `kModuleWritesTelemetry` module publishes what it draws about itself, or null and
   /// `kNoTelemetrySlotCtx` when nobody is watching that channel. This slot is the module's alone: the
   /// parameter values the scheduler publishes for the same module go to a different one, so a module
@@ -115,20 +128,31 @@ public:
   /// Message thread, once, before `prepare`: the model's param values and structured data for this
   /// instance. A module that declares `kParamStructural` params reads them here, because such a param can
   /// only take effect while the instance is being built; node data is structural for the same reason, and
-  /// is compared the same way. Never called again — `InstanceTable::acquire` rebuilds instead.
+  /// is compared the same way. Never called again — `InstanceTable::acquire` rebuilds instead, and the
+  /// rebuilt instance hears about the one it replaced through `adopt`.
   virtual void configure(const ParamValues&, const NodeData&) {}
   virtual void prepare(const PrepareInfo&) = 0;   // message thread; the only place to allocate
-  /// RESERVED, and CALLED BY NOTHING TODAY. Not the scheduler, not `Engine::renderBlock`, not the program
-  /// swap: implementing it gets you silence rather than behaviour, so never reach for it to clear per-voice
-  /// state. There are already two answers for that and they cover what the engine can currently ask for.
-  /// A stolen voice retriggers through the one-frame gate dip `note.toPoly` emits, which is the right
-  /// modular answer -- a downstream envelope sees an edge like any other. Everything else resets by being
-  /// built again: `InstanceTable::acquire` makes a fresh instance whenever the sample rate, the voice count,
-  /// a `kParamStructural` param or the node data changes. It stays declared because a transport-level panic
-  /// or an explicit voice-reset command is the one thing that would need it, and because `VoicedModule` and
-  /// the vendored adapter already implement it correctly for when that lands. Do not invent a caller to
-  /// make it used. Kept in sync with the note in docs/engine.md.
+  /// Audio thread, at the swap that makes this instance current, when it was built to REPLACE one: the
+  /// same node id and module type, rebuilt because its node data, a `kParamStructural` param or its voice
+  /// count changed. `retiring` is the instance that ran until this block and will never run again, so
+  /// this is the one chance to carry over what it was in the middle of. A module that emits events copies
+  /// the notes it has opened and not yet closed, so the note offs come from the instance that goes on
+  /// running; without that every held note downstream is stuck the moment a pattern is edited. Same
+  /// rules as `process`, and copy rather than move, bounded by this instance's own sizes: the swap can be
+  /// retried, in which case this runs again with the retiring instance one block further on. The default
+  /// carries nothing, which is right for a module whose state is a picture or a filter.
+  virtual void adopt(const Module& /*retiring*/) {}
+  /// Audio thread. Called by the scheduler on every module of an instrument when a voice pair that
+  /// was dead comes back to life, before the pair runs, so a new note starts from clean DSP state
+  /// rather than from whatever the last note left in a filter or a delay line. Same rules as
+  /// `process`: no allocation, no locks, no syscalls. A stolen voice inside a live pair is not reset;
+  /// it retriggers through the one-frame gate dip `note.toPoly` emits, as a downstream envelope expects.
   virtual void reset(uint32_t /*voicePair*/) {}
+  /// Audio thread, `kModuleVoiceEntry` modules only: once per block, before the instrument's voice
+  /// passes, with the module's event inputs bound. Reads the block's note events and decides which
+  /// voice each goes to, marking the instrument's `VoiceActivity`; `process` then replays the
+  /// decisions for each pair it is run for.
+  virtual void allocate(ProcessContext&) {}
   virtual void process(ProcessContext&) = 0;      // audio thread; no alloc/lock/IO/exceptions
   /**
    * One cycle of the waveform this module would produce at `params`, written as `count` samples in

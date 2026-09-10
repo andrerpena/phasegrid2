@@ -219,8 +219,9 @@ like an edit to send back.
 Parameter keys are prefixed `param:`. A module is free to name a parameter `id` or `name`, and a
 collision with the identity fields would silently show the wrong value in one of the two places.
 
-A structural parameter is shown but not editable — the engine rebuilds the node to change one, which
-is not something to offer behind a field that looks like every other field. A hidden one is left out.
+A structural parameter is edited like any other, committed on change rather than dragged; its help says
+that the engine rebuilds the node to apply it, which is how an instrument's Voices is set. A hidden one is
+left out.
 
 It defaults to `center-bottom` rather than a sidebar: the form is label-and-value rows, and a sidebar
 wide enough for the values is a sidebar that has taken the room the grid wanted.
@@ -265,6 +266,13 @@ the ones being played lit in the pitch signal's colour, fed by the `Keys` the en
 in the inspector -- read from the document the way a knob's value is, so turning one reshapes the
 keys at once; the keyboard fills its block whatever the range, since the face is the engine's to
 declare and does not change with a knob.
+
+A cable leaving a module inside an instrument through a continuous port is drawn heavier
+(`CABLE_POLY_EXTRA` in `grid/components/Cable.ts`), the way a polyphonic wire is in a modular that has
+them: it carries one signal per voice. Which modules those are is the engine's knowledge — every commit
+answers with `domains`, kept in the engine store and handed to `GridRenderer.setDomains` — so the canvas
+never guesses at it, and the inspector's first line says whether the selected module runs once or per
+voice of which converter.
 
 Every place a cable can plug in is a `Socket` with a `facing`: a jack's, inside its tile under the
 port's name, and the one in the bottom right corner of every knob tile whose parameter can be

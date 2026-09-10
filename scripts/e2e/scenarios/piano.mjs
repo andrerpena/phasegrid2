@@ -7,7 +7,6 @@ import { projectDoc, seedProject } from "../harness.mjs";
  */
 const PATCH = {
   schemaVersion: 1,
-  voiceCount: 4,
   feedbackMode: "sample",
   modules: [
     {
@@ -46,7 +45,7 @@ const BLOCK = 'window.pg.grid.face("piano")?.find((b) => b.kind === "piano")';
 export default {
   name: "piano",
   description:
-    "a keyboard lights the keys the voices are playing, and reshapes when its range is turned",
+    "a keyboard lights the keys the voices are playing, follows an edit to the source under a held chord, and reshapes when its range is turned",
   seed(ws) {
     seedProject(
       ws,
@@ -82,6 +81,18 @@ export default {
       `(${BLOCK})?.keys?.held?.join() === "60,64,67"`,
     );
     await screenshot("piano-chord");
+
+    // Editing the pattern rebuilds the source under the held chord. The old instance's notes must be
+    // released by the new one, or the converter holds their voices and the keys stay lit for ever.
+    await pg(
+      'patch.apply([{ op: "moduleSetData", id: "pat", data: { pattern: "[d4,f4,a4]", velocity: "" } }], "Edit pattern")',
+    );
+    await idle();
+    await checkEventually(
+      "editing the chord while it sounds moves the lit keys, and none stays stuck",
+      `(${BLOCK})?.keys?.held?.join() === "62,65,69"`,
+    );
+    await screenshot("piano-edited-chord");
 
     // The range is the document's: turning the knob reshapes the keys without the engine's help.
     await pg('patch.setParam("piano", "octaves", 4)');

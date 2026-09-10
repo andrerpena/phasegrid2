@@ -11,7 +11,6 @@ Engine::Engine(Registry& registry, EngineConfig config) : registry_(registry), c
   initial_ = std::make_unique<Program>();
   initial_->allocBuffer();
   initial_->allocEventBuffer();
-  initial_->activeVoiceMask.push_back(Program::voiceMaskFor(1, 0));
   initial_->sampleRate = config_.sampleRate;
   initial_->blockSize = config_.blockSize;
   current_ = initial_.get();
@@ -41,6 +40,14 @@ Result Engine::commit() {
     return Result::fail(out.error.substr(0, colon), out.error.substr(colon + 2));
   }
   ++revision_;
+  // Which instrument each node landed in, kept on the message thread for the interface: a per-voice
+  // cable is drawn differently from a global one, and that is the compiler's knowledge, not the editor's.
+  domains_.clear();
+  for (size_t i = 0; i < out.program->nodes.size(); ++i) {
+    const int32_t instrument = out.program->nodeInstrument[i];
+    domains_[out.program->nodes[i].inst->id] =
+      instrument < 0 ? std::string() : out.program->nodes[out.program->instruments[static_cast<size_t>(instrument)].entryNode].inst->id;
+  }
   if (Program* stale = pending_.exchange(out.program.release(), std::memory_order_acq_rel)) delete stale;
   reconcileParams();
   return {};
@@ -138,6 +145,9 @@ void Engine::collectGarbage() {
 void Engine::swapIfPending() {
   if (!deferred_) deferred_ = pending_.exchange(nullptr, std::memory_order_acq_rel);   // take at most one
   if (!deferred_) return;
+  // Before the old program is retired, while it is still ours: a rebuilt instance takes over what the
+  // one it replaces was holding. Runs again on a retry, on purpose -- the old program ran another block.
+  deferred_->adoptFrom(*current_);
   if (!retired_.try_enqueue(current_)) return;      // retire queue full: keep deferred_, retry next block
   current_ = deferred_;
   deferred_ = nullptr;

@@ -30,7 +30,6 @@ const oneOfEach: PatchOp[] = [
   { op: "edgeRemove", id: "e1" },
   { op: "paramSet", module: "osc1", param: "level", value: 0.25 },
   { op: "moduleMove", id: "osc1", x: 4, y: 8 },
-  { op: "setVoiceCount", voiceCount: 8 },
 ];
 
 describe("PatchOp", () => {
@@ -75,11 +74,9 @@ describe("PatchOp", () => {
         params: { shape: "saw" },
       }).success,
     ).toBe(false);
+    // Polyphony belongs to each converter now; the patch-level op is gone.
     expect(
-      PatchOpSchema.safeParse({ op: "setVoiceCount", voiceCount: 0 }).success,
-    ).toBe(false);
-    expect(
-      PatchOpSchema.safeParse({ op: "setVoiceCount", voiceCount: 65 }).success,
+      PatchOpSchema.safeParse({ op: "setVoiceCount", voiceCount: 8 }).success,
     ).toBe(false);
   });
 

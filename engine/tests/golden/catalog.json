@@ -1,5 +1,5 @@
 {
-  "catalogHash": "2888cfda7bfa947a",
+  "catalogHash": "9711c9c8689a1ae6",
   "conventions": {
     "blockSize": 128,
     "gateThreshold": 0,
@@ -26,6 +26,8 @@
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
         "writesTelemetry": false
       },
       "id": "amp.vca",
@@ -141,6 +143,8 @@
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
         "writesTelemetry": true
       },
       "id": "display.meter",
@@ -197,6 +201,8 @@
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
         "writesTelemetry": true
       },
       "id": "display.piano",
@@ -210,7 +216,7 @@
           "role": "pitch"
         },
         {
-          "doc": "High while the voice's key is down. Unconnected, every voice is held, so a bare pitch lights one key",
+          "doc": "High while the voice's key is down. Inside an instrument the voices know this themselves, so it can stay unconnected; outside one, an unconnected gate means held, so a bare pitch lights one key",
           "id": "gate",
           "implicit": false,
           "kind": "continuous",
@@ -305,6 +311,8 @@
         "publishesScope": true,
         "publishesValue": false,
         "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
         "writesTelemetry": true
       },
       "id": "display.scope",
@@ -370,6 +378,8 @@
         "publishesScope": false,
         "publishesValue": true,
         "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
         "writesTelemetry": true
       },
       "id": "display.value",
@@ -401,6 +411,8 @@
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
         "writesTelemetry": false
       },
       "id": "env.dahdsr",
@@ -488,6 +500,26 @@
         }
       ],
       "params": [
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "Keep the voice alive until this envelope has finished its release. Off, the envelope still plays but has no say in when the voice ends",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "primary": false,
+            "structural": false
+          },
+          "id": "lifetime",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Affect voice lifetime",
+          "uiWidget": "toggle",
+          "unit": "none"
+        },
         {
           "curve": "linear",
           "default": 0.14949999749660492,
@@ -684,6 +716,8 @@
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
         "writesTelemetry": false
       },
       "id": "filter.multi",
@@ -1147,6 +1181,8 @@
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
         "writesTelemetry": false
       },
       "id": "fx.chorus",
@@ -1499,6 +1535,8 @@
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
         "writesTelemetry": false
       },
       "id": "fx.compressor",
@@ -2028,6 +2066,8 @@
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
         "writesTelemetry": false
       },
       "id": "fx.delay",
@@ -2383,6 +2423,8 @@
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
         "writesTelemetry": false
       },
       "id": "fx.distortion",
@@ -2622,6 +2664,8 @@
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
         "writesTelemetry": false
       },
       "id": "fx.eq",
@@ -2996,6 +3040,8 @@
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
         "writesTelemetry": false
       },
       "id": "fx.flanger",
@@ -3278,6 +3324,8 @@
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
         "writesTelemetry": false
       },
       "id": "fx.phaser",
@@ -3589,6 +3637,8 @@
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
         "writesTelemetry": false
       },
       "id": "fx.reverb",
@@ -3967,7 +4017,7 @@
     },
     {
       "category": "I/O",
-      "doc": "Sends stereo audio to the engine output. Voices are summed.",
+      "doc": "Sends stereo audio to the engine output. The voices of an instrument are summed here. With Affect voice lifetime on, a released voice stays alive until it has fallen silent here.",
       "face": [
         [
           "inL",
@@ -3989,6 +4039,8 @@
         "publishesScope": false,
         "publishesValue": false,
         "terminal": true,
+        "voiceEntry": false,
+        "voiceExit": true,
         "writesTelemetry": false
       },
       "id": "io.audioOut",
@@ -4041,6 +4093,26 @@
           "name": "Gain",
           "uiWidget": "slider",
           "unit": "ratio"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Keep a released voice alive until what arrives here from it has fallen silent. Off, a voice ends with its envelopes, or with its note when it has none",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "primary": false,
+            "structural": false
+          },
+          "id": "lifetime",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Affect voice lifetime",
+          "uiWidget": "toggle",
+          "unit": "none"
         }
       ],
       "texts": []
@@ -4058,6 +4130,8 @@
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
         "writesTelemetry": false
       },
       "id": "math.scaleOffset",
@@ -4157,6 +4231,8 @@
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
         "writesTelemetry": false
       },
       "id": "mix.mixer",
@@ -4365,6 +4441,8 @@
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
         "writesTelemetry": false
       },
       "id": "mod.lfo",
@@ -4493,6 +4571,8 @@
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
         "writesTelemetry": false
       },
       "id": "mod.random",
@@ -4756,6 +4836,8 @@
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
         "writesTelemetry": false
       },
       "id": "note.toCv",
@@ -4856,7 +4938,7 @@
     },
     {
       "category": "Notes",
-      "doc": "Spreads note events across the program's voices: each output carries a different value per voice lane. A note takes a free voice, or steals the one that has been sounding longest, and releases its voice on the matching note off.",
+      "doc": "The start of an instrument: spreads note events across its own pool of voices, and everything its pitch, gate and velocity reach plays once per voice until the voices are summed again. Voices sets the pool; a voice costs nothing while it is silent. A note takes a free voice, or steals the one that has been sounding longest, and releases its voice on the matching note off.",
       "face": null,
       "flags": {
         "needsTransport": false,
@@ -4867,12 +4949,14 @@
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
+        "voiceEntry": true,
+        "voiceExit": false,
         "writesTelemetry": false
       },
       "id": "note.toPoly",
       "inputs": [
         {
-          "doc": "Note events to spread across the program's voices",
+          "doc": "Note events to spread across the instrument's voices",
           "id": "notes",
           "implicit": false,
           "kind": "event",
@@ -4907,7 +4991,28 @@
           "role": "cv"
         }
       ],
-      "params": [],
+      "params": [
+        {
+          "curve": "linear",
+          "default": 16.0,
+          "doc": "How many notes this instrument can play at once. A voice costs nothing while it is silent, so the default is generous; past it, the note that has sounded longest is stolen",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "primary": false,
+            "structural": true
+          },
+          "id": "voices",
+          "max": 32.0,
+          "min": 1.0,
+          "name": "Voices",
+          "uiWidget": "slider",
+          "unit": "none"
+        }
+      ],
       "texts": []
     },
     {
@@ -4940,6 +5045,8 @@
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
         "writesTelemetry": false
       },
       "id": "notefx.arp",
@@ -5086,6 +5193,8 @@
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
         "writesTelemetry": false
       },
       "id": "notefx.chord",
@@ -5175,6 +5284,8 @@
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
         "writesTelemetry": false
       },
       "id": "notefx.humanize",
@@ -5274,6 +5385,8 @@
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
         "writesTelemetry": false
       },
       "id": "notefx.quantize",
@@ -5340,6 +5453,8 @@
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
         "writesTelemetry": false
       },
       "id": "notes.clip",
@@ -5510,6 +5625,8 @@
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
         "writesTelemetry": true
       },
       "id": "notes.pattern",
@@ -5717,6 +5834,8 @@
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
         "writesTelemetry": false
       },
       "id": "osc.pulse",
@@ -5831,6 +5950,8 @@
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
         "writesTelemetry": false
       },
       "id": "osc.sawtooth",
@@ -5945,6 +6066,8 @@
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
         "writesTelemetry": false
       },
       "id": "osc.sine",
@@ -6031,6 +6154,8 @@
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
         "writesTelemetry": false
       },
       "id": "osc.wavetable",
@@ -6860,6 +6985,8 @@
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
         "writesTelemetry": false
       },
       "id": "phase.clock",
@@ -6959,6 +7086,8 @@
         "publishesScope": false,
         "publishesValue": false,
         "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
         "writesTelemetry": false
       },
       "id": "sampler.player",
@@ -7229,6 +7358,74 @@
           "min": -1.0,
           "name": "Sample Tune",
           "uiWidget": "slider",
+          "unit": "none"
+        }
+      ],
+      "texts": []
+    },
+    {
+      "category": "I/O",
+      "doc": "Adds every voice of an instrument into one signal. Everything after it is global -- an effect here runs once, not once per voice. With Affect voice lifetime on, a released voice stays alive until it has fallen silent here.",
+      "face": [
+        [
+          "in",
+          "out"
+        ]
+      ],
+      "flags": {
+        "needsTransport": false,
+        "previewsWave": false,
+        "publishesKeys": false,
+        "publishesMeter": false,
+        "publishesNotes": false,
+        "publishesScope": false,
+        "publishesValue": false,
+        "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": true,
+        "writesTelemetry": false
+      },
+      "id": "voices.sum",
+      "inputs": [
+        {
+          "doc": "The voices to sum",
+          "id": "in",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "In",
+          "role": "audio"
+        }
+      ],
+      "name": "Voice Sum",
+      "outputs": [
+        {
+          "doc": "Every voice added together: one global stereo signal",
+          "id": "out",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Out",
+          "role": "audio"
+        }
+      ],
+      "params": [
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Keep a released voice alive until what arrives here from it has fallen silent. Off, a voice ends with its envelopes, or with its note when it has none",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "primary": false,
+            "structural": false
+          },
+          "id": "lifetime",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Affect voice lifetime",
+          "uiWidget": "toggle",
           "unit": "none"
         }
       ],

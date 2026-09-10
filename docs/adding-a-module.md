@@ -66,6 +66,15 @@ const char* const kFace[] = {
 | `meter` | the level meter, at least two by two, on a module that `kModulePublishesMeter`; it draws the level the module writes into its telemetry slot |
 | `piano` | the keyboard, at least four cells across by two, on a module that `kModulePublishesKeys`; it lights the keys the module writes into its telemetry slot |
 
+A module runs once per block when it is global and once per live voice pair when it is inside an instrument;
+`ctx.firstPass` and `ctx.lastPass` say where a pass sits, `ctx.voiceMask` which lanes carry a voice, and
+`ctx.activity` is the instrument's pool or null. Per-block work goes on the first pass, a fold clears on the
+first and publishes on the last. `kModuleVoiceEntry` marks a module that starts an instrument (it implements
+`Module::allocate` and has a `voices` param); `kModuleVoiceExit` one that folds the voices to a global signal.
+A module that knows a voice is still going after its note off -- an envelope in its release, an exit that
+still hears it -- says so each pass through `ctx.activity->hold(voice)`; a released voice nobody holds is
+free at the end of the block. See the instruments section of docs/engine.md.
+
 Implicit modulation ports (`param:<id>`) never appear: the socket for one sits at its knob's foot, and a cable dropped
 on the knob connects to it. A jack in the leftmost or rightmost column sits its socket on the module's border; one on
 the bottom row sits it on the bottom border; anywhere else the socket is the cell's centre. Short rows are padded

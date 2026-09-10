@@ -67,12 +67,6 @@ Result GraphModel::setNodeData(const std::string& node, NodeData data) {
   return {};
 }
 
-Result GraphModel::setVoiceCount(uint32_t n) {
-  if (n < 1 || n > 64) return Result::fail("E_VOICES", "voiceCount must be 1..64");
-  voiceCount = n;
-  return {};
-}
-
-void GraphModel::clear() { nodes_.clear(); edges_.clear(); voiceCount = 1; feedbackMode = FeedbackMode::Sample; }
+void GraphModel::clear() { nodes_.clear(); edges_.clear(); feedbackMode = FeedbackMode::Sample; }
 
 }  // namespace pg

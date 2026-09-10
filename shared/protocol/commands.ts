@@ -22,9 +22,18 @@ import { TELEMETRY_CHANNELS } from "./telemetry";
 
 const NoArgs = z.object({});
 
+/** Where a module runs: on every voice of the named converter's instrument, or once, globally. */
+export const DomainSchema = z.union([
+  z.literal("global"),
+  z.object({ instrument: z.string().min(1) }),
+]);
+export type Domain = z.infer<typeof DomainSchema>;
+
 /** Every command that changes the graph answers with the revision its commit produced. */
 const RevisionResultSchema = z.object({
   revision: z.number().int().nonnegative(),
+  /** Per module, after the commit: which instrument it landed in. Absent on answers that did not compile. */
+  domains: z.record(z.string(), DomainSchema).optional(),
 });
 
 /**
@@ -178,10 +187,6 @@ export const COMMANDS = {
    */
   "patch.batch": {
     args: z.object({ ops: z.array(PatchOpSchema) }),
-    result: RevisionResultSchema,
-  },
-  "patch.setVoiceCount": {
-    args: z.object({ voiceCount: z.number().int().min(1).max(64) }),
     result: RevisionResultSchema,
   },
   "patch.setFeedbackMode": {
@@ -348,7 +353,10 @@ export const EVENTS = {
     level: z.enum(["debug", "info", "warn", "error"]),
     message: z.string(),
   }),
-  "patch.revision": z.object({ revision: z.number().int().nonnegative() }),
+  "patch.revision": z.object({
+    revision: z.number().int().nonnegative(),
+    domains: z.record(z.string(), DomainSchema).optional(),
+  }),
   "transport.position": TransportPositionSchema,
   "device.changed": DeviceListResultSchema,
   /** `restarted` is the reconciler's cue to resend the patch it still holds. */

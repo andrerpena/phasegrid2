@@ -230,7 +230,6 @@ async function runDemo(show, call, defaultArgs) {
       to: { module: to, port: toPort },
     });
 
-  await show("patch.setVoiceCount", { voiceCount: 4 });
   await show("transport.setTempo", { tempo: 96 });
   await show("transport.play", {});
   console.log("playing for 4 seconds...");

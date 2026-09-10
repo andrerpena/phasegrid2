@@ -19,6 +19,8 @@ import { PORT_RADIUS, type Point } from "../layout";
 
 /** How far the arrowhead reaches back from its tip along the cable. */
 export const CABLE_HEAD_LENGTH = 7;
+/** How much heavier a per-voice cable is drawn than a global one. */
+export const CABLE_POLY_EXTRA = 2;
 /** Half the width of the arrowhead at its base. */
 const CABLE_HEAD_HALF_WIDTH = 3.5;
 
@@ -129,14 +131,20 @@ export class Cable {
       dimmed?: boolean;
       toFacing?: Facing;
       fromFacing?: Facing;
+      /** The cable carries one signal per voice of an instrument, not one global one. */
+      poly?: boolean;
     } = {},
   ): void {
     this.view.clear();
+    // A per-voice cable is drawn heavier, the way a polyphonic wire is in a modular that has them:
+    // it is the one thing on the canvas that says where an instrument's voices run.
+    const width =
+      (options.selected ? 3 : 2) + (options.poly ? CABLE_POLY_EXTRA : 0);
     drawCableShape(
       this.view,
       cableShape(from, to, options.toFacing, options.fromFacing),
       {
-        width: options.selected ? 3 : 2,
+        width,
         color: this.color,
         alpha: options.dimmed ? 0.35 : 1,
       },

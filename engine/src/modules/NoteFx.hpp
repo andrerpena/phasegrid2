@@ -104,7 +104,7 @@ public:
   }
 
   void process(ProcessContext& c) final {
-    if (c.voice == 0) {
+    if (c.firstPass) {
       eventCount_ = 0;
       advance(c);
     }

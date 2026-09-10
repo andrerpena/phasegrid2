@@ -1,5 +1,6 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <nlohmann/json.hpp>
 #include <vector>
 #include "core/Engine.hpp"
 #include "modules/TestModules.hpp"
@@ -32,12 +33,9 @@ TEST_CASE("engine renders silence before any commit and audio after; only active
   rig.edge("e", "c", "out", "s", "in");
   REQUIRE(rig.engine.commit());
   rig.render();
-  REQUIRE(rig.l[10] == Catch::Approx(0.5f));   // voice 0 only: voice 1 lanes are masked at voiceCount 1
+  // A global signal lives in voice 0's lanes and reaches the output once; its mirrored half is masked.
+  REQUIRE(rig.l[10] == Catch::Approx(0.5f));
   REQUIRE(rig.r[10] == Catch::Approx(0.5f));
-  REQUIRE(rig.engine.model().setVoiceCount(2));
-  REQUIRE(rig.engine.commit());
-  rig.render();
-  REQUIRE(rig.l[10] == Catch::Approx(1.0f));   // both voices carry the constant and are summed
 }
 
 TEST_CASE("engine hot-swap keeps DSP state continuous", "[engine]") {
@@ -93,6 +91,41 @@ TEST_CASE("engine commit failure keeps the old program", "[engine]") {
   REQUIRE(rig.engine.retiredCount() == 0);
   rig.render();
   REQUIRE(rig.l[0] == Catch::Approx(0.5f));
+}
+
+TEST_CASE("a rebuilt instance takes over from the one it replaced, at the swap", "[engine][rt]") {
+  // Node data is structural, so an edit to it builds a NEW instance. What the old one was in the middle
+  // of -- for a note source, the notes it has started -- must reach the new one, or it is lost with the
+  // old program: the swap hands each replaced instance the retiring one to `adopt` from.
+  Rig rig;
+  rig.add("n", "test.blockCount"); rig.add("s", "test.sink");
+  rig.edge("e", "n", "out", "s", "in");
+  REQUIRE(rig.engine.commit());
+  for (int i = 0; i < 3; ++i) rig.render();
+  REQUIRE(rig.l[0] == 3.f);
+
+  REQUIRE(rig.engine.model().setNodeData("n", nlohmann::json{{"edit", 1}}));
+  REQUIRE(rig.engine.commit());
+  pg::test::resetRtViolations();
+  { pg::test::RtScope scope; rig.render(); }
+  REQUIRE(pg::test::rtViolations() == 0);   // the hand-over is audio-thread work
+  REQUIRE(rig.l[0] == 4.f);                 // a fresh instance would say 1
+
+  // Two edits before one swap: the instance the second edit replaced never ran, so the one that did is
+  // what the survivor takes over from.
+  REQUIRE(rig.engine.model().setNodeData("n", nlohmann::json{{"edit", 2}}));
+  REQUIRE(rig.engine.commit());
+  REQUIRE(rig.engine.model().setNodeData("n", nlohmann::json{{"edit", 3}}));
+  REQUIRE(rig.engine.commit());
+  rig.render();
+  REQUIRE(rig.l[0] == 5.f);
+
+  // An instance the compile reused is not handed itself.
+  rig.add("unrelated", "test.const");
+  REQUIRE(rig.engine.commit());
+  rig.render();
+  REQUIRE(rig.l[0] == 6.f);
+  rig.engine.collectGarbage();
 }
 
 TEST_CASE("engine render path is allocation free, including the swap", "[engine][rt]") {

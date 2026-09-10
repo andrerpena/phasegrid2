@@ -37,7 +37,9 @@ shapes; this is the map, not the territory.
   face to draw. Only modules whose descriptor has `previewsWave` answer; the rest return `E_UNSUPPORTED`.
   The picture is computed by the module from the same parameters the sound is, on the message thread.
 - **Patch:** `patch.load`, `patch.clear`, `patch.batch`, `module.add`, `module.remove`, `edge.add`,
-  `edge.remove`, `param.set`, `patch.setVoiceCount`, `patch.setFeedbackMode`.
+  `edge.remove`, `param.set`, `patch.setFeedbackMode`. Every answer that committed, and the `patch.revision`
+  event, carries `domains`: per module, `"global"` or `{instrument: <entry id>}`, as the compiler decided
+  (docs/engine.md, instruments). There is no patch-level voice count: polyphony is each converter's `voices`.
 - **Transport:** `transport.play`, `transport.stop`, `transport.setTempo`, `transport.seek`,
   `transport.setTimeSignature`, `transport.setScale`. Tempo, meter and scale belong to the project and are
   pushed to the engine by the renderer whenever the project changes; every transport answer, and the

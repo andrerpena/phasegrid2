@@ -159,7 +159,7 @@ TEST_CASE("every command in the shared table has a handler", "[protocol]") {
   FakeDeviceHost host;
   f.ctx.device = &host;
   for (const char* cmd : {"hello", "engine.ping", "engine.shutdown", "catalog.get", "patch.load",
-                          "patch.clear", "patch.render", "patch.batch", "patch.setVoiceCount", "patch.setFeedbackMode",
+                          "patch.clear", "patch.render", "patch.batch", "patch.setFeedbackMode",
                           "module.add", "module.remove", "edge.add", "edge.remove", "param.set",
                           "transport.play", "transport.stop", "transport.setTempo", "transport.setTimeSignature",
                           "transport.setScale", "transport.seek",
@@ -262,13 +262,13 @@ TEST_CASE("patch.batch applies every op or none of them", "[protocol]") {
            {"from", {{"module", "lfo"}, {"port", "out"}}}, {"to", {{"module", "amp"}, {"port", "param:gain"}}}},
       json{{"op", "edgeRemove"}, {"id", "e3"}},
       json{{"op", "moduleRemove"}, {"id", "lfo2"}},
-      json{{"op", "setVoiceCount"}, {"voiceCount", 4}},
   })}};
   const json applied = f.call("patch.batch", good);
   REQUIRE(applied["ok"] == true);
   REQUIRE(applied["result"]["revision"] == revision + 1);   // one commit for the whole batch
   REQUIRE(f.nodeCount() == 4);
-  REQUIRE(f.engine.model().voiceCount == 4);
+  // Every commit says which instrument each module landed in; nothing here has a converter, so all global.
+  REQUIRE(applied["result"]["domains"]["amp"] == "global");
   REQUIRE(f.engine.model().nodes().at("amp").params.at("gain") == Catch::Approx(0.25));
 }
 
@@ -302,25 +302,30 @@ TEST_CASE("a commit failure is reported and the model goes back to what was play
   f.buildWorkingPatch();
   const uint64_t revision = f.revision();
 
-  // `GraphModel` accepts 1..64 voices but the compiler tops out at 32, so this passes the model and
-  // fails the commit -- the one path where the edit is valid and the program still cannot be built.
-  const json refused = f.call("patch.setVoiceCount", json{{"voiceCount", 40}});
-  REQUIRE(errorCode(refused) == "E_VOICES");
+  // Two converters reaching one module is a graph the model accepts and the compiler refuses -- the
+  // path where the edit is valid and the program still cannot be built.
+  pg::registerBuiltinModules(f.registry);
+  const json refused = f.call("patch.batch", json{{"ops", json::array({
+      json{{"op", "moduleAdd"}, {"id", "polyA"}, {"type", "note.toPoly"}},
+      json{{"op", "moduleAdd"}, {"id", "polyB"}, {"type", "note.toPoly"}},
+      json{{"op", "edgeAdd"}, {"id", "xa"}, {"from", {{"module", "polyA"}, {"port", "gate"}}}, {"to", {{"module", "amp"}, {"port", "in"}}}},
+      json{{"op", "edgeAdd"}, {"id", "xb"}, {"from", {{"module", "polyB"}, {"port", "gate"}}}, {"to", {{"module", "amp"}, {"port", "in"}}}},
+  })}});
+  REQUIRE(errorCode(refused) == "E_INSTRUMENT_MIX");
   REQUIRE(f.revision() == revision);
-  REQUIRE(f.engine.model().voiceCount == 1);
+  REQUIRE(f.engine.model().nodes().count("polyA") == 0);
   REQUIRE_FALSE(f.emitted("patch.revision"));
 
   // And the engine still works afterwards: the failure left nothing behind.
-  REQUIRE(f.call("patch.setVoiceCount", json{{"voiceCount", 8}})["ok"] == true);
-  REQUIRE(f.engine.model().voiceCount == 8);
+  REQUIRE(f.call("patch.batch", json{{"ops", json::array({json{{"op", "moduleAdd"}, {"id", "polyA"}, {"type", "note.toPoly"}}})}})["ok"] == true);
+  REQUIRE(f.engine.model().nodes().count("polyA") == 1);
 }
 
-TEST_CASE("patch.setVoiceCount and patch.setFeedbackMode validate their arguments", "[protocol]") {
+TEST_CASE("patch.setFeedbackMode validates its argument, and the old voice count command is gone", "[protocol]") {
   Fixture f;
-  REQUIRE(errorCode(f.call("patch.setVoiceCount", json{{"voiceCount", 0}})) == "E_VOICES");
-  REQUIRE(errorCode(f.call("patch.setVoiceCount", json{{"voiceCount", 65}})) == "E_VOICES");
-  REQUIRE(errorCode(f.call("patch.setVoiceCount", json{{"voiceCount", 2.5}})) == "E_VOICES");
-  REQUIRE(errorCode(f.call("patch.setVoiceCount", json::object())) == "E_SCHEMA");
+  // Polyphony belongs to each converter now; the patch-level command no longer exists.
+  REQUIRE(errorCode(f.call("patch.setVoiceCount", json{{"voiceCount", 4}})) == "E_UNKNOWN_CMD");
+  REQUIRE(errorCode(f.call("patch.batch", json{{"ops", json::array({json{{"op", "setVoiceCount"}, {"voiceCount", 4}}})}})) == "E_SCHEMA");
 
   REQUIRE(f.call("patch.setFeedbackMode", json{{"mode", "block"}})["ok"] == true);
   REQUIRE(f.engine.model().feedbackMode == pg::FeedbackMode::Block);
@@ -364,8 +369,7 @@ TEST_CASE("patch.load replaces the whole document, or nothing at all", "[protoco
                                   {"from", {{"module", "a"}, {"port", "out"}}},
                                   {"to", {{"module", "b"}, {"port", "in"}}}}})}};
   REQUIRE(f.call("patch.load", json{{"patch", patch}})["ok"] == true);
-  REQUIRE(f.nodeCount() == 2);
-  REQUIRE(f.engine.model().voiceCount == 2);
+  REQUIRE(f.nodeCount() == 2);   // the `voiceCount` from before instruments is read past
   REQUIRE(f.revision() > revision);
 
   // A patch from another schema version leaves the loaded one alone.

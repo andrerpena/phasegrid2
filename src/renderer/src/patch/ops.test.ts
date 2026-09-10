@@ -125,12 +125,6 @@ describe("inverting operations", () => {
     ).toBe(true);
   });
 
-  it("undoes a voice count change", () => {
-    expect(roundTrips(base, [{ op: "setVoiceCount", voiceCount: 8 }])).toBe(
-      true,
-    );
-  });
-
   it("undoes several operations in the right order", () => {
     // Reversed, because undoing a sequence means undoing its last step first. Applied forwards, the
     // second operation's inverse would run against a document that no longer matches it.

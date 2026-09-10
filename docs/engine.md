@@ -6,7 +6,7 @@ C++20 process. One message thread (socket/commands, compiles), one audio thread 
 
 The wire signal is `pg::Sample = vital::poly_float`: four float lanes `[voice0.L, voice0.R, voice1.L, voice1.R]`
 (SSE2 on x86-64, NEON on arm64). Every continuous port carries `Sample[numFrames]`; stereo everywhere; mono sources write L = R.
-Voices run in pairs: `Program.voicePairs = ceil(voiceCount / 2)`, unused voice lanes are masked by the terminal module (see the scheduler contract below).
+Voices run in pairs, two per `Sample`, inside an *instrument* (see below); a global signal lives in voice 0's lanes with voice 1's mirroring it, and an exit masks the lanes it folds.
 Helpers in `core/Signal.hpp` (`lanes::voice/left/right/mono/stereo/lane`). `kMaxBlockSize = 128`.
 
 Every port declares a `SignalRole` -- `Any`, `Audio`, `Cv`, `Gate`, `Pitch`, `Phase`, `Note` -- which is a UI
@@ -25,38 +25,69 @@ No `new`/`delete`/growing containers, no locks, no syscalls, no exceptions, no l
 Allocate in `Module::prepare` only. `[rt]` tests fail on any global allocation inside an `RtScope`.
 `PG_RT_NONBLOCKING` (`[[clang::nonblocking]]`) marks audio functions as a trailing attribute paired with `noexcept`; on this toolchain it is documentation unless the `rtsan` preset is used; the `RtScope` tests enforce the rules in the test harness.
 
-## Voices and the scheduler contract
+## Instruments, voices and the scheduler contract
 
-`Program.voicePairs = ceil(voiceCount / 2)`, up to `kMaxVoices` = 32 voices (16 pairs). `Scheduler::run`
-executes the **whole op list once per pair**, in **ascending pair order**, inside one block, passing the pair
-index as `ctx.voice` and that pair's active-lane mask as `ctx.voiceMask`. Buffers and event buffers are shared
-by every pair, so a pair overwrites what the previous one left and only the last pair's values survive a block.
+Polyphony is not a property of the patch. An **instrument** is the region of a patch between a *voice
+entry* -- `note.toPoly`, which turns a note stream into one pitch, gate and velocity per voice and owns the
+pool those voices come from (its `voices` param, default 16, at most `kMaxVoices` = 32) -- and its *voice
+exits*, the folds that add the voices back into one signal: `voices.sum`, or `io.audioOut` itself. The
+compiler works out membership from the cables: every node a continuous signal path reaches from the
+entry's outputs without crossing an exit is **per-voice** and belongs to that instrument; the exit belongs
+too, but what leaves it is **global**. Everything reached from no entry is global. A node two entries reach
+is `E_INSTRUMENT_MIX` (sum one first); a feedback loop that straddles an instrument's edge is
+`E_FEEDBACK_DOMAIN`. Event ports are always global: a note stream is the same for every voice. Two
+converters are two instruments with independent pools; an instrument's summed output may feed another
+instrument as a global signal, and the compiler orders them so it does. `kModuleVoiceEntry` and
+`kModuleVoiceExit` mark the two ends in a descriptor; a module cannot be both.
 
-That has one consequence every module has to honour:
+The program is a list of **segments**. A global segment runs its ops once, with `ctx.voice` 0,
+`firstPass` and `lastPass` both true, `ctx.voiceMask` voice 0's lanes and `ctx.activity` null. An
+instrument's ops are one contiguous segment (its pairs share the program's buffers, so a pass must see the
+whole instrument's work for its own pair): the scheduler first runs the entry's **`Module::allocate`**
+once, which reads the block's note events and marks the instrument's `VoiceActivity` (`core/Voices.hpp`)
+-- a note on makes a voice *held*, a note off lets it *release* -- then runs the ops once per **live
+pair**, in ascending order, with `ctx.voice` the pair, the mask the lanes of its voices that are not free,
+`firstPass` on the first live pair and `lastPass` on the last, and `ctx.activity` the pool. A pair with
+no held or releasing voice is not run at all, which is why a pool of sixteen costs nothing while nothing
+plays.
 
-- **Per-block work runs on pair 0.** Work that is identical for every voice -- reading the block's note
-  events, deriving a playhead from `transport.ppq` -- must happen when `ctx.voice == 0`, with the result
-  reused for later pairs, or it happens `voicePairs` times. Ascending order is what makes "pair 0 first"
-  meaningful. Per-*voice* state is indexed by the pair instead: `VoicedModule<State>` sizes its vector to
-  `voicePairs` and `st(ctx)` picks `ctx.voice`.
+**When a released voice ends** is the reference instrument's rule, not a measurement (docs/adrs/0002): after its note off
+a voice lives only while something in the instrument *holds* it, and each holder says so per pass, per
+block, through `VoiceActivity::hold(voice)`. An envelope holds its voice until its release stage is over
+(`env.dahdsr` reads the vendored envelope's stage; its `lifetime` toggle, on by default, takes it out of
+the decision). An exit -- `io.audioOut`, `voices.sum` -- holds a voice while what it hears from it is
+above `kVoiceSilence`, but only with its own `lifetime` toggle on, which is off by default. After the
+passes `settle()` frees every releasing voice nobody held that block. So a voice with an envelope rings
+out; a voice with none ends with its note -- a bare oscillator stops rather than droning, and a run of
+single notes into it plays one voice instead of filling the pool -- and a patch that wants the drone
+held until it is silent asks the exit for it. Allocation takes a free voice first, then the
+longest-releasing, then the longest-held, with the one-frame gate dip on a steal so a downstream envelope
+retriggers.
 
-A **terminal module masks its own contribution**: `io.audioOut` (and the test suite's `test.sink`) applies
-`ctx.voiceMask` as it adds into the bus. That is the last point at which the pair the lanes belong to is
-known -- by the time `Engine::renderBlock` folds the bus, every pair has added into it and no single mask
-describes the sum, so the fold applies none. Masking there with pair 0's mask let the empty lane of an odd
-count's last pair through as a phantom voice.
+Two rules follow for a module:
+
+- **Per-block work runs on the first pass.** Work that is the same for every voice -- reading the block's
+  note events, deriving a playhead from `transport.ppq` -- happens when `ctx.firstPass`, and a fold that
+  sums the voices (the display modules, `voices.sum`, `io.audioOut`) clears then and publishes on
+  `ctx.lastPass`. Per-*voice* state is indexed by the pair: `VoicedModule<State>` sizes its vector to the
+  node's `PrepareInfo.voiceCount`, which is the instrument's voices for a per-voice node and 1 for a global
+  one, so a global LFO holds one state and a vendored oscillator only multiplies inside an instrument
+  (`InstanceTable::acquire` rebuilds a node whose count moved and reuses the rest).
+- **An exit masks its own contribution** with `ctx.voiceMask` as it adds. That is the last point at which
+  the pair the lanes belong to is known -- by the time `Engine::renderBlock` folds the bus every pair has
+  added into it and no single mask describes the sum. A global signal arrives with voice 0's mask, so its
+  mirrored half is dropped and it reaches the output once.
+
+`Module::reset(uint32_t voicePair)` is called by the scheduler on every module of an instrument when a
+pair that was dead comes back to life, before the pair runs, so a new note starts from clean DSP state
+rather than from what the last note left in a filter or a delay line. A stolen voice inside a live pair is
+not reset: it retriggers through the gate dip, as a downstream envelope expects. `VoicedModule` clears its
+state and the vendored adapter hard-resets the vendored module; the entry's own reset is a no-op because
+the pool's memory is the activity's. Feedback memory (`FeedbackState::z`) is one slot per pair of the
+loop's domain.
 
 Parallelising pairs later would break both halves of the per-block rule -- the ordering and the shared
 buffers -- so it would have to revisit this contract, not just the loop.
-
-`Module::reset(uint32_t voicePair)` is **reserved and called by nothing**. No part of the engine invokes
-it -- not the scheduler, not `Engine::renderBlock`, not the program swap -- so a module that implements it
-gets silence rather than behaviour. Per-voice state is cleared the two ways the engine actually has: a
-stolen voice retriggers through the one-frame gate dip `note.toPoly` emits, which is the correct modular
-answer, and everything else resets by being rebuilt (`InstanceTable::acquire` makes a fresh instance
-whenever the sample rate, the voice count, a structural param or the node data changes). It stays declared
-for a future transport panic or voice-reset command, and because `VoicedModule` and the vendored adapter
-already implement it. Do not invent a caller to make it used.
 
 ## Vendored Vital DSP
 
@@ -112,11 +143,11 @@ attributed to our sources.
 ## Modules
 
 Built-ins are registered in `engine/src/modules/builtin.cpp`, one line each. Own modules are a single `.cpp` under
-`engine/src/modules`; vendored-backed ones a single `ModuleSpec` under `engine/src/modules/vital`. Today, thirty-five:
+`engine/src/modules`; vendored-backed ones a single `ModuleSpec` under `engine/src/modules/vital`. Today, thirty-six:
 
 - own: `io.audioOut`, `note.toCv`, `note.toPoly`, `notes.clip`, `notes.pattern`, `phase.clock`, `math.scaleOffset`,
   `mix.mixer`, `amp.vca`, `osc.sawtooth`, `osc.pulse`, `osc.sine`, `mod.lfo`, `display.meter`, `display.scope`,
-  `display.value`, `display.piano`, and the four note effects `notefx.chord`, `notefx.quantize`, `notefx.arp`, `notefx.humanize`
+  `display.value`, `display.piano`, `voices.sum`, and the four note effects `notefx.chord`, `notefx.quantize`, `notefx.arp`, `notefx.humanize`
 - vendored-backed: `osc.wavetable`, `sampler.player`, `filter.multi`, `env.dahdsr`, `mod.random`, and the
   eight audio effects `fx.reverb`, `fx.delay`, `fx.chorus`, `fx.flanger`, `fx.phaser`, `fx.distortion`,
   `fx.compressor`, `fx.eq`.
@@ -205,14 +236,17 @@ each *pair* of cycles (the second starts at `1 + swing` instead of `1`, and both
 ramp), which degenerates to plain `frac(position)` at swing 0. Its phase output is `0 <= phase < 1`: a double a hair
 under one rounds UP to exactly `1.0f` when narrowed, so the narrowing is clamped rather than trusted.
 
-`note.toPoly` is the polyphonic sibling of `note.toCv`: its pitch, gate and velocity outputs carry a different
-value in each voice lane. Its voice table is per *program*, not per pair, so it is not a `VoicedModule`: pair 0
-runs the whole block's allocation once and records a change list, and every pair (0 included) then replays that
-list for the two voices its lanes carry. The table has `2 * voicePairs` entries so every lane index is in range,
-but allocation stops at `voiceCount` -- a note on the empty lane of an odd count's last pair would be masked away
-at the terminal and go silently missing. A note takes the lowest free voice, or steals the one that has been
-sounding longest, and a steal drops that voice's gate for exactly one frame so a downstream envelope retriggers.
-A note off matches on the note number, so a note off for a note that was already stolen releases nobody.
+`note.toPoly` is the polyphonic sibling of `note.toCv` and the entry of an instrument: its pitch, gate and
+velocity outputs carry a different value in each voice lane, and its `voices` param sizes the pool. Its voice
+table is per *instrument*, not per pair, so it is not a `VoicedModule`: `allocate` runs once per block ahead
+of the passes and records a change list against the instrument's `VoiceActivity`, and every pass replays that
+list for the two voices its lanes carry. The table has `2 * pairs` entries so every lane index is in range,
+but allocation stops at `voices` -- a note on the empty lane of an odd pool's last pair would be masked away
+at the exit and go silently missing. A note takes a free voice first, then the voice that has been releasing
+longest, then the one held longest, and a steal drops that voice's gate for exactly one frame so a downstream
+envelope retriggers. A note off matches on the note number, so a note off for a note that was already stolen
+releases nobody. `voices.sum` is the matching exit short of the output: it adds every live voice into one
+global stereo signal on its last pass, so an effect after it runs once rather than once per voice.
 
 `notes.clip` is the grid's own note source: a list of notes in musical time, played against the transport
 and emitted as a note stream, with the playhead out as a phase. The notes live in the node's `data` as
@@ -228,9 +262,11 @@ tempo, the way `phase.clock` does, which is also what makes it audible under `--
 `play` input runs the clip, so it is not silently stopped the moment it is placed.
 
 Every frame re-derives the set of notes the playhead is inside and emits the difference against what is
-sounding. A transport jump, a loop wrap, the play gate falling and a note simply ending are then one code
-path, and none of them can leave a note on without its note off, because the note off IS how a note leaves
-the set. A loop wrap releases everything first, so a note that fills the whole clip retriggers rather than
+sounding. A transport jump, a loop wrap, the play gate falling, an edit to the notes and a note simply
+ending are then one code path, and none of them can leave a note on without its note off, because the note
+off IS how a note leaves the set. An edit rebuilds the instance and the new one `adopt`s the held set: a
+held note the new clip still has (same start, end and pitch) is rebound to it; one it no longer has is kept
+as an orphan nothing covers, so the next frame releases it. A loop wrap releases everything first, so a note that fills the whole clip retriggers rather than
 hanging. That costs O(frames x notes) per block, which is why a clip is capped at 512 notes. Events are
 worked out once on pair 0 and replayed for every pair, per the scheduler contract; a note off carries the
 note number its note ON used, so moving `transpose` under a held note still releases the right one.
@@ -326,7 +362,12 @@ only place it is ever read, so the only way to apply a change is to build the in
 `InstanceTable::acquire` compares the blob and rebuilds when it differs. That is a heavy hammer for something
 edited as often as a clip's notes, and it is affordable only because such a module derives its position from
 `transport.ppq` every block, so a rebuilt instance resumes where the old one was rather than restarting.
-`notes.clip` is the first module built this way. Unlike
+What the position cannot carry is what the old instance was in the middle of -- the notes it had started and
+not yet ended -- and that is what `Module::adopt` is for: at the swap, on the audio thread, the rebuilt
+instance is handed the retiring one and copies its held set (see "Program and hot-swap"). `notes.clip` and
+`notes.pattern` are built this way: the new instance releases whatever the edited source no longer has at
+that place and keeps sounding whatever it still does, so an edit under a held chord never leaves a voice
+stuck downstream. Unlike
 `params`, `data` is genuinely diffed here, so the model cannot get ahead of the engine the way param values can.
 If editing ever proves too slow, the upgrade is the pattern the program swap already uses: build the new list on
 the message thread, swap an atomic pointer, retire the old one.
@@ -338,6 +379,13 @@ the message thread, swap an atomic pointer, retire the old one.
 When the retire queue fills, `Engine` keeps a `deferred_` program and adopts it on a later block; `commit()` runs `collectGarbage()` at entry.
 `InstanceTable` reuses a `ModuleInstance` when `(id, type)`, every `kParamStructural` param value and `NodeModel::data` are unchanged;
 a change of sample rate or voice count makes it create fresh instances (DSP state resets).
+**A rebuilt instance adopts from the one it replaced, at the swap.** `swapIfPending` calls `Program::adoptFrom`
+on the incoming program before the old one is retired: every instance whose node id is in the old program under
+the same type, and is not the same instance, gets `Module::adopt(retiring)` on the audio thread. Matched there,
+against the program that actually ran, rather than recorded at compile time, because two commits can land
+before one swap and the instance the second replaced never ran a block. `adopt` copies and never moves,
+bounded by the new instance's own sizes: a swap the full retire queue defers runs it again, with the old
+instance one block further on. The default carries nothing; the note sources carry their held notes.
 Feedback memory is reused by edge id. Param changes never compile: `Engine::setParam` enqueues `{serial, param, norm}`; the audio thread applies it by binary search.
 
 **Model params are applied at instance creation, and reconciled on every commit.** `InstanceTable::acquire` copies
@@ -393,7 +441,8 @@ transport-driven module to a sample-level cluster before that lands.
 
 ## Compilation constraints
 
-- Max `kMaxVoices` = 32 voices (16 pairs) per program; `compileGraph` rejects more with `E_VOICES`. `GraphModel` itself accepts 1..64.
+- Max `kMaxVoices` = 32 voices (16 pairs) per instrument; `compileGraph` rejects a larger `voices` with `E_VOICES`.
+- A node two instruments reach is `E_INSTRUMENT_MIX`; a feedback loop across an instrument's edge is `E_FEEDBACK_DOMAIN`.
 - Fan-in into one port is capped at `kMaxPortsPerModule` (32) → `E_FAN_IN`.
 
 ## Ops

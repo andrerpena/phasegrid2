@@ -46,13 +46,6 @@ export const CONFIG_SCHEMA: Record<string, ConfigPropertySchema> = {
     minimum: 16,
     maximum: 2048,
   },
-  "engine.voiceCount": {
-    type: "number",
-    default: 4,
-    description: "How many voices a polyphonic patch runs.",
-    minimum: 1,
-    maximum: 32,
-  },
   "telemetry.fps": {
     type: "number",
     default: 30,

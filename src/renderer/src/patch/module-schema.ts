@@ -90,6 +90,13 @@ export function flattenModule(
   return view;
 }
 
+/** A structural parameter's help says what changing it costs: the module is built again. */
+function structuralDoc(param: ParamDesc): string {
+  return param.flags.structural
+    ? `${param.doc} Changing it rebuilds the module.`
+    : param.doc;
+}
+
 export function buildModuleSchema(
   descriptor: ModuleDescriptor,
   /** What the expand button on a text field does. Absent leaves the field a plain one-liner. */
@@ -104,14 +111,14 @@ export function buildModuleSchema(
   for (const param of inspectableParams(descriptor)) {
     const key = `${PARAM_PREFIX}${param.id}`;
     const unit = UNIT_SUFFIX[param.unit];
-    // Structural parameters are read-only: changing one makes the engine rebuild the node, which is
-    // not something to offer behind a field that looks like every other field.
-    const editable = !param.flags.structural;
+    // A structural parameter is edited like any other; the engine rebuilds the node to apply it,
+    // which the description says, and the field is committed on change rather than dragged.
+    const editable = true;
 
     if (param.flags.enum) {
       shape[key] = schema.string().withMetadata({
         label: param.name,
-        description: param.doc,
+        description: structuralDoc(param),
         editable,
         renderer: "enum",
         // The label is both what is shown and what is stored in the form; `numericValue` turns it
@@ -127,7 +134,7 @@ export function buildModuleSchema(
 
     shape[key] = schema.number().withMetadata({
       label: param.name,
-      description: param.doc,
+      description: structuralDoc(param),
       editable,
       ...(unit === "" ? {} : { unit }),
       defaultValue: param.default,

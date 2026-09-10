@@ -11,8 +11,9 @@ namespace pg {
 class InstanceTable {
 public:
   /// Reuses the instance when the type is unchanged; otherwise creates and prepares a new one.
-  /// A change of sample rate, block size or voice count creates fresh instances (DSP state resets);
-  /// reuse only happens while PrepareInfo is unchanged.
+  /// A change of sample rate, block size or the NODE's voice count (the voices of the instrument it
+  /// is in, or 1 when global) creates a fresh instance for that node (its DSP state resets); the
+  /// other nodes keep theirs.
   ///
   /// `params` is applied here at creation ONLY. A reused instance keeps the values it already has,
   /// and this is deliberate: `ParamState` is owned by the audio thread once `prepare` has run — the
@@ -33,6 +34,9 @@ public:
   /// hot-swap keeps the loop running; a change of voice count makes a fresh one instead of resizing the
   /// live one, because the audio thread may still be reading the program that holds it.
   std::shared_ptr<FeedbackState> acquireFeedback(const std::string& edgeId, uint32_t voicePairs);
+  /// One pool per instrument entry, reused across compiles so the voices a program was playing are
+  /// still the voices the next one plays; a change of `voices` makes a fresh one.
+  std::shared_ptr<VoiceActivity> acquireActivity(const std::string& entryId, uint32_t voices);
   void prune(const std::set<std::string>& liveNodeIds, const std::set<std::string>& liveEdgeIds);
   const ModuleInstance* find(const std::string& id) const;
   ModuleInstance* find(const std::string& id);
@@ -48,7 +52,7 @@ public:
 private:
   std::map<std::string, std::shared_ptr<ModuleInstance>> byId_;
   std::map<std::string, std::shared_ptr<FeedbackState>> feedbackById_;
-  PrepareInfo lastInfo_{};
+  std::map<std::string, std::shared_ptr<VoiceActivity>> activityById_;
   uint64_t nextSerial_ = 1;
 };
 

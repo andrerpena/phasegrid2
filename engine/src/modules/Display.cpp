@@ -17,9 +17,10 @@ namespace {
  * like. Nobody watching means no slot, and then `process` does nothing at all.
  *
  * Voices are folded to stereo the way `io.audioOut` folds them, so a meter reads what the output reads
- * rather than one voice of it. Because the scheduler runs the whole graph once per voice pair over
- * shared buffers, the fold accumulates across pairs into per-instance scratch and publishes on the last
- * one; publishing every pair would let a reader catch a partial sum and show a meter that dips.
+ * rather than one voice of it. Inside an instrument the scheduler runs the module once per live voice
+ * pair over shared buffers, so the fold accumulates across the passes into per-instance scratch and
+ * publishes on the last one; publishing every pass would let a reader catch a partial sum and show a
+ * meter that dips. Fed a global signal there is one pass and the fold is a copy.
  */
 
 /// One pair's contribution, folded to left and right and masked to the voices that exist.
@@ -55,10 +56,10 @@ public:
     if (c.telemetry == nullptr || c.displaySlot == kNoTelemetrySlotCtx) return;
 
     float* out = scratch_.data();
-    if (c.voice == 0) std::fill_n(out, static_cast<size_t>(c.numFrames) * 2, 0.f);
+    if (c.firstPass) std::fill_n(out, static_cast<size_t>(c.numFrames) * 2, 0.f);
     accumulate(c.in(0).readOr(), c.numFrames, c.voiceMask, out);
 
-    if (c.voice + 1 < c.voicePairs) return;   // more pairs still to add
+    if (!c.lastPass) return;   // more pairs still to add
     ++block_;
     publish(c, out);
   }

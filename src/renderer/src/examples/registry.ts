@@ -90,7 +90,6 @@ register({
     "Pan to hear what they do to a bare tone.",
   patch: {
     schemaVersion: 1,
-    voiceCount: 1,
     feedbackMode: "sample",
     modules: [
       {
@@ -133,7 +132,6 @@ register({
     "sync harmonics come in.",
   patch: {
     schemaVersion: 1,
-    voiceCount: 1,
     feedbackMode: "sample",
     modules: [
       {
@@ -173,7 +171,6 @@ register({
     "its face fill up as you hear the harmonics arrive.",
   patch: {
     schemaVersion: 1,
-    voiceCount: 1,
     feedbackMode: "sample",
     modules: [
       {
@@ -213,7 +210,6 @@ register({
     "itself: the arch on its face grows lobes, and the tone gains harmonics with no filter involved.",
   patch: {
     schemaVersion: 1,
-    voiceCount: 1,
     feedbackMode: "sample",
     modules: [
       {
@@ -284,7 +280,6 @@ function throughExample(args: {
     description: args.description,
     patch: {
       schemaVersion: 1,
-      voiceCount: 1,
       feedbackMode: "sample",
       modules: [
         source("osc", args.sourceParams),
@@ -332,7 +327,6 @@ function modulatedExample(args: {
     description: args.description,
     patch: {
       schemaVersion: 1,
-      voiceCount: 1,
       feedbackMode: "sample",
       modules: [
         source(),
@@ -373,7 +367,6 @@ register({
     "Where sound leaves the engine. Turn Gain; everything else in a patch ends here.",
   patch: {
     schemaVersion: 1,
-    voiceCount: 1,
     feedbackMode: "sample",
     modules: [source(), OUT],
     edges: [edge("e1", ["osc", "out"], ["out", "inL"])],
@@ -487,7 +480,6 @@ register({
     "turn Rate, Shape and Depth to change how it moves.",
   patch: {
     schemaVersion: 1,
-    voiceCount: 1,
     feedbackMode: "sample",
     modules: [
       {
@@ -575,7 +567,6 @@ function noteExample(args: {
   source?: Omit<PatchModule, "id" | "x" | "y">;
   /** A note effect between the source and the converter, for the examples that are about one. */
   through?: Omit<PatchModule, "id" | "x" | "y">;
-  voiceCount?: number;
 }): ModuleExample {
   // With an effect in the chain everything after the source moves right to make room for it.
   const shift = args.through === undefined ? 0 : 9;
@@ -632,7 +623,6 @@ function noteExample(args: {
     description: args.description,
     patch: {
       schemaVersion: 1,
-      voiceCount: args.voiceCount ?? 1,
       feedbackMode: "sample",
       modules,
       edges,
@@ -704,7 +694,6 @@ register(
       "inspector to hear a major one, a seventh, a suspension; four voices, so the tones sound together.",
     converter: "note.toPoly",
     through: { type: "notefx.chord", params: { chord: 1 } },
-    voiceCount: 4,
   }),
 );
 
@@ -781,7 +770,6 @@ register({
     "hear one disappear.",
   patch: {
     schemaVersion: 1,
-    voiceCount: 1,
     feedbackMode: "sample",
     modules: [
       source("oscA", { level: 0.7 }),
@@ -820,7 +808,6 @@ function displayExample(
     description,
     patch: {
       schemaVersion: 1,
-      voiceCount: 1,
       feedbackMode: "sample",
       modules: [
         source(),
@@ -870,7 +857,6 @@ register({
       name: "",
       description: "",
       converter: "note.toPoly",
-      voiceCount: 4,
       source: {
         type: "notes.pattern",
         params: { cycle: 4, legato: 0.9 },
@@ -893,6 +879,58 @@ register({
     example.patch.edges.push(
       edge("e7", ["voices", "pitch"], ["piano", "pitch"]),
       edge("e8", ["voices", "gate"], ["piano", "gate"]),
+    );
+  }
+}
+
+/**
+ * The voices summed before a reverb, so the reverb runs once on the whole chord rather than once
+ * per voice. The sum is where an instrument ends: everything after it is global.
+ */
+register({
+  moduleId: "voices.sum",
+  name: "Voice Sum",
+  description:
+    "The chord's voices added into one signal and sent through a reverb that runs once, not once " +
+    "per voice. Cables before the sum are per voice, drawn heavier; after it they are global.",
+  patch: {
+    ...noteExample({
+      moduleId: "voices.sum",
+      name: "",
+      description: "",
+      converter: "note.toPoly",
+      source: {
+        type: "notes.pattern",
+        params: { cycle: 4, legato: 0.8 },
+        data: { pattern: "[c4,e4,g4] [a3,c4,e4]" },
+      },
+    }).patch,
+  },
+});
+{
+  const example = EXAMPLES.get("voices.sum");
+  if (example !== undefined) {
+    const { modules, edges } = example.patch;
+    const out = modules.find((m) => m.id === "out");
+    if (out !== undefined) out.x = col(46);
+    modules.push(
+      { id: "sum", type: "voices.sum", x: col(34), y: col(2) },
+      {
+        id: "verb",
+        type: "fx.reverb",
+        x: col(38),
+        y: col(2),
+        params: { dry_wet: 0.4 },
+      },
+    );
+    const direct = edges.findIndex(
+      (e) => e.from.module === "vca" && e.to.module === "out",
+    );
+    if (direct >= 0) edges.splice(direct, 1);
+    edges.push(
+      edge("e7", ["vca", "out"], ["sum", "in"]),
+      edge("e8", ["sum", "out"], ["verb", "in"]),
+      edge("e9", ["verb", "out"], ["out", "inL"]),
     );
   }
 }

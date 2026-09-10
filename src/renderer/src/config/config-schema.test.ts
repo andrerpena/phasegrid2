@@ -34,7 +34,7 @@ describe("validating settings", () => {
 
   it("refuses a value out of range", () => {
     expect(parse({ "grid.snap": 0 }).success).toBe(false);
-    expect(parse({ "engine.voiceCount": 999 }).success).toBe(false);
+    expect(parse({ "engine.blockSize": 999999 }).success).toBe(false);
   });
 
   it("refuses a panel this build does not have", () => {

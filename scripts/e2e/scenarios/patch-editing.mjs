@@ -4,7 +4,6 @@ import { projectDoc, seedProject } from "../harness.mjs";
 
 const WIRING = {
   schemaVersion: 1,
-  voiceCount: 1,
   feedbackMode: "sample",
   modules: [
     { id: "osc", type: "osc.wavetable", x: 48, y: 48, params: { level: 0.7 } },

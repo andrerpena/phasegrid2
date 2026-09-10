@@ -128,12 +128,6 @@ export const ConfigOverridesSchema = z
       .max(2048)
       .describe(CONFIG_SCHEMA["engine.blockSize"].description)
       .optional(),
-    "engine.voiceCount": z
-      .number()
-      .min(1)
-      .max(32)
-      .describe(CONFIG_SCHEMA["engine.voiceCount"].description)
-      .optional(),
     "telemetry.fps": z
       .number()
       .min(1)

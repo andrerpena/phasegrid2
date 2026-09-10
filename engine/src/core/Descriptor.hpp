@@ -62,6 +62,14 @@ inline constexpr uint32_t kModulePublishesNotes = 1u << 7;
 /// note. An interface gives such a module a keyboard on its face (`piano` in the face rows) and
 /// lights the keys. Implies `kModuleWritesTelemetry`, like the others.
 inline constexpr uint32_t kModulePublishesKeys  = 1u << 8;
+/// The module starts an instrument: it turns a note stream into per-voice signals and owns the pool
+/// of voices those signals run on. It implements `Module::allocate`, which the scheduler runs once per
+/// block before the instrument's voice passes, and its `voices` param sizes the pool (`core/Voices.hpp`).
+inline constexpr uint32_t kModuleVoiceEntry     = 1u << 9;
+/// The module ends an instrument: it folds every voice of its input into one global output, and
+/// reports to the instrument's `VoiceActivity` which voices it still hears, so a released voice can
+/// ring out and then be freed. `io.audioOut` and `voices.sum` are the two. Never also an entry.
+inline constexpr uint32_t kModuleVoiceExit      = 1u << 10;
 
 // C-layout so descriptors can cross a dlopen boundary unchanged.
 struct PortDesc {

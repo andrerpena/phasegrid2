@@ -168,6 +168,13 @@ export const ModuleFlagsSchema = z
      * module a keyboard on its face and lights the keys.
      */
     publishesKeys: z.boolean(),
+    /**
+     * Starts an instrument: turns a note stream into one signal per voice and owns the pool those
+     * voices come from (its `voices` param). Everything its outputs reach runs once per voice.
+     */
+    voiceEntry: z.boolean(),
+    /** Ends an instrument: sums its voices into one global signal. Cables leaving it are global again. */
+    voiceExit: z.boolean(),
   })
   .strict();
 

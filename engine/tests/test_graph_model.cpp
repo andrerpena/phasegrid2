@@ -25,9 +25,6 @@ TEST_CASE("GraphModel validates nodes, edges and params", "[model]") {
   REQUIRE(m.setParam(reg(), "g", "gain", 0.25f));
   REQUIRE(m.nodes().at("g").params.at("gain") == 0.25f);
   REQUIRE(m.setParam(reg(), "g", "nope", 1.f).code == "E_PARAM_NOT_FOUND");
-  REQUIRE(m.setVoiceCount(3));
-  REQUIRE(m.voiceCount == 3);
-  REQUIRE(m.setVoiceCount(0).code == "E_VOICES");
 
   REQUIRE(m.removeEdge("e3"));
   REQUIRE(m.removeEdge("e3").code == "E_EDGE_NOT_FOUND");

@@ -36,7 +36,6 @@ struct Script : pg::VoicedModule<int> {
   static inline std::vector<Timed> events;
   static inline uint64_t base = 0;
   void process(pg::ProcessContext& c) override {
-    if (c.voice != 0) return;   // the buffer is shared by every pair; filling it once is enough
     for (const Timed& t : events) {
       if (t.frame < base || t.frame >= base + c.numFrames) continue;
       pg::Event e = t.e;
@@ -89,8 +88,7 @@ struct Rig {
   std::vector<Timed> log;
   uint64_t pos = 0;
 
-  Rig(const char* type, std::vector<Timed> script, std::map<std::string, float> params = {},
-      uint32_t voices = 1) {
+  Rig(const char* type, std::vector<Timed> script, std::map<std::string, float> params = {}) {
     pg::registerBuiltinModules(f.reg);
     REQUIRE_FALSE(f.reg.add(kScript).has_value());
     REQUIRE_FALSE(f.reg.add(kRecorder).has_value());
@@ -103,7 +101,6 @@ struct Rig {
     f.node("rec", "test.noteRecorder");
     f.edge("e0", "src.notes", "fx.notes");
     f.edge("e1", "fx.notes", "rec.notes");
-    f.model.setVoiceCount(voices);
     f.transport.tempo = kTempo;
     program = f.compile(kSampleRate, 64);
   }
@@ -210,14 +207,6 @@ TEST_CASE("chord: an off for a note never seen is ignored", "[notefx]") {
   Rig rig("notefx.chord", {off(0, 60.f)});
   rig.run();
   CHECK(rig.log.empty());
-}
-
-TEST_CASE("chord: every voice pair sees the same chord", "[notefx]") {
-  Rig rig("notefx.chord", {on(0, 60.f)}, {}, 4);
-  rig.run();
-  REQUIRE(Recorder::perPair[0].count == 3);
-  REQUIRE(Recorder::perPair[1].count == 3);
-  CHECK(Recorder::perPair[1].events[2].a == 67.f);
 }
 
 // ------------------------------------------------------------------------------------- quantize

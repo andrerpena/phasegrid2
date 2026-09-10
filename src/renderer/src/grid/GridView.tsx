@@ -1,5 +1,6 @@
 import { useCatalogStore } from "@renderer/catalog/catalog-store";
 import { commandRegistry } from "@renderer/commands/registry";
+import { useEngineStore } from "@renderer/engine/engine-store";
 import { uniqueEdgeId } from "@renderer/patch/add-module";
 import { paramValue } from "@renderer/patch/params";
 import { usePatchStore } from "@renderer/patch/patch-store";
@@ -106,6 +107,14 @@ export const GridView = () => {
       stop.push(telemetry.stop);
 
       stop.push(usePatchStore.subscribe((state) => view.sync(state.doc)));
+      // Which modules run per voice, from the engine's last compile: a per-voice cable is drawn heavier.
+      view.setDomains(useEngineStore.getState().domains);
+      stop.push(
+        useEngineStore.subscribe((state, previous) => {
+          if (state.domains !== previous.domains)
+            view.setDomains(state.domains);
+        }),
+      );
       stop.push(useThemeStore.subscribe((state) => view.setTheme(state.theme)));
       // The catalogue arrives after the engine handshake, which is after this runs. Without this the
       // renderer keeps the empty map it was built with and silently draws nothing: every module in the

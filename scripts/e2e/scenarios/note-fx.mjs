@@ -4,11 +4,11 @@ import { projectDoc, seedProject } from "../harness.mjs";
  * The note effects: modules with a note stream in and a different one out, in their own group in
  * the catalogue beside the audio effects. A pattern through a chord module into the voices is heard;
  * the project's scale reaches the engine, which is what the quantizer reads; and the two declared
- * faces draw block by block.
+ * faces draw block by block. And the point of instruments: the chord plays polyphonically in a project
+ * that never set a voice count, because the converter owns its voices.
  */
 const PATCH = {
   schemaVersion: 1,
-  voiceCount: 4,
   feedbackMode: "sample",
   modules: [
     {
@@ -23,6 +23,7 @@ const PATCH = {
     { id: "voices", type: "note.toPoly", x: 456, y: 48 },
     { id: "osc", type: "osc.sawtooth", x: 600, y: 48 },
     { id: "out", type: "io.audioOut", x: 864, y: 48, params: { gain: 0.3 } },
+    { id: "piano", type: "display.piano", x: 600, y: 200 },
     { id: "arp", type: "notefx.arp", x: 48, y: 336 },
     { id: "human", type: "notefx.humanize", x: 312, y: 336 },
   ],
@@ -46,6 +47,11 @@ const PATCH = {
       id: "e4",
       from: { module: "osc", port: "out" },
       to: { module: "out", port: "inL" },
+    },
+    {
+      id: "e5",
+      from: { module: "voices", port: "pitch" },
+      to: { module: "piano", port: "pitch" },
     },
   ],
 };
@@ -107,6 +113,24 @@ export default {
       "a pattern through the chord module is audible",
       sound.rms[0] > 0.02,
       JSON.stringify(sound),
+    );
+
+    // ── The chord plays as a chord with no voice count set anywhere: the converter's own pool ──
+    await checkEventually(
+      "the chord lights three keys on the piano, one voice each",
+      `(() => {
+        const held = window.pg.grid.face("piano")?.find((b) => b.kind === "piano")?.keys?.held;
+        return Array.isArray(held) && held.length === 3 && held[1] - held[0] === 3 && held[2] - held[0] === 7;
+      })()`,
+    );
+    // The compiler says which modules run per voice: the oscillator does, the pattern does not.
+    const domains = await pg("stores.engine.getState().domains");
+    check(
+      "the engine reports the oscillator inside the converter's instrument and the pattern as global",
+      domains.osc?.instrument === "voices" &&
+        domains.pat === "global" &&
+        domains.out?.instrument === "voices",
+      JSON.stringify(domains),
     );
 
     // ── The project's scale reaches the engine ──

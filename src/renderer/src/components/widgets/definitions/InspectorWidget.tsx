@@ -1,6 +1,7 @@
 import { useCatalogStore } from "@renderer/catalog/catalog-store";
 import { SchemaFormBody } from "@renderer/components/form";
 import { useSchemaForm } from "@renderer/components/form/useSchemaForm";
+import { useEngineStore } from "@renderer/engine/engine-store";
 import { editModuleText } from "@renderer/patch/editor/edit-text";
 import {
   buildModuleSchema,
@@ -9,6 +10,7 @@ import {
   paramIdFor,
   textIdFor,
 } from "@renderer/patch/module-schema";
+import { paramValue } from "@renderer/patch/params";
 import { usePatchStore } from "@renderer/patch/patch-store";
 import { schema as schemaFactory } from "@renderer/schemas/core/schema";
 import { useSelectionStore } from "@renderer/selection/selection-store";
@@ -125,7 +127,7 @@ const ModuleInspector = ({ moduleId }: { moduleId: string }) => {
       const paramId = paramIdFor(key);
       if (paramId === null) continue;
       const param = descriptor.params.find((p) => p.id === paramId);
-      if (param === undefined || param.flags.structural) continue;
+      if (param === undefined) continue;
       if (pushed.current[key] === value) continue;
 
       const next = numericValue(param, value);
@@ -159,8 +161,38 @@ const ModuleInspector = ({ moduleId }: { moduleId: string }) => {
 
   return (
     <div className="p-2">
+      <InstrumentLine moduleId={moduleId} />
       <SchemaFormBody form={form} mode="edit" autoFocusFirst={false} />
     </div>
+  );
+};
+
+/**
+ * Where the module runs, as the engine's last compile decided: once, or once per voice of the
+ * instrument a converter starts. The compiler's knowledge, shown rather than guessed at here.
+ */
+const InstrumentLine = ({ moduleId }: { moduleId: string }) => {
+  const domain = useEngineStore((s) => s.domains[moduleId]);
+  const entry = usePatchStore((s) =>
+    domain === undefined || domain === "global"
+      ? undefined
+      : s.doc.modules.find((m) => m.id === domain.instrument),
+  );
+  const voices = useCatalogStore((s) => {
+    const descriptor = entry === undefined ? undefined : s.byId.get(entry.type);
+    return entry === undefined || descriptor === undefined
+      ? undefined
+      : paramValue(entry, descriptor, "voices");
+  });
+  if (domain === undefined) return null;
+  const text =
+    domain === "global"
+      ? "Runs once: global"
+      : `Runs per voice of ${entry?.label ?? entry?.id ?? domain.instrument}${voices === undefined ? "" : ` (${voices} voices)`}`;
+  return (
+    <p className="m-0 mb-2 text-2xs uppercase tracking-wide text-muted-foreground">
+      {text}
+    </p>
   );
 };
 

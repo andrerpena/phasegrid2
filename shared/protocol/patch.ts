@@ -94,11 +94,6 @@ export const ModuleMoveOpSchema = z.object({
   y: z.number(),
 });
 
-export const SetVoiceCountOpSchema = z.object({
-  op: z.literal("setVoiceCount"),
-  voiceCount: z.number().int().min(1).max(64),
-});
-
 export const PatchOpSchema = z.discriminatedUnion("op", [
   ModuleAddOpSchema,
   ModuleRemoveOpSchema,
@@ -107,7 +102,6 @@ export const PatchOpSchema = z.discriminatedUnion("op", [
   EdgeRemoveOpSchema,
   ParamSetOpSchema,
   ModuleMoveOpSchema,
-  SetVoiceCountOpSchema,
 ]);
 
 export type PortRef = z.infer<typeof PortRefSchema>;
@@ -157,6 +151,11 @@ export const PatchDocSchema = z.object({
   schemaVersion: z.literal(1),
   id: z.string().optional(),
   name: z.string().optional(),
+  /**
+   * From before instruments: polyphony belongs to each note converter now (`note.toPoly`'s `voices`),
+   * and the compiler works out which modules run on it. Still accepted so an old file opens, and
+   * ignored; nothing writes it.
+   */
   voiceCount: z.number().int().min(1).max(64).optional(),
   feedbackMode: FeedbackModeSchema.optional(),
   modules: z.array(PatchModuleSchema),
@@ -170,7 +169,6 @@ export type PatchDoc = z.infer<typeof PatchDocSchema>;
 
 export const EMPTY_PATCH: PatchDoc = {
   schemaVersion: 1,
-  voiceCount: 1,
   feedbackMode: "sample",
   modules: [],
   edges: [],

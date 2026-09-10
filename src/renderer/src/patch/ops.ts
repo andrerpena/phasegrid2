@@ -91,8 +91,6 @@ function applyOpUnordered(doc: PatchDoc, op: PatchOp): PatchDoc {
           m.id === op.id ? { ...m, x: op.x, y: op.y } : m,
         ),
       };
-    case "setVoiceCount":
-      return { ...doc, voiceCount: op.voiceCount };
   }
 }
 
@@ -196,7 +194,5 @@ function inverseOf(doc: PatchDoc, op: PatchOp): PatchOp[] {
         { op: "moduleMove", id: op.id, x: module.x ?? 0, y: module.y ?? 0 },
       ];
     }
-    case "setVoiceCount":
-      return [{ op: "setVoiceCount", voiceCount: doc.voiceCount ?? 1 }];
   }
 }

@@ -1,4 +1,5 @@
 #include <string>
+#include "core/Voices.hpp"
 #include "envelope_module.h"
 #include "vital/Descriptors.hpp"
 
@@ -16,7 +17,24 @@ const ModuleDescriptor& envDahdsr() {
     spec.doc = "Delay/attack/hold/decay/sustain/release envelope. The gate holds it at the sustain level; "
                "a falling edge starts the release. Times are in seconds after the stage curve is applied.";
     spec.prefix = "env_1";
-  spec.face = {"attack", "decay", "sustain", "release"};
+    spec.face = {"attack", "decay", "sustain", "release"};
+    // The envelope is what decides how long a voice lives after its note: the voice stays alive until
+    // the release stage is over, unless the patch takes this envelope out of the decision. The vendored
+    // envelope writes its stage into its phase output -- `kVoiceIdle` for the delay through `kVoiceOff`
+    // for the release, each plus how far through -- and `kVoiceKill` once the release has run out;
+    // before its first trigger it sits at `kInvalid`, which is not going either.
+    spec.extraParams = {
+      ParamDesc{"lifetime", "Affect voice lifetime", 0.f, 1.f, 1.f, ParamUnit::None, ParamCurve::Linear,
+                kParamInteger | kParamNoSmooth, nullptr, 0, "toggle", nullptr,
+                "Keep the voice alive until this envelope has finished its release. Off, the envelope still "
+                "plays but has no say in when the voice ends"},
+    };
+    spec.alive = [](vital::SynthModule& m) -> Sample {
+      const Sample phase = m.output(vital::EnvelopeModule::kPhase)->buffer[0];
+      const vital::poly_mask going = vital::poly_float::greaterThanOrEqual(phase, static_cast<float>(vital::kVoiceIdle)) &
+                                     vital::poly_float::lessThan(phase, static_cast<float>(vital::kVoiceKill));
+      return Sample(1.f) & going;
+    };
     // The second argument forces audio rate: without it the envelope would follow whatever rate its parent
     // router runs at, and there is no parent router here.
     spec.create = [](vendor::ModuleContext&) { return vendor::makeModule<vital::EnvelopeModule>(std::string("env_1"), true); };

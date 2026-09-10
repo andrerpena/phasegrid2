@@ -37,7 +37,6 @@ export function moduleNode(
 /** A small patch that exercises node shapes, port roles and cable colours together. */
 export const DEMO_PATCH: PatchDoc = {
   schemaVersion: 1,
-  voiceCount: 4,
   feedbackMode: "sample",
   modules: [
     // Every position is a multiple of CELL: a module sits on cell boundaries, never between them.

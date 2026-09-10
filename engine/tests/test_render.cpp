@@ -1,5 +1,6 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <nlohmann/json.hpp>
 #include <cstdio>
 #include <filesystem>
 #include "core/Engine.hpp"
@@ -103,49 +104,50 @@ TEST_CASE("left and right stay distinct through renderInterleaved", "[render]") 
   }
 }
 
-// Four voices is two pairs, and two pairs is the first count at which the scheduler runs its op list
-// more than once per block. Voice allocation does not exist yet (it arrives with note.toPoly), so every
-// voice carries the same signal and the output scales with the voice count -- which is exactly what a
-// pair silently dropped, or a pair counted twice, would break.
-// One asymmetric constant into io.audioOut at `voices` voices. Every voice carries the same signal
-// (voice allocation arrives with note.toPoly), so the output is exactly `voices` copies of it.
+// An eight-note chord into an instrument of `voices` voices, each voice turned into a constant 0.25 by a
+// scale/offset fed from its gate, and summed at the output: the output is 0.25 times the number of
+// voices that got a note, which is exactly what a pair silently dropped, a pair counted twice, or a
+// pool that did not cap would break.
 static std::pair<std::vector<float>, std::vector<float>> renderVoices(uint32_t voices) {
   pg::Registry reg;
   pg::registerBuiltinModules(reg);
   pg::test::registerTestModules(reg);
   pg::Engine engine{reg, pg::EngineConfig{48000.0, 64}};
-  REQUIRE(engine.model().setVoiceCount(voices));
-  REQUIRE(engine.model().addNode(reg, {"s", "test.stereo", {{"l", 0.25f}, {"r", -0.5f}}}));
+  REQUIRE(engine.model().addNode(reg, {"pat", "notes.pattern", {{"legato", 1.f}}}));
+  REQUIRE(engine.model().setNodeData("pat", nlohmann::json{{"pattern", "[c3,e3,g3,bb3,d4,f4,a4,c5]"}}));
+  REQUIRE(engine.model().addNode(reg, {"poly", "note.toPoly", {{"voices", static_cast<float>(voices)}}}));
+  REQUIRE(engine.model().addNode(reg, {"level", "math.scaleOffset", {{"scale", 0.f}, {"offset", 0.25f}}}));
   REQUIRE(engine.model().addNode(reg, {"out", "io.audioOut", {{"gain", 1.f}}}));
-  REQUIRE(engine.model().addEdge(reg, {"eL", "s", "out", "out", "inL"}));
-  REQUIRE(engine.model().addEdge(reg, {"eR", "s", "out", "out", "inR"}));
+  REQUIRE(engine.model().addEdge(reg, {"e1", "pat", "notes", "poly", "notes"}));
+  REQUIRE(engine.model().addEdge(reg, {"e2", "poly", "gate", "level", "in"}));
+  REQUIRE(engine.model().addEdge(reg, {"eL", "level", "out", "out", "inL"}));
   REQUIRE(engine.commit());
   std::vector<float> l(64, 99.f), r(64, 99.f); float* planar[2] = {l.data(), r.data()};
   engine.renderBlock(planar, 2, 64, pg::TransportSnapshot{});
   return {l, r};
 }
 
-TEST_CASE("a four-voice program renders every voice", "[render]") {
+TEST_CASE("a four-voice instrument renders every voice, and a two-voice one caps the chord", "[render]") {
   const auto [l2, r2] = renderVoices(2);
   const auto [l4, r4] = renderVoices(4);
   for (uint32_t i = 0; i < 64; ++i) {
-    REQUIRE(l2[i] == Catch::Approx(2 * 0.25f));    // one pair: two voices
-    REQUIRE(r2[i] == Catch::Approx(2 * -0.5f));
+    REQUIRE(l2[i] == Catch::Approx(2 * 0.25f));    // one pair: two voices, the other six notes stolen away
+    REQUIRE(r2[i] == Catch::Approx(2 * 0.25f));    // the right channel mirrors the left when only inL is cabled
     REQUIRE(l4[i] == Catch::Approx(4 * 0.25f));    // two pairs: four voices, none lost
-    REQUIRE(r4[i] == Catch::Approx(4 * -0.5f));
+    REQUIRE(r4[i] == Catch::Approx(4 * 0.25f));
   }
 }
 
-// An odd voice count leaves the top pair holding one real voice and one empty lane. Masking that lane is
-// the terminal's job, because by the time renderBlock folds the bus every pair has already added into it
-// and there is no single mask that describes the sum -- masking the fold with pair 0's mask lets the empty
+// An odd pool leaves the top pair holding one real voice and one empty lane. Masking that lane is the
+// exit's job, because by the time renderBlock folds the bus every pair has already added into it and
+// there is no single mask that describes the sum -- masking the fold with pair 0's mask lets the empty
 // lane of the last pair through as a phantom voice.
 TEST_CASE("an odd voice count produces no phantom voice", "[render]") {
   for (uint32_t voices : {1u, 3u, 5u, 7u}) {
     const auto [l, r] = renderVoices(voices);
     for (uint32_t i = 0; i < 64; ++i) {
       REQUIRE(l[i] == Catch::Approx(static_cast<float>(voices) * 0.25f));
-      REQUIRE(r[i] == Catch::Approx(static_cast<float>(voices) * -0.5f));
+      REQUIRE(r[i] == Catch::Approx(static_cast<float>(voices) * 0.25f));
     }
   }
 }
@@ -173,7 +175,6 @@ TEST_CASE("loadPatchJson rejects wrong JSON types instead of throwing", "[render
   REQUIRE(load(R"({"schemaVersion": 1, "modules": [{"id": "a", "type": "io.audioOut", "params": 3}]})").code == "E_SCHEMA");
   REQUIRE(load(R"({"schemaVersion": 1, "modules": [],
                    "edges": [{"id": "e", "from": "a.out", "to": {"module": "b", "port": "inL"}}]})").code == "E_SCHEMA");
-  REQUIRE(load(R"({"schemaVersion": 1, "voiceCount": "two", "modules": []})").code == "E_SCHEMA");
 }
 
 TEST_CASE("loadPatchJson surfaces GraphModel errors for bad edges", "[render]") {

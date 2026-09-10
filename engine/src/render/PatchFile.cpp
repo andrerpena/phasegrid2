@@ -7,7 +7,7 @@ namespace {
 Result loadPatchJsonUnguarded(const nlohmann::json& j, const Registry& registry, GraphModel& model) {
   if (!j.is_object() || j.value("schemaVersion", 0) != 1) return Result::fail("E_SCHEMA", "unsupported schemaVersion");
   GraphModel fresh;
-  if (Result r = fresh.setVoiceCount(j.value("voiceCount", 1u)); !r) return r;
+  // A `voiceCount` from before instruments is read past: polyphony belongs to each note converter now.
   const std::string mode = j.value("feedbackMode", "sample");
   if (mode != "sample" && mode != "block") return Result::fail("E_SCHEMA", "feedbackMode must be sample|block");
   fresh.feedbackMode = mode == "block" ? FeedbackMode::Block : FeedbackMode::Sample;
@@ -66,7 +66,6 @@ Result loadPatchJson(const nlohmann::json& j, const Registry& registry, GraphMod
 nlohmann::json savePatchJson(const GraphModel& model) {
   nlohmann::json j;
   j["schemaVersion"] = 1;
-  j["voiceCount"] = model.voiceCount;
   j["feedbackMode"] = model.feedbackMode == FeedbackMode::Block ? "block" : "sample";
   j["modules"] = nlohmann::json::array();
   for (const auto& [id, n] : model.nodes()) {

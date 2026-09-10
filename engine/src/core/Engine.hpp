@@ -1,6 +1,7 @@
 #pragma once
 #include <array>
 #include <atomic>
+#include <map>
 #include <memory>
 #include <utility>
 #include <readerwriterqueue.h>
@@ -40,6 +41,9 @@ public:
   Result preview(const std::string& node, float* out, uint32_t count);
   void collectGarbage();
   uint64_t revision() const { return revision_; }
+  /// Which instrument each node of the last compiled program belongs to: the entry node's id, or an
+  /// empty string for a global node. Message thread; what a client draws per-voice cables from.
+  const std::map<std::string, std::string>& domains() const { return domains_; }
   size_t retiredCount() const { return retired_.size_approx(); }
 
   // ---- audio thread
@@ -107,6 +111,7 @@ private:
   /// True unless someone has held the patch. Default true, so a render, a tone and every test run.
   std::atomic<bool> running_{true};
   uint64_t revision_ = 0;
+  std::map<std::string, std::string> domains_;
 
   std::unique_ptr<Program> initial_;
   Program* current_ = nullptr;

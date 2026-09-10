@@ -199,15 +199,6 @@ Result applyParamSet(GraphModel& model, const Registry& registry, const json& o)
   return model.setParam(registry, node, param, static_cast<float>(value));
 }
 
-Result applySetVoiceCount(GraphModel& model, const json& o) {
-  ArgReader a(o);
-  const double n = a.num("voiceCount");
-  if (!a) return a.result();
-  if (n < 1.0 || n > 64.0 || n != static_cast<double>(static_cast<uint32_t>(n)))
-    return Result::fail("E_VOICES", "voiceCount must be a whole number 1..64");
-  return model.setVoiceCount(static_cast<uint32_t>(n));
-}
-
 Result applyOp(GraphModel& model, const Registry& registry, const json& op) {
   if (!op.is_object()) return Result::fail("E_SCHEMA", "an op must be an object");
   const auto kind = op.find("op");
@@ -219,7 +210,6 @@ Result applyOp(GraphModel& model, const Registry& registry, const json& op) {
   if (name == "edgeAdd") return applyEdgeAdd(model, registry, op);
   if (name == "edgeRemove") return applyEdgeRemove(model, op);
   if (name == "paramSet") return applyParamSet(model, registry, op);
-  if (name == "setVoiceCount") return applySetVoiceCount(model, op);
   // Layout, not signal. Engine sync drops it before sending; a client that forgets should not have its
   // whole batch rejected over where a node is drawn, so it is accepted and does nothing here.
   if (name == "moduleMove") return {};
@@ -227,6 +217,15 @@ Result applyOp(GraphModel& model, const Registry& registry, const json& op) {
 }
 
 // ---------------------------------------------------------------------------------------------------
+
+/// Which instrument each node is in, as the compiler decided: `{module: "global" | {instrument: entryId}}`.
+/// The interface draws a per-voice cable differently and says which converter a module plays through.
+json domainsJson(const Engine& engine) {
+  json out = json::object();
+  for (const auto& [node, entry] : engine.domains())
+    out[node] = entry.empty() ? json("global") : json{{"instrument", entry}};
+  return out;
+}
 
 /// Every graph edit, atomically (trap 5). The edit runs against a copy; only a copy that survived every
 /// op is moved into place, and only a commit that succeeded is kept. A failure anywhere leaves the model
@@ -243,8 +242,8 @@ json editGraph(ProtocolContext& ctx, const json& id, Edit&& edit) {
     return errorResponse(id, r);
   }
   const uint64_t revision = ctx.engine.revision();
-  ctx.events.push_back({"patch.revision", json{{"revision", revision}}});
-  return okResponse(id, json{{"revision", revision}});
+  ctx.events.push_back({"patch.revision", json{{"revision", revision}, {"domains", domainsJson(ctx.engine)}}});
+  return okResponse(id, json{{"revision", revision}, {"domains", domainsJson(ctx.engine)}});
 }
 
 }  // namespace
@@ -471,8 +470,6 @@ json dispatchCommand(const std::string& cmd, const json& id, const json& args, P
       return Result{};
     });
   }
-  if (cmd == "patch.setVoiceCount")
-    return editGraph(ctx, id, [&](GraphModel& model) { return applySetVoiceCount(model, args); });
   if (cmd == "patch.setFeedbackMode") {
     ArgReader a(args);
     const std::string mode = a.str("mode");
@@ -527,7 +524,7 @@ json dispatchCommand(const std::string& cmd, const json& id, const json& args, P
     }
     if (structural && !transient) {
       if (Result r = ctx.engine.commit(); !r) return errorResponse(id, r);
-      ctx.events.push_back({"patch.revision", json{{"revision", ctx.engine.revision()}}});
+      ctx.events.push_back({"patch.revision", json{{"revision", ctx.engine.revision()}, {"domains", domainsJson(ctx.engine)}}});
     }
     return okResponse(id, json{{"revision", ctx.engine.revision()}});
   }

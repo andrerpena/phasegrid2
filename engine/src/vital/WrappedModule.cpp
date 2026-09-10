@@ -3,6 +3,7 @@
 #include <string>
 #include "core/Conventions.hpp"
 #include "core/Registry.hpp"
+#include "core/Voices.hpp"
 #include "value.h"
 #include "value_switch.h"
 #include "vital/Descriptors.hpp"
@@ -15,7 +16,10 @@ Module* WrappedModule::createFromRegistry() {
   return new WrappedModule(*g_creatingDescriptor);
 }
 
-WrappedModule::WrappedModule(const ModuleDescriptor& desc) : desc_(desc), spec_(specFor(desc)) {}
+WrappedModule::WrappedModule(const ModuleDescriptor& desc) : desc_(desc), spec_(specFor(desc)) {
+  for (uint32_t i = 0; i < desc_.numParams; ++i)
+    if (std::string(desc_.params[i].id) == "lifetime") lifetimeParam_ = static_cast<int32_t>(i);
+}
 
 void WrappedModule::prepare(const PrepareInfo& info) {
   // One vendored module per voice pair: a `SynthModule` carries the DSP state of a single `poly_float`, and
@@ -174,7 +178,15 @@ void WrappedModule::process(ProcessContext& c) {
   if (spec_.processWithInput) pair.module->processWithInput(audioIn ? audioIn : pair.zero.data(), static_cast<int>(n));
   else pair.module->process(static_cast<int>(n));
 
-  // 4. Outputs. The module owns its output buffers, so this is a copy; some outputs are control rate.
+  // 4. Voice lifetime: the lanes the module is still busy with hold their voices through this block.
+  if (spec_.alive && c.activity != nullptr &&
+      (lifetimeParam_ < 0 || lanes::lane(c.param(static_cast<uint32_t>(lifetimeParam_)).at(0), 0) > 0.5f)) {
+    const Sample going = spec_.alive(*pair.module);
+    if (going[0] > 0.5f || going[1] > 0.5f) c.activity->hold(2 * c.voice);
+    if (going[2] > 0.5f || going[3] > 0.5f) c.activity->hold(2 * c.voice + 1);
+  }
+
+  // 5. Outputs. The module owns its output buffers, so this is a copy; some outputs are control rate.
   for (uint32_t o = 0; o < spec_.outputs.size(); ++o) {
     Sample* dst = c.out(o).data;
     if (dst == nullptr) continue;   // output not connected to anything

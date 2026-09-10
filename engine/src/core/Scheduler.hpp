@@ -5,16 +5,30 @@
 
 namespace pg {
 
-/// Executes a Program's op list once per voice pair. Audio-thread safe after construction.
+/// Executes a Program segment by segment: a global segment once, an instrument segment once per live
+/// voice pair. Audio-thread safe after construction.
 class Scheduler {
 public:
   void run(Program& p, uint32_t numFrames, const TransportSnapshot& t, AudioBus* bus,
            TelemetryWriter* telemetry = nullptr) noexcept PG_RT_NONBLOCKING;
 private:
-  void exec(Program& p, const Op& op, uint32_t offset, uint32_t n, uint32_t pair, const TransportSnapshot& t, AudioBus* bus,
+  /// One pass over a segment's ops: which pair, with which lanes, and where in the block's passes it sits.
+  struct Pass {
+    uint32_t pair = 0;
+    Mask mask = Program::globalMask();
+    bool first = true;
+    bool last = true;
+    VoiceActivity* activity = nullptr;
+  };
+  void runSegment(Program& p, const Segment& seg, uint32_t numFrames, const Pass& pass, const TransportSnapshot& t,
+                  AudioBus* bus, TelemetryWriter* telemetry);
+  void exec(Program& p, const Op& op, uint32_t offset, uint32_t n, const Pass& pass, const TransportSnapshot& t, AudioBus* bus,
             TelemetryWriter* telemetry);
-  void runCluster(Program& p, size_t first, uint32_t count, uint32_t numFrames, uint32_t pair, const TransportSnapshot& t, AudioBus* bus,
+  void runCluster(Program& p, size_t first, uint32_t count, uint32_t numFrames, const Pass& pass, const TransportSnapshot& t, AudioBus* bus,
                   TelemetryWriter* telemetry);
+  /// Binds a node's ports and params into a context for the pass. Shared by Process and Allocate.
+  void bind(Program& p, NodeSlot& slot, uint32_t offset, uint32_t n, const Pass& pass, const TransportSnapshot& t, AudioBus* bus,
+            TelemetryWriter* telemetry, ProcessContext& ctx, AudioBus& busSlice);
   static SignalView view(Program& p, uint32_t buf, uint32_t offset, uint32_t n) { return SignalView{p.buffers[buf].data.data() + offset, n}; }
 
   std::array<SignalView, kMaxPortsPerModule> in_{}, out_{};

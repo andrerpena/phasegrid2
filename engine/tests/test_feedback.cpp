@@ -1,6 +1,9 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <cmath>
+#include <nlohmann/json.hpp>
+#include <stdexcept>
+#include "modules/builtin.hpp"
 #include "util/GraphFixture.hpp"
 #include "util/RtGuard.hpp"
 
@@ -67,15 +70,28 @@ TEST_CASE("feedback: FeedbackState survives recompiles", "[feedback]") {
 }
 
 // y[n] = x[n] + y[n-1] with x a single impulse: a pure integrator, so anything that leaks from one
-// voice pair into another is a permanent offset rather than something the loop decays away.
+// voice pair into another is a permanent offset rather than something the loop decays away. The loop
+// sits inside an instrument of `voices` voices, all of them held by a chord, so it runs once per pair:
+// the gate reaches it through a gain of zero, which puts it in the instrument without changing its sum.
 static void buildIntegrator(GraphFixture& f, uint32_t voices) {
+  pg::registerBuiltinModules(f.reg);
+  f.node("pat", "notes.pattern", {{"legato", 1.f}});
+  if (!f.model.setNodeData("pat", nlohmann::json{{"pattern", "[c3,e3,g3,bb3,d4,f4,a4,c5]"}})) throw std::runtime_error("data");
+  f.node("poly", "note.toPoly", {{"voices", static_cast<float>(voices)}});
+  f.node("zero", "test.gain", {{"gain", 0.f}});
   f.node("add", "test.add");
   f.node("hold", "test.gain", {{"gain", 1.f}});
   f.node("x", "test.impulse");
+  f.edge("n0", "pat.notes", "poly.notes");
+  f.edge("n1", "poly.gate", "zero.in");
+  f.edge("n2", "zero.out", "add.a");
   f.edge("e_in", "x.out", "add.a");
   f.edge("e_fwd", "add.out", "hold.in");
   f.edge("e_back", "hold.out", "add.b");
-  if (!f.model.setVoiceCount(voices)) throw std::runtime_error("voiceCount");
+}
+
+static uint32_t pairsOf(const pg::Program& p) {
+  return p.instruments.empty() ? 1u : p.instruments[0].pairs;
 }
 
 TEST_CASE("feedback: each voice pair has its own delay memory", "[feedback]") {
@@ -85,14 +101,14 @@ TEST_CASE("feedback: each voice pair has its own delay memory", "[feedback]") {
   GraphFixture one; buildIntegrator(one, 2);
   auto p1 = one.compile();
   one.run(*p1, 64);
-  REQUIRE(p1->voicePairs == 1);
+  REQUIRE(pairsOf(*p1) == 1);
   REQUIRE(one.out(*p1, "add", "out", 0) == 1.f);    // the impulse, then held
   REQUIRE(one.out(*p1, "add", "out", 63) == 1.f);
 
   GraphFixture two; buildIntegrator(two, 4);
   auto p2 = two.compile();
   two.run(*p2, 64);
-  REQUIRE(p2->voicePairs == 2);
+  REQUIRE(pairsOf(*p2) == 2);
   for (uint32_t i : {0u, 1u, 31u, 63u})
     for (uint32_t lane : {0u, 1u, 2u, 3u})
       REQUIRE(two.out(*p2, "add", "out", i, lane) == one.out(*p1, "add", "out", i, lane));
@@ -133,7 +149,7 @@ TEST_CASE("feedback: scheduler run is allocation free across several voice pairs
   // Per-pair delay memory is a vector sized on the message thread; indexing it must not touch the heap.
   GraphFixture f; buildIntegrator(f, 8);
   auto p = f.compile();
-  REQUIRE(p->voicePairs == 4);
+  REQUIRE(pairsOf(*p) == 4);
   pg::test::resetRtViolations();
   { pg::test::RtScope scope; for (int i = 0; i < 20; ++i) f.run(*p, 64); }
   REQUIRE(pg::test::rtViolations() == 0);

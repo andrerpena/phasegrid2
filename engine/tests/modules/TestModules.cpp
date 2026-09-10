@@ -1,6 +1,9 @@
 #include "modules/TestModules.hpp"
+#include <algorithm>
+#include <cmath>
 #include <stdexcept>
 #include "core/Module.hpp"
+#include "core/Voices.hpp"
 
 namespace pg::test {
 namespace {
@@ -63,15 +66,18 @@ class Impulse : public VoicedModule<ImpulseState> {
 const ModuleDescriptor kImpulse{kModuleAbiVersion, "test.impulse", "Impulse", "test", "", nullptr, 0, kImpulseOut, 1, nullptr, 0, 0, 0, [] () -> Module* { return new Impulse(); }, nullptr, 0};
 
 const PortDesc kSinkIn[] = {{"in", "In", PortKind::Continuous, 1, SignalRole::Audio, ""}};
+/// An exit that only folds: it never holds a voice, so a released voice is free at the end of its block.
 class Sink : public VoicedModule<int> {
   void process(ProcessContext& c) override {
-    if (!c.outputBus) return;
     const Sample* in = c.in(0).readOr();
-    // A terminal masks its own contribution: the fold in Engine::renderBlock sees every pair at once.
-    for (uint32_t i = 0; i < c.numFrames; ++i) c.outputBus->data[i] += in[i] & c.voiceMask;
+    for (uint32_t i = 0; i < c.numFrames; ++i) {
+      // A terminal masks its own contribution: the fold in Engine::renderBlock sees every pair at once.
+      const Sample masked = in[i] & c.voiceMask;
+      if (c.outputBus) c.outputBus->data[i] += masked;
+    }
   }
 };
-const ModuleDescriptor kSink{kModuleAbiVersion, "test.sink", "Sink", "test", "", kSinkIn, 1, nullptr, 0, nullptr, 0, kModuleTerminal, 0, [] () -> Module* { return new Sink(); }, nullptr, 0};
+const ModuleDescriptor kSink{kModuleAbiVersion, "test.sink", "Sink", "test", "", kSinkIn, 1, nullptr, 0, nullptr, 0, kModuleTerminal | kModuleVoiceExit, 0, [] () -> Module* { return new Sink(); }, nullptr, 0};
 
 const PortDesc kEvGenOut[] = {{"events", "Events", PortKind::Event, 0, SignalRole::Gate, ""}};   // bare triggers, not notes
 const ParamDesc kEvGenParams[] = {
@@ -100,8 +106,24 @@ const ModuleDescriptor kEventTrace{kModuleAbiVersion, "test.eventTrace", "EventT
 
 }  // namespace
 
+/// Counts the blocks it has run and puts the count out, and `adopt`s the count from the instance it
+/// replaces. Its node data means nothing to it, so any change to it is a rebuild for its own sake: what the
+/// engine's hand-over at the swap is tested with.
+const PortDesc kBlockCountOut[] = {{"out", "Out", PortKind::Continuous, 1, SignalRole::Cv, ""}};
+class BlockCount : public Module {
+  void prepare(const PrepareInfo&) override { count_ = 0; }
+  void adopt(const Module& retiring) override { count_ = static_cast<const BlockCount&>(retiring).count_; }
+  void process(ProcessContext& c) override {
+    if (c.firstPass) ++count_;
+    Sample* o = c.out(0).data;
+    for (uint32_t i = 0; i < c.numFrames; ++i) o[i] = Sample(static_cast<float>(count_));
+  }
+  uint32_t count_ = 0;
+};
+const ModuleDescriptor kBlockCount{kModuleAbiVersion, "test.blockCount", "BlockCount", "test", "", nullptr, 0, kBlockCountOut, 1, nullptr, 0, 0, 0, [] () -> Module* { return new BlockCount(); }, nullptr, 0};
+
 void registerTestModules(Registry& r) {
-  for (const ModuleDescriptor* d : {&kConst, &kStereo, &kGain, &kAdd, &kImpulse, &kSink, &kEventGen, &kEventTrace})
+  for (const ModuleDescriptor* d : {&kConst, &kStereo, &kGain, &kAdd, &kImpulse, &kSink, &kEventGen, &kEventTrace, &kBlockCount})
     if (auto err = r.add(*d)) throw std::runtime_error(*err);
 }
 

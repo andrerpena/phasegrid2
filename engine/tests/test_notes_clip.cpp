@@ -80,14 +80,13 @@ struct Rig {
   uint64_t pos = 0;
   bool logging = true;
 
-  Rig(const nlohmann::json& data, std::map<std::string, float> params = {}, uint32_t voices = 1, bool wirePlay = true) {
+  Rig(const nlohmann::json& data, std::map<std::string, float> params = {}, bool wirePlay = true) {
     pg::registerBuiltinModules(f.reg);
     REQUIRE_FALSE(f.reg.add(kRecorder).has_value());
     REQUIRE_FALSE(f.reg.add(kPlayGate).has_value());
     PlayGate::toggles.clear();
     PlayGate::base = 0;
     Recorder::perPair = {};
-    REQUIRE(f.model.setVoiceCount(voices));
     f.node("clip", "notes.clip", std::move(params));
     REQUIRE(f.model.setNodeData("clip", data));
     f.node("rec", "test.noteRecorder");
@@ -118,6 +117,15 @@ struct Rig {
     for (uint32_t i = 0; i < n; ++i) run();
   }
   float phase(uint32_t frame) { return f.out(*program, "clip", "phase", frame); }
+
+  /// Installs new notes the way an edit does: node data is structural, so the compile builds a new
+  /// instance, and the swap hands it the old one to adopt from, as `Engine::swapIfPending` does.
+  void edit(const nlohmann::json& data) {
+    REQUIRE(f.model.setNodeData("clip", data));
+    auto next = f.compile(kSampleRate, 64);
+    next->adoptFrom(*program);
+    program = std::move(next);
+  }
 };
 
 /// Fails unless every note on in the log is matched by a later note off, and no note is ever on twice at
@@ -366,27 +374,8 @@ TEST_CASE("malformed clip data plays nothing rather than throwing", "[modules][c
   REQUIRE(plays(nlohmann::json::object()) == 0);                           // no notes at all is simply empty
 }
 
-TEST_CASE("notes.clip gives every voice pair the same note stream", "[modules][clip]") {
-  // The event buffer is cleared and refilled once per pair, so a clip that worked its events out inside the
-  // per-pair loop would hand pair 1 a different (or empty) stream than pair 0.
-  Rig rig(clipData({note(0.0, 1.0, 60.0), note(0.0, 1.0, 64.0)}), {{"length", 4.f}}, 4);
-  rig.run();
-
-  REQUIRE(Recorder::perPair[0].count == 2);   // it really emitted something, so the comparison means something
-  REQUIRE(Recorder::perPair[1].count == Recorder::perPair[0].count);
-  for (uint32_t i = 0; i < Recorder::perPair[0].count; ++i) {
-    const pg::Event& a = Recorder::perPair[0].events[i];
-    const pg::Event& b = Recorder::perPair[1].events[i];
-    REQUIRE(b.frame == a.frame);
-    REQUIRE(b.type == a.type);
-    REQUIRE(b.a == a.a);
-    REQUIRE(b.b == a.b);
-    REQUIRE(b.noteId == a.noteId);
-  }
-}
-
 TEST_CASE("notes.clip runs with nothing plugged into play", "[modules][clip]") {
-  Rig rig(clipData({note(0.0, 1.0, 60.0)}), {{"length", 4.f}}, 1, false);
+  Rig rig(clipData({note(0.0, 1.0, 60.0)}), {{"length", 4.f}}, false);
   rig.runBlocks(2);
   REQUIRE(rig.log.size() == 2);   // an unconnected gate would read as silence and stop the clip for ever
 }
@@ -408,6 +397,42 @@ TEST_CASE("notes.clip never leaves a note on without its note off", "[modules][c
   PlayGate::toggles = {0};        // hold play low for a whole block: everything must come back off
   rig.run();
   requireBalanced(rig.log);
+}
+
+TEST_CASE("notes.clip releases the notes an edit took away and keeps the ones it left", "[modules][clip]") {
+  // The rebuilt instance adopts the old one's held set: a note the new clip still has goes on sounding
+  // and is released where it ends; one the new clip no longer has is released at the edit. Without the
+  // hand-over neither has a note off anywhere and whatever is downstream holds both for ever.
+  Rig rig(clipData({note(0.0, 3.0, 60.0), note(0.0, 3.0, 64.0)}), {{"length", 4.f}, {"loop", 1.f}});
+  rig.run();   // beat 1: both sounding
+  rig.edit(clipData({note(0.0, 3.0, 60.0), note(1.5, 1.0, 67.0)}));   // e4 gone, a new g4 later
+  rig.runBlocks(3);
+  requireBalanced(rig.log);
+  REQUIRE(rig.log.size() == 6);
+  CHECK_FALSE(rig.log[2].on());
+  CHECK(rig.log[2].e.a == 64.f);
+  CHECK(rig.log[2].frame == 64);    // released at the edit
+  CHECK(rig.log[3].on());
+  CHECK(rig.log[3].e.a == 67.f);
+  CHECK(rig.log[3].frame == 96);
+  CHECK_FALSE(rig.log[4].on());
+  CHECK(rig.log[4].e.a == 67.f);
+  CHECK(rig.log[4].frame == 160);
+  CHECK_FALSE(rig.log[5].on());
+  CHECK(rig.log[5].e.a == 60.f);
+  CHECK(rig.log[5].frame == 192);   // c4 ran on, untouched, to its own end
+  CHECK(rig.log[5].e.noteId == rig.log[0].e.noteId);
+}
+
+TEST_CASE("notes.clip releases what it held when an edit empties it", "[modules][clip]") {
+  Rig rig(clipData({note(0.0, 3.0, 60.0), note(0.0, 3.0, 64.0)}), {{"length", 4.f}, {"loop", 1.f}});
+  rig.run();
+  rig.edit(clipData({}));
+  rig.run();
+  requireBalanced(rig.log);
+  REQUIRE(rig.log.size() == 4);
+  CHECK(rig.log[2].frame == 64);
+  CHECK(rig.log[3].frame == 64);
 }
 
 TEST_CASE("notes.clip is allocation free", "[modules][clip][rt]") {

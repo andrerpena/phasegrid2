@@ -83,6 +83,7 @@ private:
 
   const ModuleDescriptor& desc_;
   const ModuleSpec& spec_;
+  int32_t lifetimeParam_ = -1;   // index of the spec's `lifetime` toggle, or -1 when `alive` is unconditional
   ParamValues configured_;
   std::vector<std::unique_ptr<Pair>> pairs_;   // one per voice pair, built in prepare()
 };

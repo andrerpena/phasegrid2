@@ -13,6 +13,7 @@
 #include "core/Param.hpp"
 #include "core/Registry.hpp"
 #include "core/Signal.hpp"
+#include "core/Voices.hpp"
 
 namespace pg {
 
@@ -63,6 +64,9 @@ struct ModuleInstance {
   std::vector<float> appliedValues;
   /// `NodeModel::data` at creation time, compared the same way and for the same reason.
   NodeData nodeData = NodeData::object();
+  /// What the instance was prepared for. Compared by `InstanceTable::acquire`: a node whose voice
+  /// count moved (it joined, left or resized an instrument) is rebuilt, and only that node.
+  PrepareInfo info{};
 };
 
 /// Delay memory for one back edge, one slot per voice PAIR: `z[pair].data[i]` holds the last written
@@ -76,9 +80,29 @@ struct FeedbackState {
 };
 
 struct Op {
-  enum Kind : uint8_t { Sum, Merge, FillParam, FeedbackRead, FeedbackWrite, ClearEvents, Process, ClusterBegin, ClusterEnd };
+  /// `Allocate` runs an instrument entry's `Module::allocate` once, at the head of the instrument's
+  /// segment, before its voice passes; `a` is the node.
+  enum Kind : uint8_t { Sum, Merge, FillParam, FeedbackRead, FeedbackWrite, ClearEvents, Process, ClusterBegin, ClusterEnd, Allocate };
   Kind kind;
   uint32_t a = 0, b = 0, c = 0;
+};
+
+/// One instrument of the program: its entry node, the pool it runs on, and every node inside it.
+struct Instrument {
+  uint32_t entryNode = 0;
+  uint32_t voices = 1;
+  uint32_t pairs = 1;
+  std::shared_ptr<VoiceActivity> activity;
+  std::vector<uint32_t> nodes;   // every node of the instrument, the entry included
+};
+
+/// A run of ops that share a domain. A global segment runs once; an instrument segment runs its ops once
+/// per live voice pair. An instrument's ops are always one contiguous segment, because the pairs share
+/// the program's buffers and a pass has to see the whole instrument's work for its own pair.
+struct Segment {
+  int32_t instrument = -1;   // -1: global
+  size_t firstOp = 0;
+  size_t count = 0;
 };
 
 struct NodeSlot {
@@ -93,9 +117,6 @@ struct NodeSlot {
 /// Immutable once published. Built on the message thread, executed on the audio thread.
 struct Program {
   uint64_t revision = 0;
-  uint32_t voiceCount = 1;
-  uint32_t voicePairs = 1;
-  std::vector<Mask> activeVoiceMask;   // one per pair; lanes of voices that exist
   uint32_t blockSize = kDefaultBlockSize;
   double sampleRate = 48000.0;
   FeedbackMode feedbackMode = FeedbackMode::Sample;
@@ -105,6 +126,12 @@ struct Program {
   std::vector<EventBuffer> eventBufs;
   std::vector<uint32_t> args;       // operand lists for Sum/Merge
   std::vector<Op> ops;
+  /// The ops in segments, in order. Empty means the whole op list is one global segment, which is what
+  /// a hand-built program in a test is.
+  std::vector<Segment> segments;
+  std::vector<Instrument> instruments;
+  /// Per node: the instrument it belongs to, or -1 for a global node.
+  std::vector<int32_t> nodeInstrument;
   std::vector<std::shared_ptr<FeedbackState>> feedback;
   std::vector<std::pair<uint64_t, uint32_t>> serialIndex;   // sorted (serial, node index)
 
@@ -119,11 +146,24 @@ struct Program {
     auto it = std::lower_bound(serialIndex.begin(), serialIndex.end(), std::make_pair(serial, uint32_t{0}));
     return (it != serialIndex.end() && it->first == serial) ? static_cast<int32_t>(it->second) : -1;
   }
-  static Mask voiceMaskFor(uint32_t voiceCount, uint32_t pair) {
-    const uint32_t first = pair * 2;
-    const bool v0 = first < voiceCount, v1 = first + 1 < voiceCount;
-    return Mask(v0 ? -1 : 0, v0 ? -1 : 0, v1 ? -1 : 0, v1 ? -1 : 0);
+  /// Audio thread, at the swap that makes this program current: every instance that replaced one of
+  /// `previous`'s -- same node id, same type, a different instance -- is handed the retiring one to
+  /// `Module::adopt` from. Matched by id here, against the program that actually ran, rather than
+  /// recorded at compile time: two compiles can land before one swap, and the instance the second one
+  /// replaced never ran a block. Copies only, no allocation; a retried swap runs it again, which `adopt`
+  /// is written for. Quadratic in the node count, paid once per swap, which is once per edit.
+  void adoptFrom(const Program& previous) const {
+    for (const NodeSlot& slot : nodes) {
+      for (const NodeSlot& old : previous.nodes) {
+        if (old.inst->id != slot.inst->id) continue;
+        if (old.inst != slot.inst && old.inst->type == slot.inst->type) slot.inst->module->adopt(*old.inst->module);
+        break;
+      }
+    }
   }
+  /// The lanes a global signal lives in: voice 0's. A global module runs once and its output's second
+  /// half mirrors its first, so a per-voice reader takes either half and a global one takes this.
+  static Mask globalMask() { return Mask(-1, -1, 0, 0); }
 };
 
 }  // namespace pg

@@ -48,8 +48,12 @@ struct ClipNote {
 /// A note the clip has emitted a note on for and not yet a note off. It carries the note number and id the
 /// note ON used, so the off matches even if `transpose` has moved since -- otherwise a transpose under a
 /// held note would release a note nobody is playing and leave the real one sounding forever.
+///
+/// `index` names the note in `notes_`, or is `kOrphan` for a note carried over from a retired instance
+/// (see `adopt`) that the edited clip no longer has: nothing covers it, so the next frame releases it.
 struct Held {
-  uint32_t index = 0;
+  static constexpr uint32_t kOrphan = UINT32_MAX;
+  uint32_t index = kOrphan;
   float note = kMiddleCMidi;
   uint32_t id = 0;
 };
@@ -109,7 +113,9 @@ public:
 
   void prepare(const PrepareInfo&) override {
     sounding_.assign(notes_.size(), 0);
-    held_.assign(notes_.size(), Held{});   // a note can be held only once, so its own count is the ceiling
+    // A note can be held only once, so a clip's own count bounds what it holds -- but `adopt` brings in
+    // the old clip's held notes, which may be more than the new clip has, so the ceiling is every clip's.
+    held_.assign(kMaxNotes, Held{});
     events_.assign(kMaxEventsPerBlock, Event{});
     heldCount_ = 0;
     eventCount_ = 0;
@@ -117,8 +123,33 @@ public:
     lastPos_ = 0.0;
   }
 
+  /// The retiring instance's held notes become this one's, so the edited clip releases them rather than
+  /// leaving them sounding downstream. A note the new clip still has -- same start, end and pitch -- is
+  /// rebound to it and keeps sounding; one it no longer has is kept as an orphan and released next frame.
+  void adopt(const Module& retiring) override {
+    const auto& old = static_cast<const NotesClip&>(retiring);
+    heldCount_ = 0;
+    for (uint32_t k = 0; k < old.heldCount_ && heldCount_ < held_.size(); ++k) {
+      Held h = old.held_[k];
+      const ClipNote& was = old.notes_[h.index];
+      h.index = Held::kOrphan;
+      for (uint32_t i = 0; i < notes_.size(); ++i) {
+        const ClipNote& n = notes_[i];
+        if (n.start > was.start) break;   // sorted by start
+        if (sounding_[i] != 0 || n.start != was.start || n.end != was.end || n.pitch != was.pitch) continue;
+        h.index = i;
+        sounding_[i] = 1;
+        break;
+      }
+      held_[heldCount_++] = h;
+    }
+    nextId_ = old.nextId_;
+    lastPos_ = old.lastPos_;
+    haveLast_ = old.haveLast_;
+  }
+
   void process(ProcessContext& c) override {
-    if (c.voice == 0) advance(c);   // per-block work runs on pair 0; the notes are the same for every voice
+    if (c.firstPass) advance(c);   // per-block work runs on the first pass; the notes are the same for every voice
 
     EventBuffer& out = c.eventOut(0);
     for (uint32_t i = 0; i < eventCount_; ++i) out.push(events_[i]);
@@ -194,14 +225,17 @@ private:
     uint32_t keep = 0;
     for (uint32_t k = 0; k < heldCount_; ++k) {
       const Held h = held_[k];
-      const ClipNote& n = notes_[h.index];
-      const bool covered = pos >= n.start && pos < n.end;
+      const bool orphan = h.index == Held::kOrphan;
+      const bool covered = !orphan && pos >= notes_[h.index].start && pos < notes_[h.index].end;
       Event e;
       e.frame = frame;
       e.type = EventType::NoteOff;
       e.noteId = h.id;
       e.a = h.note;
-      if (!covered && record(e)) { sounding_[h.index] = 0; continue; }
+      if (!covered && record(e)) {
+        if (!orphan) sounding_[h.index] = 0;
+        continue;
+      }
       held_[keep++] = h;   // still sounding, or the block is out of events and it is released next block
     }
     heldCount_ = keep;

@@ -68,14 +68,17 @@ const char* const kFace[] = {
 
 /// A note the module has emitted a note on for and not yet a note off.
 ///
-/// Identified by WHERE IN THE CYCLE it starts and which step of the source it came from, rather
-/// than by an index into the last query: the query is redone at every cycle boundary, and an index
-/// into it would name a different note afterwards. The start is an exact rational, so this is an
-/// equality and not a tolerance.
+/// Identified by WHERE IN THE CYCLE it starts, which step of the source it came from and what that
+/// step said, rather than by an index into the last query: the query is redone at every cycle
+/// boundary, and an index into it would name a different note afterwards. The start is an exact
+/// rational, so this is an equality and not a tolerance. The value is part of the identity because
+/// the set can outlive the pattern -- it is carried across an edit -- and a step rewritten under a
+/// held note must release the old note and start the new one, where a step left alone keeps sounding.
 struct Held {
   Fraction start;
   int32_t atom = -1;
-  float note = kMiddleCMidi;
+  float value = kMiddleCMidi;   // the step's own pitch, before transpose
+  float note = kMiddleCMidi;    // the number the note on used, after it
   uint32_t id = 0;
 };
 
@@ -83,7 +86,9 @@ struct Held {
 ///
 /// Everything about how the notes are emitted is `notes.clip`'s, deliberately -- the playhead is
 /// DERIVED from the transport rather than accumulated, so an edit to the pattern rebuilds the
-/// instance (node data is structural) and it lands where the old one was; the block's events are
+/// instance (node data is structural) and it lands where the old one was; the rebuilt instance
+/// `adopt`s the held set, so the notes the old one had started are released by the new one, as
+/// the edited pattern says, rather than left sounding downstream for ever; the block's events are
 /// worked out once on pair 0 and replayed for every pair; and a note off is how a note leaves the
 /// sounding set, so no note on can lose one. What is new is only where the notes come from.
 class NotesPattern final : public Module {
@@ -115,9 +120,22 @@ public:
     lastPos_ = 0.0;
   }
 
+  /// The retiring instance's held notes become this one's, with the ids and playhead memory that go
+  /// with them. Not its cycle cache: the pattern is what changed, so the first frame queries afresh
+  /// and `release` then lets go of every held note the new pattern does not have at that place.
+  void adopt(const Module& retiring) override {
+    const auto& old = static_cast<const NotesPattern&>(retiring);
+    heldCount_ = std::min(old.heldCount_, static_cast<uint32_t>(held_.size()));
+    std::copy_n(old.held_.begin(), heldCount_, held_.begin());
+    nextId_ = old.nextId_;
+    lastPos_ = old.lastPos_;
+    haveLast_ = old.haveLast_;
+    block_ = old.block_;
+  }
+
   void process(ProcessContext& c) override {
-    if (c.voice == 0) {
-      advance(c);   // per-block work runs on pair 0; the notes are the same for every voice
+    if (c.firstPass) {
+      advance(c);   // per-block work runs on the first pass; the notes are the same for every voice
       publish(c);
     }
 
@@ -250,7 +268,7 @@ private:
       bool covered = false;
       for (uint32_t i = 0; i < noteCount_; ++i) {
         const Hap& hap = noteHaps_[i];
-        if (hap.atom != h.atom || !(hap.whole.begin == h.start)) continue;
+        if (!sameStep(hap, h)) continue;
         covered = covers(hap, position, legato);
         break;
       }
@@ -277,13 +295,17 @@ private:
       e.a = std::clamp(hap.value + transpose, 0.f, 127.f);
       e.b = std::clamp(velocityAt(hap) * knob, 0.f, 1.f);
       if (!record(e)) return;
-      held_[heldCount_++] = Held{hap.whole.begin, hap.atom, e.a, e.noteId};
+      held_[heldCount_++] = Held{hap.whole.begin, hap.atom, hap.value, e.a, e.noteId};
     }
+  }
+
+  static bool sameStep(const Hap& hap, const Held& h) {
+    return hap.atom == h.atom && hap.value == h.value && hap.whole.begin == h.start;
   }
 
   bool isHeld(const Hap& hap) const {
     for (uint32_t k = 0; k < heldCount_; ++k)
-      if (held_[k].atom == hap.atom && held_[k].start == hap.whole.begin) return true;
+      if (sameStep(hap, held_[k])) return true;
     return false;
   }
 

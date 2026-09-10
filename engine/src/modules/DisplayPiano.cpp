@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "core/Module.hpp"
+#include "core/Voices.hpp"
 #include "services/Telemetry.hpp"
 
 namespace pg::modules {
@@ -24,7 +25,8 @@ const PortDesc kIn[] = {
   {"pitch", "Pitch", PortKind::Continuous, 1, SignalRole::Pitch,
    "The pitch each voice is playing, 0.1 per octave from middle C, as a note converter puts out"},
   {"gate", "Gate", PortKind::Continuous, 1, SignalRole::Gate,
-   "High while the voice's key is down. Unconnected, every voice is held, so a bare pitch lights one key"},
+   "High while the voice's key is down. Inside an instrument the voices know this themselves, so it can stay unconnected; "
+   "outside one, an unconnected gate means held, so a bare pitch lights one key"},
 };
 
 const ParamDesc kParams[] = {
@@ -53,22 +55,34 @@ public:
     // Nobody watching: the fast path every display module has. The writer would refuse an
     // out-of-range slot anyway; this only saves the work.
     if (c.telemetry == nullptr || c.displaySlot == kNoTelemetrySlotCtx || c.numFrames == 0) return;
-    if (c.voice == 0) std::fill_n(keys_, kTelemetryMaxKeys, 0.f);
+    if (c.firstPass) std::fill_n(keys_, kTelemetryMaxKeys, 0.f);
+    // Nothing cabled into Pitch is nothing to show. An unconnected input reads as zero, and zero is
+    // middle C: without this an idle keyboard would light C4 for ever.
+    if (c.in(0).empty()) {
+      if (c.lastPass) c.telemetry->writeKeys(c.displaySlot, keys_, kTelemetryMaxKeys, ++block_);
+      return;
+    }
 
     const uint32_t last = c.numFrames - 1;
     const Sample pitch = c.in(0).readOr()[last];
-    const bool alwaysHeld = c.in(1).empty();
+    const bool gateUnconnected = c.in(1).empty();
     const Sample gate = c.in(1).readOr()[last];
     // Lane 0 is this pair's first voice, lane 2 its second; the mask says whether each exists.
     for (uint32_t lane = 0; lane < 4; lane += 2) {
       if (c.voiceMask[static_cast<int>(lane)] == 0) continue;
-      if (!(alwaysHeld || gateHigh(lanes::lane(gate, lane)))) continue;
+      // Inside an instrument the pool knows which voices are down, so a key is lit only while its
+      // voice holds a note: a released voice ringing out, or an idle one still carrying its last
+      // pitch, is not a pressed key. Outside one, a bare pitch lights a key unless a gate says otherwise.
+      const bool down = c.activity != nullptr
+        ? c.activity->state(2 * c.voice + lane / 2) == VoiceState::Held && (gateUnconnected || gateHigh(lanes::lane(gate, lane)))
+        : gateUnconnected || gateHigh(lanes::lane(gate, lane));
+      if (!down) continue;
       const long note = std::lround(pitchToMidiNote(lanes::lane(pitch, lane)));
       if (note < 0 || note >= static_cast<long>(kTelemetryMaxKeys)) continue;
       keys_[note] = 1.f;
     }
 
-    if (c.voice + 1 < c.voicePairs) return;   // more pairs still to add their voices
+    if (!c.lastPass) return;   // more pairs still to add their voices
     c.telemetry->writeKeys(c.displaySlot, keys_, kTelemetryMaxKeys, ++block_);
   }
 

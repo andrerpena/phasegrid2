@@ -5,17 +5,14 @@ namespace pg {
 std::shared_ptr<ModuleInstance> InstanceTable::acquire(const std::string& id, const RegisteredModule& type,
                                                        const PrepareInfo& info, const std::map<std::string, float>& params,
                                                        const NodeData& data) {
-  if (!(info == lastInfo_)) {
-    byId_.clear();   // old instances stay alive through the retired program's shared_ptrs; feedback states may stay
-    lastInfo_ = info;
-  }
   auto modelValue = [&params](const ParamDesc& d) {
     auto pv = params.find(d.id);
     return pv == params.end() ? d.def : pv->second;
   };
 
   auto it = byId_.find(id);
-  if (it != byId_.end() && it->second->type == &type) {
+  // The old instance stays alive through the retired program's shared_ptr until that program is collected.
+  if (it != byId_.end() && it->second->type == &type && it->second->info == info) {
     // Node data is structural for the same reason a kParamStructural param is: `configure` reads it once,
     // before `prepare`, so the only way to apply a change is to build the instance again.
     bool structuralSame = it->second->nodeData == data;
@@ -45,6 +42,7 @@ std::shared_ptr<ModuleInstance> InstanceTable::acquire(const std::string& id, co
   inst->appliedValues.reserve(type.desc->numParams);
   for (uint32_t i = 0; i < type.desc->numParams; ++i) inst->appliedValues.push_back(modelValue(type.desc->params[i]));
   inst->nodeData = data;
+  inst->info = info;
   inst->module->configure(params, data);   // structural params and node data take effect here; prepare() may allocate around them
   inst->module->prepare(info);
   for (uint32_t i = 0; i < type.desc->numParams; ++i) {
@@ -63,9 +61,18 @@ std::shared_ptr<FeedbackState> InstanceTable::acquireFeedback(const std::string&
   return fb;
 }
 
+std::shared_ptr<VoiceActivity> InstanceTable::acquireActivity(const std::string& entryId, uint32_t voices) {
+  auto it = activityById_.find(entryId);
+  if (it != activityById_.end() && it->second->voices() == voices) return it->second;
+  auto activity = std::make_shared<VoiceActivity>(voices);
+  activityById_[entryId] = activity;   // the old pool stays alive through any program still holding it
+  return activity;
+}
+
 void InstanceTable::prune(const std::set<std::string>& liveNodeIds, const std::set<std::string>& liveEdgeIds) {
   for (auto it = byId_.begin(); it != byId_.end();) it = liveNodeIds.contains(it->first) ? std::next(it) : byId_.erase(it);
   for (auto it = feedbackById_.begin(); it != feedbackById_.end();) it = liveEdgeIds.contains(it->first) ? std::next(it) : feedbackById_.erase(it);
+  for (auto it = activityById_.begin(); it != activityById_.end();) it = liveNodeIds.contains(it->first) ? std::next(it) : activityById_.erase(it);
 }
 
 void InstanceTable::clearSlots() {

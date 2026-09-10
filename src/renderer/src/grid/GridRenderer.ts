@@ -74,6 +74,8 @@ export class GridRenderer {
   private hoveredNode: string | null = null;
   /** The last document drawn, so cables can be redrawn without one being passed in again. */
   private doc: PatchDoc | null = null;
+  /** Which instrument each module runs in, from the engine's last compile. Empty until it reports. */
+  private domains: Record<string, "global" | { instrument: string }> = {};
 
   constructor(
     private readonly app: Application,
@@ -177,7 +179,11 @@ export class GridRenderer {
         this.cableLayer.addChild(cable.view);
       }
       cable.setColor(this.cableColor(edge.from.module, edge.from.port));
-      cable.update(from, to, { toFacing: to.facing, fromFacing: from.facing });
+      cable.update(from, to, {
+        toFacing: to.facing,
+        fromFacing: from.facing,
+        poly: this.isPoly(edge.from.module, edge.from.port),
+      });
     }
     for (const [id, cable] of this.cables) {
       if (seenEdges.has(id)) continue;
@@ -210,8 +216,35 @@ export class GridRenderer {
       const to = this.portPosition(edge.to.module, edge.to.port, "input");
       if (cable === undefined || from === null || to === null) continue;
       cable.setColor(this.cableColor(edge.from.module, edge.from.port));
-      cable.update(from, to, { toFacing: to.facing, fromFacing: from.facing });
+      cable.update(from, to, {
+        toFacing: to.facing,
+        fromFacing: from.facing,
+        poly: this.isPoly(edge.from.module, edge.from.port),
+      });
     }
+  }
+
+  /**
+   * Which instrument each module runs in, as the engine's last commit said. Set by the view when the
+   * engine reports; until then every cable is drawn global.
+   */
+  setDomains(domains: Record<string, "global" | { instrument: string }>): void {
+    this.domains = domains;
+    this.refreshCables();
+  }
+
+  /**
+   * A cable carries one signal per voice when it leaves a module inside an instrument through a
+   * continuous port -- except from an exit, whose output is the instrument summed to one signal.
+   */
+  private isPoly(moduleId: string, portId: string): boolean {
+    const domain = this.domains[moduleId];
+    if (domain === undefined || domain === "global") return false;
+    const node = this.nodes.get(moduleId);
+    if (node === undefined) return false;
+    const port = node.descriptor.outputs.find((p) => p.id === portId);
+    if (port === undefined || port.kind !== "continuous") return false;
+    return !node.descriptor.flags.voiceExit;
   }
 
   private connectedPortsOf(doc: PatchDoc, moduleId: string): Set<string> {

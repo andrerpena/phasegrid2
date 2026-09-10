@@ -11,7 +11,6 @@ import { projectDoc, seedProject } from "../harness.mjs";
  */
 const WITH_PATTERN = {
   schemaVersion: 1,
-  voiceCount: 1,
   feedbackMode: "sample",
   modules: [
     {

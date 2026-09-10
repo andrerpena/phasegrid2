@@ -60,10 +60,6 @@ const cases: Record<CommandName, { valid: unknown; invalid: unknown }> = {
     valid: { ops: [{ op: "moduleRemove", id: "osc1" }] },
     invalid: { ops: [{ op: "moduleRemove" }] },
   },
-  "patch.setVoiceCount": {
-    valid: { voiceCount: 8 },
-    invalid: { voiceCount: 8.5 },
-  },
   "patch.setFeedbackMode": {
     valid: { mode: "block" },
     invalid: { mode: "perSample" },
@@ -124,7 +120,6 @@ describe("command table", () => {
       "patch.clear",
       "patch.render",
       "patch.batch",
-      "patch.setVoiceCount",
       "patch.setFeedbackMode",
       "module.add",
       "module.remove",
@@ -226,7 +221,6 @@ describe("command results", () => {
       "patch.load",
       "patch.clear",
       "patch.batch",
-      "patch.setVoiceCount",
       "patch.setFeedbackMode",
       "module.add",
       "module.remove",

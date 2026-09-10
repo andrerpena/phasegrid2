@@ -7,7 +7,6 @@ import { projectDoc, seedProject } from "../harness.mjs";
  */
 const PATCH = {
   schemaVersion: 1,
-  voiceCount: 1,
   feedbackMode: "sample",
   modules: [
     {

@@ -32,11 +32,11 @@ public:
   Result setParam(const Registry& reg, const std::string& node, const std::string& param, float value);
   /// Replaces a node's structured data. Must be a JSON object; the next compile rebuilds that instance.
   Result setNodeData(const std::string& node, NodeData data);
-  Result setVoiceCount(uint32_t n);
   void clear();
   const std::map<std::string, NodeModel>& nodes() const { return nodes_; }
   const std::map<std::string, EdgeModel>& edges() const { return edges_; }
-  uint32_t voiceCount = 1;
+  /// Polyphony is not a property of the patch: each note converter owns its instrument's voices
+  /// (`note.toPoly`'s `voices`), and the compiler works out which modules run on them.
   FeedbackMode feedbackMode = FeedbackMode::Sample;
 private:
   std::map<std::string, NodeModel> nodes_;
