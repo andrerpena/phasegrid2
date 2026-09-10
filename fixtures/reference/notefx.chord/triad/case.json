@@ -1,0 +1,109 @@
+{
+  "_about": "The chord that clipped: <c4 eb4> g3*2 [~ bb3] [c4] through a major Chord into three sines, no envelope, output at its defaults. Three unity sines sum past full scale, so this case is as much about level convention as about the module: reference.wav should be the reference instrument's export of exactly this patch, and the first thing to compare is peak. Ours at gain 1 asks the device to clamp; if the reference peaks around 0.3 for the same patch, that is a level convention to decide, not a bug to fix.",
+  "patch": {
+    "schemaVersion": 1,
+    "feedbackMode": "sample",
+    "modules": [
+      {
+        "id": "pat",
+        "type": "notes.pattern",
+        "params": {
+          "cycle": 4
+        },
+        "data": {
+          "pattern": "<c4 eb4> g3*2 [~ bb3] [c4]",
+          "velocity": "1 0.4 0.8"
+        },
+        "x": 0,
+        "y": 0
+      },
+      {
+        "id": "chord",
+        "type": "notefx.chord",
+        "x": 100,
+        "y": 0
+      },
+      {
+        "id": "poly",
+        "type": "note.toPoly",
+        "x": 200,
+        "y": 0
+      },
+      {
+        "id": "osc",
+        "type": "osc.sine",
+        "x": 400,
+        "y": 0
+      },
+      {
+        "id": "out",
+        "type": "io.audioOut",
+        "params": {
+          "gain": 1
+        },
+        "x": 600,
+        "y": 0
+      }
+    ],
+    "edges": [
+      {
+        "id": "e2",
+        "from": {
+          "module": "poly",
+          "port": "pitch"
+        },
+        "to": {
+          "module": "osc",
+          "port": "pitch"
+        }
+      },
+      {
+        "id": "e3",
+        "from": {
+          "module": "osc",
+          "port": "out"
+        },
+        "to": {
+          "module": "out",
+          "port": "inL"
+        }
+      },
+      {
+        "id": "e1a",
+        "from": {
+          "module": "pat",
+          "port": "notes"
+        },
+        "to": {
+          "module": "chord",
+          "port": "notes"
+        }
+      },
+      {
+        "id": "e1b",
+        "from": {
+          "module": "chord",
+          "port": "notes"
+        },
+        "to": {
+          "module": "poly",
+          "port": "notes"
+        }
+      }
+    ]
+  },
+  "tempo": 80,
+  "bars": 2,
+  "expect": {
+    "overs": {
+      "max": 0.0
+    },
+    "crest": {
+      "near": "reference",
+      "tolerance": 0.15
+    },
+    "thd": {
+      "max": 1.5
+    }
+  }
+}

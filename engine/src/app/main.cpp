@@ -125,7 +125,10 @@ static int runRender(int argc, char** argv) {
   const std::vector<float> data = pg::renderInterleaved(engine, options);
   std::string err;
   if (!pg::writeWav(out, data, 2, sr, err)) { std::fprintf(stderr, "%s\n", err.c_str()); return 1; }
-  std::printf("rendered %zu frames to %s\n", data.size() / 2, out.c_str());
+  // The one number a render cannot carry in its samples: how many the device boundary had to clamp.
+  // The WAV holds what the device would play; this says whether the patch asked for more than that.
+  std::printf("rendered %zu frames to %s%s\n", data.size() / 2, out.c_str(),
+              engine.deviceClips() == 0 ? "" : (", clamped " + std::to_string(engine.deviceClips()) + " samples at full scale").c_str());
   return 0;
 }
 

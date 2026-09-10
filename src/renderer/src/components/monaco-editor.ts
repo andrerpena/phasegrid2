@@ -1,4 +1,5 @@
 import { getConfigJsonSchema } from "@renderer/config/config-schema";
+import { getProjectJsonSchema } from "@renderer/project/project-schema";
 // The core API and the JSON language service, named separately.
 //
 // Importing the `monaco-editor` barrel instead registers every language Monaco ships -- abap,
@@ -44,16 +45,29 @@ self.MonacoEnvironment = {
  * reported after you save. The schema is generated from the same Zod definition that validates at
  * runtime, so the editor cannot disagree with the application about what is allowed.
  */
+/** The model URI the settings editor opens; the settings schema is bound to it and nothing else. */
+export const SETTINGS_MODEL_URI = "phasegrid://settings/workspace.json";
+/** The model URI a project's source view opens; the project schema is bound to these. */
+export const projectModelUri = (id: string): string =>
+  `phasegrid://project/${id}.json`;
+
 function configureJson(): void {
   jsonDefaults.setDiagnosticsOptions({
     validate: true,
     allowComments: false,
+    // Two documents, two schemas, told apart by the model's URI. Matching everything with the settings
+    // schema was fine while the settings file was the only JSON here; a project source view underlined
+    // in that schema would call every key a mistake.
     schemas: [
       {
         uri: "phasegrid://settings-schema.json",
-        // Every model this editor opens is the settings, so one schema matches all of them.
-        fileMatch: ["*"],
+        fileMatch: ["phasegrid://settings/*"],
         schema: getConfigJsonSchema(),
+      },
+      {
+        uri: "phasegrid://project-schema.json",
+        fileMatch: ["phasegrid://project/*"],
+        schema: getProjectJsonSchema(),
       },
     ],
     // Provided inline above; there is no server to ask.

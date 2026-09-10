@@ -32,6 +32,11 @@ export interface ProjectState {
    * gets serialised, and a saved file that remembers it was once unsaved would be nonsense.
    */
   dirtyIds: string[];
+  /**
+   * Which projects are being looked at as text -- the document Save writes, in an editor -- rather
+   * than as a grid. Runtime state like dirtiness: a view is not a property of the piece.
+   */
+  sourceIds: string[];
 }
 
 export interface ProjectActions {
@@ -56,6 +61,15 @@ export interface ProjectActions {
   snapshot: (id: string) => ProjectDoc | null;
   /** Records where a project now lives. */
   located: (id: string, slug: string, name?: string) => void;
+  /** Grid or source, per project. */
+  toggleSource: (id: string) => void;
+  isSource: (id: string) => boolean;
+  /**
+   * The whole document at once, from the source view's text: tempo, meter, scale, name and patch.
+   * The id and where it lives stay what they were. The live patch is replaced the way activating a
+   * project replaces it, so the engine hears it and the undo history starts over. Marks it dirty.
+   */
+  replace: (id: string, doc: ProjectDoc) => boolean;
 }
 
 let nextId = 1;
@@ -99,6 +113,7 @@ export const useProjectStore = create<ProjectState & ProjectActions>(
     projects: [],
     activeId: null,
     dirtyIds: [],
+    sourceIds: [],
 
     open: (project) => {
       const projects = captureActive(get());
@@ -113,7 +128,11 @@ export const useProjectStore = create<ProjectState & ProjectActions>(
 
     close: (id) => {
       const projects = captureActive(get()).filter((p) => p.id !== id);
-      set({ projects, dirtyIds: get().dirtyIds.filter((d) => d !== id) });
+      set({
+        projects,
+        dirtyIds: get().dirtyIds.filter((d) => d !== id),
+        sourceIds: get().sourceIds.filter((s) => s !== id),
+      });
       if (get().activeId !== id) return;
       const next = projects.at(-1);
       if (next === undefined) {
@@ -194,6 +213,29 @@ export const useProjectStore = create<ProjectState & ProjectActions>(
       if (record === undefined) return null;
       if (id !== get().activeId) return record;
       return { ...record, patch: usePatchStore.getState().doc };
+    },
+
+    toggleSource: (id) =>
+      set({
+        sourceIds: get().sourceIds.includes(id)
+          ? get().sourceIds.filter((s) => s !== id)
+          : [...get().sourceIds, id],
+      }),
+
+    isSource: (id) => get().sourceIds.includes(id),
+
+    replace: (id, doc) => {
+      const projects = captureActive(get());
+      const current = projects.find((p) => p.id === id);
+      if (current === undefined) return false;
+      const next: ProjectDoc = { ...doc, id, slug: current.slug };
+      set({ projects: projects.map((p) => (p.id === id ? next : p)) });
+      if (get().activeId === id) {
+        usePatchStore.getState().replace(next.patch);
+        useHistoryStore.getState().clear();
+      }
+      get().markDirty(id);
+      return true;
     },
 
     located: (id, slug, name) =>

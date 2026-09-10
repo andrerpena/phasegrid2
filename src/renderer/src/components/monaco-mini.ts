@@ -132,5 +132,7 @@ export function registerMiniLanguage(instance: typeof monaco): void {
 
 /** The Monaco language for a descriptor's `language`, or plain text for one we do not know. */
 export function monacoLanguageFor(language: string | undefined): string {
-  return language === "mini" ? MINI_LANGUAGE_ID : "plaintext";
+  if (language === "mini") return MINI_LANGUAGE_ID;
+  if (language === "json") return "json";
+  return "plaintext";
 }

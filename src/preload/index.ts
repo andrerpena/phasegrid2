@@ -188,6 +188,7 @@ const workspace: WorkspaceBridge = {
   readProject: (slug) => workspaceCall<string>("readProject", slug),
   writeProject: (slug, text) => workspaceCall<void>("writeProject", slug, text),
   deleteProject: (slug) => workspaceCall<void>("deleteProject", slug),
+  revealProject: (slug) => workspaceCall<void>("revealProject", slug),
 
   readSession: () => workspaceCall<string | null>("readSession"),
   writeSession: (text) => workspaceCall<void>("writeSession", text),

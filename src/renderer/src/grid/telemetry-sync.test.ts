@@ -233,12 +233,13 @@ describe("which modules are watched", () => {
   });
 
   it("watches every module that shows something the engine publishes, cabled or not", () => {
-    expect(displayModules(MODULATED, DESCRIPTORS)).toEqual([]);
-    expect(displayModules(SCOPED, DESCRIPTORS)).toEqual(["scope"]);
+    // The output wears a meter now, so it is watched wherever it is, and it is in every one of these.
+    expect(displayModules(MODULATED, DESCRIPTORS)).toEqual(["out"]);
+    expect(displayModules(SCOPED, DESCRIPTORS)).toEqual(["out", "scope"]);
     // A readout and a meter are watched by the same rule, and the three are one list.
-    expect(displayModules(READOUT, DESCRIPTORS)).toEqual(["readout"]);
-    expect(displayModules(METERED, DESCRIPTORS)).toEqual(["level"]);
-    expect(displayModules(KEYED, DESCRIPTORS)).toEqual(["keys"]);
+    expect(displayModules(READOUT, DESCRIPTORS)).toEqual(["out", "readout"]);
+    expect(displayModules(METERED, DESCRIPTORS)).toEqual(["level", "out"]);
+    expect(displayModules(KEYED, DESCRIPTORS)).toEqual(["keys", "out"]);
     // Nothing modulates it, so the modulated set does not know it; the subscription has to merge.
     expect(modulatedModules(SCOPED, DESCRIPTORS).has("scope")).toBe(false);
   });
@@ -256,9 +257,9 @@ describe("telemetry sync", () => {
     await flush();
     sync.stop();
     expect(opened).toEqual(["/pg-test"]);
-    // One request naming every pair: the sine's knobs, and both wave panels.
+    // One request naming every pair: the sine's knobs, both wave panels, and the output's meter.
     expect(subscriptions).toEqual([
-      { osc: ["params", "preview"], lfo: ["preview"] },
+      { osc: ["params", "preview"], lfo: ["preview"], out: ["display"] },
     ]);
   });
 
@@ -292,10 +293,11 @@ describe("telemetry sync", () => {
     expect(subscriptions.at(-1)).toEqual({
       osc: ["params", "preview"],
       lfo: ["preview"],
+      out: ["display"],
       scope: ["display"],
     });
-    // Slot 3 is the scope's display channel: a window, not knob values.
-    readings.set(3, {
+    // Slot 4 is the scope's display channel: 3 is the output's meter, and the modules are sorted: a window, not knob values.
+    readings.set(4, {
       kind: TelemetryKind.Scope,
       blockIndex: 3n,
       channels: [
@@ -316,7 +318,7 @@ describe("telemetry sync", () => {
         ],
       ],
     ]);
-    readings.set(3, {
+    readings.set(4, {
       kind: TelemetryKind.Scope,
       blockIndex: 4n,
       channels: [Float32Array.from([1, 1, 1]), Float32Array.from([1, 1, 1])],
@@ -335,10 +337,11 @@ describe("telemetry sync", () => {
     expect(subscriptions.at(-1)).toEqual({
       osc: ["params", "preview"],
       lfo: ["preview"],
+      out: ["display"],
       readout: ["display"],
     });
-    // Slot 3 is the readout's, and it carries a Value rather than a window.
-    readings.set(3, {
+    // Slot 4 is the readout's, and it carries a Value rather than a window.
+    readings.set(4, {
       kind: TelemetryKind.Value,
       blockIndex: 5n,
       values: [-0.25, 0.5],
@@ -357,6 +360,7 @@ describe("telemetry sync", () => {
     expect(subscriptions.at(-1)).toEqual({
       osc: ["params", "preview"],
       lfo: ["preview"],
+      out: ["display"],
       level: ["display"],
     });
     // Slot 0 is the meter's: the modules are sorted, and `level` comes before `lfo` and `osc`.
@@ -380,7 +384,7 @@ describe("telemetry sync", () => {
     const sync = startTelemetrySync(target, schedule);
     await flush();
     useEngineStore.setState({ running: false });
-    readings.set(3, {
+    readings.set(4, {
       kind: TelemetryKind.Scope,
       blockIndex: 9n,
       channels: [Float32Array.from([0.25])],
@@ -513,8 +517,8 @@ describe("telemetry sync", () => {
     sync.stop();
     // The sine's knobs are gone from the request; its picture is not, and nothing else changed.
     expect(subscriptions).toEqual([
-      { osc: ["params", "preview"], lfo: ["preview"] },
-      { osc: ["preview"], lfo: ["preview"] },
+      { osc: ["params", "preview"], lfo: ["preview"], out: ["display"] },
+      { osc: ["preview"], lfo: ["preview"], out: ["display"] },
     ]);
   });
 
@@ -527,7 +531,7 @@ describe("telemetry sync", () => {
     await flush();
     sync.stop();
     expect(subscriptions).toEqual([
-      { osc: ["params", "preview"], lfo: ["preview"] },
+      { osc: ["params", "preview"], lfo: ["preview"], out: ["display"] },
     ]);
   });
 
@@ -559,6 +563,7 @@ describe("telemetry sync", () => {
         osc: ["params", "preview"],
         lfo: ["preview"],
         lfo2: ["params", "preview"],
+        out: ["display"],
       },
     ]);
     usePatchStore.getState().apply([

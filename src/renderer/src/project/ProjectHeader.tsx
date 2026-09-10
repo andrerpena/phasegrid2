@@ -36,6 +36,9 @@ export const ProjectHeader = () => {
   const call = useEngineStore((s) => s.call);
   const playing = useTransportStore((s) => s.playing);
   const toggle = useTransportStore((s) => s.toggle);
+  const source = useProjectStore(
+    (s) => s.activeId !== null && s.sourceIds.includes(s.activeId),
+  );
   const [position, setPosition] = useState({ bar: 0, beat: 0 });
 
   // Typed numbers follow the one rule in `numeric-draft.ts`: the field shows what is being typed,
@@ -226,6 +229,37 @@ export const ProjectHeader = () => {
 
       <span className="flex-1" />
       <span className="text-muted-foreground">{project.name}</span>
+
+      {/* Grid or source: the same project, seen as a canvas or as the text Save writes. */}
+      <div className="flex flex-none overflow-hidden rounded-sm border border-border text-xs">
+        {(["grid", "source"] as const).map((view) => {
+          const active = view === "source" ? source : !source;
+          return (
+            <button
+              key={view}
+              type="button"
+              aria-pressed={active}
+              className={cn(
+                "cursor-pointer px-2 py-1",
+                active
+                  ? "bg-secondary text-foreground"
+                  : "bg-card text-muted-foreground hover:text-foreground",
+              )}
+              title={
+                view === "grid"
+                  ? "The patch as a canvas"
+                  : "The project as the JSON that Save writes; Cmd+Enter applies an edit"
+              }
+              onClick={() => {
+                if (!active)
+                  void commandRegistry.dispatch("project.toggleSource");
+              }}
+            >
+              {view === "grid" ? "Grid" : "Source"}
+            </button>
+          );
+        })}
+      </div>
 
       {/*
         One button, whose label says which of the two things it will do.

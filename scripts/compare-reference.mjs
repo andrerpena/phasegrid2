@@ -58,6 +58,7 @@ const metric = {
   crest: (m) => m.channels[0].crest,
   maxStep: (m) => m.channels[0].maxStep,
   thd: (m) => m.channels[0].thd,
+  overs: (m) => m.channels[0].oversPercent,
   rms: (m) => m.channels[0].rms,
   peak: (m) => m.channels[0].peak,
   f0: (m) => m.channels[0].f0,

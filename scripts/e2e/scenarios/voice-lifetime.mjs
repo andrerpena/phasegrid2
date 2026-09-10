@@ -83,7 +83,7 @@ export default {
       JSON.stringify(run),
     );
     check(
-      "and no note begins or ends on a step: the voices ramp in and out",
+      "and no note begins or ends on a step: each voice ramps out rather than stopping",
       run.maxStep[0] < 0.1,
       JSON.stringify(run),
     );
@@ -91,10 +91,12 @@ export default {
     await evaluate(`openProject("Sine held");`);
     await idle();
     const held = await pg("engine.render({ seconds: 3 })");
+    // The stack is louder than one sine and runs past full scale. The render's peak cannot show that
+    // any more -- the device boundary clamps at one -- so the clamp count and the level say it instead.
     check(
       "with the output affecting voice lifetime the released voices stay and the notes stack up",
-      held.peak[0] > 1.5,
-      JSON.stringify(held),
+      held.deviceClips > 0 && held.rms[0] > run.rms[0],
+      JSON.stringify({ held, run: run.rms }),
     );
   },
 };

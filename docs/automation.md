@@ -73,7 +73,14 @@ is. `pg.help()` lists them.
   device is actually handed, to a WAV, until stopped; stop answers `frames` and `droppedFrames`. This is
   the live output, not a render: the `live-capture` scenario records the null device while a pattern
   plays and measures the file. **`engine.call("engine.stats", {})`** — `clockDiscontinuities` (must be
-  0 after playing), `blockSize`, `periodFrames` (the callback size the device granted).
+  0 after playing), `deviceClips` (samples the boundary clamped to full scale: a patch that is too loud),
+  `blockSize`, `periodFrames` (the callback size the device granted). `engine.render` reports
+  `deviceClips` too; its WAV never holds a sample over one, so this is how a script learns the patch
+  asked for more.
+- **`commands.run("project.toggleSource")`** — the project as the JSON that Save writes, in an editor,
+  or the grid again; `snapshot().projects.open[].view` says which. **`commands.run("project.revealFile")`**
+  — the project's file in the system file manager; a no-op for a project never saved.
+  `stores.project.getState().replace(id, doc)` is what applying an edit from the source view runs.
 - Measuring, outside the app: `npm run audio:measure -- a.wav [b.wav]` prints level, continuity
   (`maxStep`) and shape (crest, harmonics, THD) for one file or two side by side; `npm run
   render:example -- <moduleId> [--bars 2] [--set m.p=v] [--period 512]` renders a built-in example and

@@ -1,14 +1,18 @@
 import { existsSync } from "node:fs";
-import type { BrowserWindow, IpcMain } from "electron";
+import { join } from "node:path";
+import { type BrowserWindow, type IpcMain, shell } from "electron";
 import type { StorageResult } from "../../../shared/protocol/storage";
 import {
   isDialogKind,
   isWorkspaceOp,
+  PROJECT_FILE,
+  PROJECTS_DIR,
   WORKSPACE_CALL_CHANNEL,
   type WorkspaceInfo,
   type WorkspaceOp,
 } from "../../../shared/protocol/workspace";
 import { type DialogHost, nativeDialogs, scriptedDialogs } from "./dialogs";
+import { projectDir } from "./path-guard";
 import { readPointer, rememberWorkspace } from "./pointer";
 import * as fs from "./workspace-fs";
 
@@ -138,6 +142,15 @@ async function run(
       return root === null
         ? noWorkspace
         : await fs.deleteProject(root, text(0));
+    case "revealProject": {
+      // The one place a project's path is spoken aloud: through the guard, like every other read.
+      if (root === null) return noWorkspace;
+      const file = join(projectDir(root, text(0), PROJECTS_DIR), PROJECT_FILE);
+      if (!existsSync(file))
+        return { ok: false, error: `no such project: ${text(0)}` };
+      shell.showItemInFolder(file);
+      return ok(undefined);
+    }
 
     case "readSession":
       return root === null ? noWorkspace : await fs.readSession(root);

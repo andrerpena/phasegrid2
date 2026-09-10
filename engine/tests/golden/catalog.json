@@ -1,5 +1,5 @@
 {
-  "catalogHash": "4e0b14976cd4bbd0",
+  "catalogHash": "b50604d1651074dd",
   "conventions": {
     "blockSize": 128,
     "gateThreshold": 0,
@@ -4017,31 +4017,35 @@
     },
     {
       "category": "I/O",
-      "doc": "Sends stereo audio to the engine output. The voices of an instrument are summed here. With Affect voice lifetime on, a released voice stays alive until it has fallen silent here.",
+      "doc": "Sends stereo audio to the engine output. The voices of an instrument are summed here, clipped at the clipping level in the chosen way, and metered with a clip light. With Affect voice lifetime on, a released voice stays alive while it is heard here above the silence threshold or within the hold time.",
       "face": [
         [
           "inL",
           "gain",
-          "gain"
+          "gain",
+          "meter",
+          "meter"
         ],
         [
           "inR",
           "gain",
-          "gain"
+          "gain",
+          "meter",
+          "meter"
         ]
       ],
       "flags": {
         "needsTransport": false,
         "previewsWave": false,
         "publishesKeys": false,
-        "publishesMeter": false,
+        "publishesMeter": true,
         "publishesNotes": false,
         "publishesScope": false,
         "publishesValue": false,
         "terminal": true,
         "voiceEntry": false,
         "voiceExit": true,
-        "writesTelemetry": false
+        "writesTelemetry": true
       },
       "id": "io.audioOut",
       "inputs": [
@@ -4096,8 +4100,59 @@
         },
         {
           "curve": "linear",
+          "default": 1.0,
+          "doc": "What happens to a sum that runs past the clipping level: nothing, a hard edge, or a rounded knee. The device itself cuts at full scale whatever is chosen here, so Off is a way of hearing that happen",
+          "enumLabels": [
+            "Off",
+            "Hard",
+            "Soft"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "primary": false,
+            "structural": false
+          },
+          "id": "clip",
+          "max": 2.0,
+          "min": 0.0,
+          "name": "Clipping",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 1.0,
+          "doc": "The level clipping engages at, above full scale",
+          "enumLabels": [
+            "0 dB",
+            "+6 dB",
+            "+12 dB",
+            "+24 dB"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "primary": false,
+            "structural": false
+          },
+          "id": "clipLevel",
+          "max": 3.0,
+          "min": 0.0,
+          "name": "Clipping level",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
           "default": 0.0,
-          "doc": "Keep a released voice alive until what arrives here from it has fallen silent. Off, a voice ends with its envelopes, or with its note when it has none",
+          "doc": "Keep a released voice alive while what arrives here from it is above the silence threshold, or was within the hold time. Off, a voice ends with its envelopes, or with its note when it has none",
           "flags": {
             "enum": false,
             "hidden": false,
@@ -4113,6 +4168,46 @@
           "name": "Affect voice lifetime",
           "uiWidget": "toggle",
           "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": -96.0,
+          "doc": "Below this a voice heard here counts as silent",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": false,
+            "noSmooth": true,
+            "primary": false,
+            "structural": false
+          },
+          "id": "silence",
+          "max": 0.0,
+          "min": -144.0,
+          "name": "Silence threshold",
+          "uiWidget": "slider",
+          "unit": "db"
+        },
+        {
+          "curve": "linear",
+          "default": 0.05000000074505806,
+          "doc": "How long after its last sound above the threshold a voice is still held",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": false,
+            "noSmooth": true,
+            "primary": false,
+            "structural": false
+          },
+          "id": "hold",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Hold time",
+          "uiWidget": "slider",
+          "unit": "seconds"
         }
       ],
       "texts": []
@@ -7365,7 +7460,7 @@
     },
     {
       "category": "I/O",
-      "doc": "Adds every voice of an instrument into one signal. Everything after it is global -- an effect here runs once, not once per voice. With Affect voice lifetime on, a released voice stays alive until it has fallen silent here.",
+      "doc": "Adds every voice of an instrument into one signal. Everything after it is global -- an effect here runs once, not once per voice. With Affect voice lifetime on, a released voice stays alive while it is heard here above the silence threshold or within the hold time.",
       "face": [
         [
           "in",
@@ -7411,7 +7506,7 @@
         {
           "curve": "linear",
           "default": 0.0,
-          "doc": "Keep a released voice alive until what arrives here from it has fallen silent. Off, a voice ends with its envelopes, or with its note when it has none",
+          "doc": "Keep a released voice alive while what arrives here from it is above the silence threshold, or was within the hold time. Off, a voice ends with its envelopes, or with its note when it has none",
           "flags": {
             "enum": false,
             "hidden": false,
@@ -7427,6 +7522,46 @@
           "name": "Affect voice lifetime",
           "uiWidget": "toggle",
           "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": -96.0,
+          "doc": "Below this a voice heard here counts as silent",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": false,
+            "noSmooth": true,
+            "primary": false,
+            "structural": false
+          },
+          "id": "silence",
+          "max": 0.0,
+          "min": -144.0,
+          "name": "Silence threshold",
+          "uiWidget": "slider",
+          "unit": "db"
+        },
+        {
+          "curve": "linear",
+          "default": 0.05000000074505806,
+          "doc": "How long after its last sound above the threshold a voice is still held",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": false,
+            "noSmooth": true,
+            "primary": false,
+            "structural": false
+          },
+          "id": "hold",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Hold time",
+          "uiWidget": "slider",
+          "unit": "seconds"
         }
       ],
       "texts": []

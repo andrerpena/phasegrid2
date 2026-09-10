@@ -28,14 +28,21 @@
 /// compiler. Owned by `InstanceTable`, keyed by the entry node, so it outlives a recompile the way a
 /// feedback state does. Fixed arrays throughout: nothing here allocates.
 #include <array>
+#include <cmath>
 #include <bitset>
 #include <cstdint>
 #include "core/Conventions.hpp"
 
 namespace pg {
 
-/// Quieter than this, an exit that affects voice lifetime calls a voice silent.
-inline constexpr float kVoiceSilence = 1e-4f;
+/// An exit that affects voice lifetime decides "still going" the way the reference instrument does: the
+/// voice's peak is above a silence threshold, or was within a hold time ago. Both are the exit's own
+/// params (`silence`, −96 dB by default; `hold`, 50 ms) and this is the per-voice state behind them,
+/// kept by the exit and counted in samples because the audio thread has no clock.
+struct ExitHold {
+  float sinceLoud = 0.f;   // samples since the voice was last above the threshold; saturates at hold
+};
+inline float dbToAmplitude(float db) { return std::pow(10.f, db / 20.f); }
 
 /// How long a voice takes to ramp to silence once nothing holds it. Long enough that the cut-off wave
 /// does not click, short enough to be inaudible as a release and to have the voice back in the pool

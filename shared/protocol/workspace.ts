@@ -143,6 +143,7 @@ export const WORKSPACE_OPS = [
   "readProject",
   "writeProject",
   "deleteProject",
+  "revealProject",
   "readSession",
   "writeSession",
   "confirmUnsaved",
@@ -200,6 +201,8 @@ export interface WorkspaceBridge {
   readProject(slug: string): Promise<StorageResult<string>>;
   writeProject(slug: string, text: string): Promise<StorageResult<void>>;
   deleteProject(slug: string): Promise<StorageResult<void>>;
+  /** Shows the project's file in the system file manager. Only a saved project has one. */
+  revealProject(slug: string): Promise<StorageResult<void>>;
 
   readSession(): Promise<StorageResult<string | null>>;
   writeSession(text: string): Promise<StorageResult<void>>;

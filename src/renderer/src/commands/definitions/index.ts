@@ -132,6 +132,33 @@ const PROJECT_COMMANDS: CommandDefinition<never>[] = [
       useModalStore.getState().show(SAVE_AS_MODAL);
     },
   },
+  {
+    /**
+     * The same document, as the text Save writes. Cmd+Enter in the view applies an edit through the
+     * schema; the grid is the same project seen the other way, not a second copy of it.
+     */
+    id: "project.toggleSource",
+    name: "Toggle Source View",
+    category: "Project",
+    description:
+      "Shows the project as the JSON that Save writes, or the grid again",
+    execute: () => {
+      const id = useProjectStore.getState().activeId;
+      if (id !== null) useProjectStore.getState().toggleSource(id);
+    },
+  },
+  {
+    id: "project.revealFile",
+    name: "Reveal Project File",
+    category: "Project",
+    description:
+      "Shows the project's file in the system file manager. An unsaved project has no file yet",
+    execute: async () => {
+      const project = useProjectStore.getState().active();
+      if (project === null || project.slug === undefined) return;
+      await window.workspace.revealProject(project.slug);
+    },
+  },
 ];
 
 const PATCH_COMMANDS: CommandDefinition<never>[] = [

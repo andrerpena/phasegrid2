@@ -128,6 +128,8 @@ export const COMMANDS = {
     args: NoArgs,
     result: z.object({
       clockDiscontinuities: z.number().int().nonnegative(),
+      /** Samples the device boundary clamped to full scale: a patch that is too loud, counted. */
+      deviceClips: z.number().int().nonnegative(),
       blockSize: z.number().int().positive(),
       sampleRate: z.number().positive(),
       periodFrames: z.number().int().nonnegative(),
@@ -212,6 +214,12 @@ export const COMMANDS = {
       peak: z.array(z.number().nonnegative()),
       maxStep: z.array(z.number().nonnegative()),
       crest: z.array(z.number().nonnegative()),
+      /**
+       * Samples the device boundary clamped to full scale during the render. The WAV holds what a device
+       * would play, so it never shows a sample over one; this is how a script learns the patch asked for
+       * more. Anything but zero is a level to turn down, or a clipping mode to choose.
+       */
+      deviceClips: z.number().int().nonnegative(),
       out: z.string().nullable(),
     }),
   },

@@ -104,6 +104,11 @@ public:
   /// never seeks, so anything but zero is a fault in whoever is driving the clock, and the command
   /// loop says so on stderr the first time it sees one.
   uint64_t clockDiscontinuities() const { return clockFaults_.load(std::memory_order_relaxed); }
+  /// Samples the device boundary had to clamp to full scale. The output module clips at its own level
+  /// first; anything still over ±1 after the master gain is cut here so nothing above full scale ever
+  /// reaches the driver, and this count says it happened. A patch that clips is a patch that is too
+  /// loud, and this is the number that says so when no meter is being watched.
+  uint64_t deviceClips() const { return deviceClips_.load(std::memory_order_relaxed); }
 
 private:
   void reconcileParams();
@@ -138,6 +143,7 @@ private:
   uint32_t interleavedChannels_ = 2;
   Transport* interleavedClock_ = nullptr;   // the device's, for the length of one renderInterleaved
   std::atomic<uint64_t> clockFaults_{0};
+  std::atomic<uint64_t> deviceClips_{0};
   uint64_t lastSamplePos_ = 0;   // audio thread only: the clock check in renderBlock
   uint32_t lastFrames_ = 0;
   bool haveLastBlock_ = false;

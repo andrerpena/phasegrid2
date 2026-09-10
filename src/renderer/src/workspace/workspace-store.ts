@@ -4,6 +4,7 @@ import {
   projectFromExample,
 } from "@renderer/examples/registry";
 import { projectId, useProjectStore } from "@renderer/project/project-store";
+import { projectText } from "@renderer/project/project-text";
 import { type ProjectDoc, ProjectDocSchema } from "@shared/protocol/project";
 import {
   type ProjectSummary,
@@ -262,18 +263,14 @@ async function write(
   slug: string,
   name: string,
 ): Promise<boolean> {
-  // `slug` is where the project lives and the folder already says so; writing it into the file as well
-  // would create a second answer that a rename could make wrong.
-  const { slug: _slug, ...payload } = { ...doc, name };
-  const validated = ProjectDocSchema.safeParse(payload);
-  if (!validated.success) {
-    set({ error: `“${name}” cannot be saved: ${validated.error.message}` });
+  // `slug` is where the project lives and the folder already says so; `projectText` leaves it out,
+  // and is the same function the source view shows, so the two can never disagree about the file.
+  const text = projectText({ ...doc, name });
+  if (!text.ok) {
+    set({ error: `“${name}” cannot be saved: ${text.error}` });
     return false;
   }
-  const written = await window.workspace.writeProject(
-    slug,
-    `${JSON.stringify(validated.data, null, 2)}\n`,
-  );
+  const written = await window.workspace.writeProject(slug, text.text);
   if (!written.ok) {
     set({ error: written.error });
     return false;

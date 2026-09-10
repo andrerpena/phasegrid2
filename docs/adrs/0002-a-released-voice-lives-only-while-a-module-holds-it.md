@@ -77,5 +77,7 @@ and a patch pays for the voices it is using.
   and its envelopes still end its voices.
 - **What this does not decide.** `kVoiceSilence` is one constant rather than a per-exit threshold, and
   a voice is stolen rather than faded when the pool is full. Both are Bitwig-shaped questions still open.
+  *Settled in [0006](0006-the-output-clips-like-the-reference-instrument.md):* the threshold and a hold
+  time are the exit's own parameters, with the reference's defaults.
   How a voice *ends* -- it turned out that stopping one dead is a click -- is
   [0003](0003-a-voice-fades-out-and-the-sine-starts-at-zero.md).

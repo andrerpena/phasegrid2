@@ -112,6 +112,11 @@ export default {
       stats.clockDiscontinuities === 0,
       JSON.stringify(stats),
     );
+    check(
+      "and the device boundary never had to clamp a single sine",
+      stats.deviceClips === 0,
+      JSON.stringify(stats),
+    );
 
     const m = measureFile(path).channels[0];
     check(

@@ -101,16 +101,19 @@ TEST_CASE("a rebuilt instance takes over from the one it replaced, at the swap",
   Rig rig;
   rig.add("n", "test.blockCount"); rig.add("s", "test.sink");
   rig.edge("e", "n", "out", "s", "in");
+  // The device boundary clamps at full scale, and a block count runs past it by block 2: read the
+  // count at a tenth, which is the count all the same.
+  rig.engine.setOutputGain(0.1f);
   REQUIRE(rig.engine.commit());
   for (int i = 0; i < 3; ++i) rig.render();
-  REQUIRE(rig.l[0] == 3.f);
+  REQUIRE(rig.l[0] == Catch::Approx(0.3f));
 
   REQUIRE(rig.engine.model().setNodeData("n", nlohmann::json{{"edit", 1}}));
   REQUIRE(rig.engine.commit());
   pg::test::resetRtViolations();
   { pg::test::RtScope scope; rig.render(); }
   REQUIRE(pg::test::rtViolations() == 0);   // the hand-over is audio-thread work
-  REQUIRE(rig.l[0] == 4.f);                 // a fresh instance would say 1
+  REQUIRE(rig.l[0] == Catch::Approx(0.4f));   // a fresh instance would say 1
 
   // Two edits before one swap: the instance the second edit replaced never ran, so the one that did is
   // what the survivor takes over from.
@@ -119,13 +122,13 @@ TEST_CASE("a rebuilt instance takes over from the one it replaced, at the swap",
   REQUIRE(rig.engine.model().setNodeData("n", nlohmann::json{{"edit", 3}}));
   REQUIRE(rig.engine.commit());
   rig.render();
-  REQUIRE(rig.l[0] == 5.f);
+  REQUIRE(rig.l[0] == Catch::Approx(0.5f));
 
   // An instance the compile reused is not handed itself.
   rig.add("unrelated", "test.const");
   REQUIRE(rig.engine.commit());
   rig.render();
-  REQUIRE(rig.l[0] == 6.f);
+  REQUIRE(rig.l[0] == Catch::Approx(0.6f));
   rig.engine.collectGarbage();
 }
 

@@ -3,7 +3,9 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <map>
 #include <memory>
+#include <string>
 #include <vector>
 #include "core/Voices.hpp"
 #include "modules/builtin.hpp"
@@ -42,13 +44,16 @@ struct Rig {
   /// say "the note ends at the top of block 1". The tests that listen rather than count states use a
   /// thirty-second of it, so a note lasts long enough to be a note.
   Rig(bool envelope, float release = 1.f, float envLifetime = 1.f, float outLifetime = 0.f,
-      const char* pattern = "c3", float legato = 0.125f, double tempo = 45000.0) {
+      const char* pattern = "c3", float legato = 0.125f, double tempo = 45000.0,
+      std::map<std::string, float> outExtra = {}) {
     pg::registerBuiltinModules(f.reg);
     f.node("pat", "notes.pattern", {{"legato", legato}, {"cycle", 5.f}});   // eight blocks to the cycle
     REQUIRE(f.model.setNodeData("pat", nlohmann::json{{"pattern", pattern}}));
     f.node("poly", "note.toPoly", {{"voices", 4.f}});
     f.node("osc", "osc.sine");
-    f.node("out", "io.audioOut", {{"lifetime", outLifetime}});
+    std::map<std::string, float> outParams = std::move(outExtra);
+    outParams["lifetime"] = outLifetime;
+    f.node("out", "io.audioOut", std::move(outParams));
     f.edge("e0", "pat.notes", "poly.notes");
     f.edge("e1", "poly.pitch", "osc.pitch");
     if (envelope) {
@@ -225,4 +230,32 @@ TEST_CASE("Full legato hands over between voices without a click", "[voices]") {
   Rig rig(false, 1.f, 1.f, 0.f, "c3 e3 b3 c4", 1.f, kMusicalTempo);
   rig.blocks(0, 260);
   REQUIRE(rig.maxStep() < 0.1f);
+}
+
+// ---------------------------------------------------------------- the exit's hold time
+
+TEST_CASE("An exit affecting voice lifetime holds a voice for the hold time after it last heard it", "[voices]") {
+  // The reference instrument's rule, parameter for parameter: a voice heard above the silence threshold
+  // is held, and so is one heard within the hold time before -- 50 ms by default. Here the envelope has
+  // no say (its toggle off) and a release short enough that the voice is silent within a block of its
+  // note off, so what keeps it alive afterwards is the exit's hold alone.
+  Rig held(true, /*release=*/0.001f, /*envLifetime=*/0.f, /*outLifetime=*/1.f);
+  held.block(0);
+  held.block(1);
+  REQUIRE(held.activity().state(0) == pg::VoiceState::Releasing);
+  // Silent now, and still held: 50 ms is 2400 samples, 37 blocks. (Blocks that are multiples of eight
+  // are the pattern's next note and are skipped, as the release test does, so nothing revives the voice.)
+  for (uint64_t b = 2; b < 24; ++b) if (b % 8 != 0) held.block(b);
+  REQUIRE(held.activity().state(0) == pg::VoiceState::Releasing);
+  REQUIRE(held.peak() == 0.f);   // held by the hold time, not by any sound
+  // Past the hold time the exit lets go, the ramp plays, and the voice is free.
+  for (uint64_t b = 24; b < 70; ++b) if (b % 8 != 0) held.block(b);
+  REQUIRE(held.activity().state(0) == pg::VoiceState::Free);
+
+  // With no hold time the same voice is let go as soon as it is silent.
+  Rig prompt(true, 0.001f, 0.f, 1.f, "c3", 0.125f, 45000.0, {{"hold", 0.f}});
+  prompt.block(0);
+  prompt.block(1);
+  for (uint64_t b = 2; b < 8; ++b) prompt.block(b);
+  REQUIRE(prompt.activity().state(0) == pg::VoiceState::Free);
 }

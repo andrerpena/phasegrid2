@@ -337,6 +337,7 @@ json dispatchCommand(const std::string& cmd, const json& id, const json& args, P
   // fed. A script asserts `clockDiscontinuities === 0` after playing; anything else is a driving fault.
   if (cmd == "engine.stats")
     return okResponse(id, json{{"clockDiscontinuities", ctx.engine.clockDiscontinuities()},
+                               {"deviceClips", ctx.engine.deviceClips()},
                                {"blockSize", ctx.engine.config().blockSize},
                                {"sampleRate", ctx.engine.config().sampleRate},
                                {"periodFrames", ctx.device != nullptr ? ctx.device->periodFrames() : 0u}});
@@ -490,6 +491,7 @@ json dispatchCommand(const std::string& cmd, const json& id, const json& args, P
                                 {"peak", std::move(peaks)},
                                 {"maxStep", std::move(steps)},
                                 {"crest", std::move(crests)},
+                                {"deviceClips", offline.deviceClips()},
                                 {"out", out.empty() ? json(nullptr) : json(out)}});
   }
   if (cmd == "patch.batch") {

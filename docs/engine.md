@@ -51,24 +51,41 @@ pair**, in ascending order, with `ctx.voice` the pair, the mask the lanes of its
 no held or releasing voice is not run at all, which is why a pool of sixteen costs nothing while nothing
 plays.
 
-**When a released voice ends** is the reference instrument's rule, not a measurement (docs/adrs/0002): after its note off
-a voice lives only while something in the instrument *holds* it, and each holder says so per pass, per
-block, through `VoiceActivity::hold(voice)`. An envelope holds its voice until its release stage is over
-(`env.dahdsr` reads the vendored envelope's stage; its `lifetime` toggle, on by default, takes it out of
-the decision). An exit -- `io.audioOut`, `voices.sum` -- holds a voice while what it hears from it is
-above `kVoiceSilence`, but only with its own `lifetime` toggle on, which is off by default. After the
-passes `settle()` starts the outgoing ramp for every releasing voice nobody held that block: a voice is
-not cut off but faded over `kVoiceFadeSeconds`, because a wave stopped mid-cycle is a step and a step is
-a click. The exits apply the ramp and the lane mask together through `VoiceGain`, and the voice is free
-when it has played out. The ramp is committed once it starts -- an exit stops hearing a voice because it
-is fading, and a claim then would restart it -- so only a new note on that voice cancels it. Inside an
-instrument an oscillator also holds a lane whose voice is free at the start of its cycle, so a voice
-taken back inside a pair that never went quiet begins where a fresh one would (docs/adrs/0003). So a voice with an envelope rings
-out; a voice with none ends with its note -- a bare oscillator stops rather than droning, and a run of
-single notes into it plays one voice instead of filling the pool -- and a patch that wants the drone
-held until it is silent asks the exit for it. Allocation takes a free voice first, then the
-longest-releasing, then the longest-held, with the one-frame gate dip on a steal so a downstream envelope
-retriggers.
+**When a released voice ends** is the reference instrument's rule, not a measurement (docs/adrs/0002).
+After its note off a voice lives only while something in the instrument *holds* it, and each holder says
+so per pass, per block, through `VoiceActivity::hold(voice)`. An envelope holds its voice until its
+release stage is over (`env.dahdsr` reads the vendored envelope's stage; its `lifetime` toggle, on by
+default, takes it out of the decision). An exit -- `io.audioOut`, `voices.sum` -- holds a voice while
+what it hears from it is above `kVoiceSilence`, but only with its own `lifetime` toggle on, which is off
+by default. So a voice with an envelope rings out; a voice with none ends with its note -- a bare
+oscillator stops rather than droning, and a run of single notes into it plays one voice instead of
+filling the pool -- and a patch that wants a drone held until it is silent asks the exit for it.
+
+**How a voice ends** (docs/adrs/0003). After the passes, `settle()` starts the outgoing ramp for every
+releasing voice nobody held that block: the voice is not cut off but faded over `kVoiceFadeSeconds`,
+because a wave stopped mid-cycle is a step and a step is a click. The exits apply the ramp and the lane
+mask together through `VoiceGain`, and the voice is free when the ramp has played out. The ramp is
+committed once it starts -- an exit stops hearing a voice *because* it is fading, and a claim then would
+restart it -- so only a new note on that voice cancels it. Inside an instrument an oscillator also holds
+a lane whose voice is free at the start of its cycle, so a voice taken back inside a pair that never went
+quiet begins where a fresh one would.
+
+**Allocation** takes a free voice first, then the longest-releasing, then the longest-held, with the
+one-frame gate dip on a steal so a downstream envelope retriggers.
+
+**The output** (`io.audioOut`, docs/adrs/0006) clips each pair's gained sum the way the reference
+instrument's Audio Out does -- `clip` Off/Hard/Soft at `clipLevel` 0/+6/+12/+24 dB, Hard at +6 by
+default -- before it reaches the bus, and publishes a `Meter` of what it sent, clip light included.
+`Engine::renderBlock`'s fold then clamps to ±1 after the master gain and counts what it clamped
+(`deviceClips`, in `engine.stats` and `patch.render`): nothing above full scale reaches the driver, and
+a patch that is too loud is a number. An exit asked to affect voice lifetime holds a voice while its
+peak is above `silence` (−96 dB) or was within `hold` (50 ms) of being so; both are its params.
+
+**Denormals.** `Engine::renderInterleaved` puts the calling thread into flush-to-zero before anything else
+(`rt/Denormals.hpp`, docs/adrs/0007). A denormal costs about a hundred cycles on x86-64 and turns up
+wherever audio decays towards silence rather than stopping -- a reverb tail, a delay's feedback, an
+envelope's release -- so it is heard as a crackle at the quietest moment rather than as a wrong number.
+`renderBlock` is deliberately left alone, so a test calling it directly keeps plain IEEE arithmetic.
 
 **The clock.** `Engine::renderInterleaved` is the device's entry point and the offline renderer's alike:
 it takes a `Transport&`, cuts the callback into engine blocks, and calls `advance()` once per block, so a

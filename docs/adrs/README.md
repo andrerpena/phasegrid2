@@ -17,3 +17,5 @@ already say: a record points at those for the mechanism and keeps only the reaso
 | [0003](0003-a-voice-fades-out-and-the-sine-starts-at-zero.md) | A voice fades out, and the sine starts at zero | 2026-09-10 |
 | [0004](0004-a-waveform-is-measured-by-its-shape.md) | A waveform is measured by its shape, and Fold 0 is a sine | 2026-09-10 |
 | [0005](0005-the-transport-ticks-per-engine-block.md) | The transport ticks per engine block, and the live output is capturable | 2026-09-10 |
+| [0006](0006-the-output-clips-like-the-reference-instrument.md) | The output clips like the reference instrument's, and says so | 2026-09-10 |
+| [0007](0007-what-we-take-from-vcv-rack.md) | What we take from VCV Rack, and what we leave | 2026-09-10 |

@@ -159,11 +159,13 @@ export function measureChannel(x, sampleRate) {
   let sumSquares = 0;
   let peak = 0;
   let maxStep = 0;
+  let overs = 0; // samples at or beyond full scale: what a device would have clamped
   for (let i = 0; i < x.length; i++) {
     const v = x[i];
     sumSquares += v * v;
     const a = Math.abs(v);
     if (a > peak) peak = a;
+    if (a >= 1) overs++;
     if (i > 0) {
       const d = Math.abs(v - x[i - 1]);
       if (d > maxStep) maxStep = d;
@@ -209,10 +211,26 @@ export function measureChannel(x, sampleRate) {
       ? Math.sqrt(harmonics.slice(1).reduce((a, r) => a + r * r, 0)) * 100
       : 0;
 
+  // A file over full scale is not what a listener hears; the device clamps it. When a file is hot, the
+  // shape numbers are also given for the clamped signal, because that is the distortion in the room.
+  const asHeard =
+    overs > 0 && peak > 1
+      ? (() => {
+          const clamped = Float32Array.from(x, (v) =>
+            Math.max(-1, Math.min(1, v)),
+          );
+          const m = measureChannel(clamped, sampleRate);
+          return { crest: m.crest, thd: m.thd, harmonics: m.harmonics };
+        })()
+      : null;
+
   return {
     rms,
     peak,
     maxStep,
+    overs,
+    oversPercent: x.length === 0 ? 0 : (100 * overs) / x.length,
+    asHeard,
     envelope,
     window: { start, seconds: start / sampleRate },
     crest,
@@ -251,7 +269,13 @@ function printOne(m) {
   );
   m.channels.forEach((c, i) => {
     console.log(`  channel ${i}`);
-    console.log(`    level       rms ${fix(c.rms)}   peak ${fix(c.peak)}`);
+    console.log(
+      `    level       rms ${fix(c.rms)}   peak ${fix(c.peak)}${c.overs > 0 ? `   OVER FULL SCALE: ${c.overs} samples (${c.oversPercent.toFixed(1)}%)` : ""}`,
+    );
+    if (c.asHeard)
+      console.log(
+        `    as heard    after the device clamps at ±1: crest ${fix(c.asHeard.crest)}   THD ${c.asHeard.thd.toFixed(2)}%   h2 ${db(c.asHeard.harmonics[1] ?? 0)}`,
+      );
     console.log(
       `    continuity  maxStep ${fix(c.maxStep, 4)}   (a click is ~0.1 or more; a sine at C4 moves by ~0.03)`,
     );
@@ -279,6 +303,7 @@ function printPair(a, b) {
   const rows = [
     ["rms", (c) => c.rms, 3],
     ["peak", (c) => c.peak, 3],
+    ["overs %", (c) => c.oversPercent, 1],
     ["crest", (c) => c.crest, 3],
     ["maxStep", (c) => c.maxStep, 4],
     ["f0 Hz", (c) => c.f0, 1],

@@ -35,7 +35,7 @@ Spec: docs/superpowers/specs/2026-09-07-phasegrid2-architecture-design.md. Engin
 - `engine/vendor/vital` is vendored GPL code: never edit it (shims only), never use the names "Vital"/"Tytel" in ids, UI or binaries.
 
 ## Rules — engine (C++)
-- Audio thread code (`Module::process`, scheduler, param drain, program swap): no allocation, locks, syscalls, exceptions, logging. Tests assert this.
+- Audio thread code (`Module::process`, scheduler, param drain, program swap): no allocation, locks, syscalls, exceptions, logging. Tests assert this. `Engine::renderInterleaved` puts the thread in flush-to-zero first (`rt/Denormals.hpp`); denormals are a hundred-cycle slow path exactly where audio decays to silence.
 - Adding a module = one `.cpp` in `engine/src/modules` + one line in `builtin.cpp`. No TypeScript changes.
 - Descriptors are C-layout; never put std types in them.
 - Signals are `pg::Sample` (vital::poly_float, lanes v0.L v0.R v1.L v1.R). Never add channel counts to ports.

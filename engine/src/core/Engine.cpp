@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cassert>
 #include "core/GraphCompiler.hpp"
+#include "rt/Denormals.hpp"
 #include "poly_utils.h"
 
 namespace pg {
@@ -193,16 +194,29 @@ void Engine::renderBlock(float* const* out, uint32_t channels, uint32_t numFrame
   // Read once per block rather than per frame: it changes at human speed, and a per-frame atomic load
   // in the innermost loop of the render is a cost paid a million times a second for nothing.
   const float gain = outputGain_.load(std::memory_order_relaxed);
+  uint64_t clipped = 0;
   for (uint32_t i = 0; i < numFrames; ++i) {
     const Sample& summed = bus_.data[i];
     const Sample folded = summed + vital::utils::swapVoices(summed);   // lanes 0,1 now hold L,R sums
-    if (channels > 0) out[0][i] = folded[0] * gain;
-    if (channels > 1) out[1][i] = folded[1] * gain;
-    for (uint32_t c = 2; c < channels; ++c) out[c][i] = folded[1] * gain;
+    // The device boundary: the last place a sample can be over full scale, and the one where it must
+    // not be. Clamped here as a device would clamp it, and counted, because a clamp that nobody can
+    // see is a mystery sound and a clamp that is counted is a level to turn down.
+    const float lft = folded[0] * gain, rgt = folded[1] * gain;
+    const float lc = std::clamp(lft, -1.f, 1.f), rc = std::clamp(rgt, -1.f, 1.f);
+    clipped += (lc != lft) + (rc != rgt);
+    if (channels > 0) out[0][i] = lc;
+    if (channels > 1) out[1][i] = rc;
+    for (uint32_t c = 2; c < channels; ++c) out[c][i] = rc;
   }
+  if (clipped != 0) deviceClips_.fetch_add(clipped, std::memory_order_relaxed);
 }
 
 void Engine::renderInterleaved(float* out, uint32_t frames, uint32_t channels, Transport& clock) noexcept {
+  // Whoever is about to render, renders without denormals. Here rather than once per thread because the
+  // device thread is not ours to set up, and here rather than in `renderBlock` because this is the entry
+  // point that plays -- the device's and the offline renderer's alike (docs/adrs/0005, 0007) -- while a
+  // test calling `renderBlock` keeps plain IEEE arithmetic.
+  rt::flushDenormals();
   interleavedChannels_ = channels;
   interleavedClock_ = &clock;
   if (channels != kMaxChannelsOut) { std::fill_n(out, static_cast<size_t>(frames) * channels, 0.f); return; }   // other counts wired in phase 4

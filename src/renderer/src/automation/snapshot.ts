@@ -39,6 +39,8 @@ export interface Snapshot {
       slug: string | null;
       dirty: boolean;
       tempo: number;
+      /** How the project is being looked at: the canvas, or the text Save writes. */
+      view: "grid" | "source";
     }[];
     activeId: string | null;
   };
@@ -90,6 +92,7 @@ export function buildSnapshot(logTail = 20): Snapshot {
         slug: p.slug ?? null,
         dirty: project.isDirty(p.id),
         tempo: p.tempo,
+        view: project.isSource(p.id) ? "source" : "grid",
       })),
       activeId: project.activeId,
     },

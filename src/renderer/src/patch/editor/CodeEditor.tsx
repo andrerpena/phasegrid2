@@ -12,6 +12,16 @@ export interface CodeEditorProps {
   onCommit?: () => void;
   /** Character ranges to outline: the steps that are sounding right now. */
   highlights?: readonly { from: number; to: number }[];
+  /**
+   * `line` is the pattern field: one line, no gutter, no wrapping, because the highlight must not move
+   * under the steps. `document` is a file: line numbers, folding, wrapping.
+   */
+  variant?: "line" | "document";
+  /**
+   * A URI for the editor's model. A JSON schema in `monaco-editor.ts` is bound to a URI pattern, so a
+   * document that wants one names itself; without this the model is anonymous and no schema applies.
+   */
+  modelUri?: string;
 }
 
 /**
@@ -31,6 +41,8 @@ export const CodeEditor = ({
   onChange,
   onCommit,
   highlights,
+  variant = "line",
+  modelUri,
 }: CodeEditorProps) => {
   const host = useRef<HTMLDivElement>(null);
   const editor = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -57,24 +69,38 @@ export const CodeEditor = ({
     void initializeMonaco().then((instance) => {
       if (disposed || host.current === null || editor.current !== null) return;
 
+      const languageId = monacoLanguageFor(languageRef.current);
+      let ownModel: monaco.editor.ITextModel | null = null;
+      if (modelUri !== undefined) {
+        const uri = instance.Uri.parse(modelUri);
+        ownModel =
+          instance.editor.getModel(uri) ??
+          instance.editor.createModel(latest.current, languageId, uri);
+        if (ownModel.getValue() !== latest.current)
+          ownModel.setValue(latest.current);
+      }
+      const document = variant === "document";
       const created = instance.editor.create(element, {
-        value: latest.current,
-        language: monacoLanguageFor(languageRef.current),
+        ...(ownModel
+          ? { model: ownModel }
+          : { value: latest.current, language: languageId }),
         theme: THEME_ID,
         automaticLayout: true,
         scrollBeyondLastLine: false,
         minimap: { enabled: false },
-        fontSize: 14,
+        fontSize: document ? 13 : 14,
         fontFamily: '"Source Code Pro", ui-monospace, Menlo, monospace',
+        tabSize: 2,
         // A pattern is read as one line of steps; wrapping it would move the steps around under
-        // the highlight as you type, which is exactly what a live editor must not do.
-        wordWrap: "off",
-        lineNumbers: "off",
-        folding: false,
+        // the highlight as you type, which is exactly what a live editor must not do. A document
+        // is read as a file, and gets a file's gutter.
+        wordWrap: document ? "on" : "off",
+        lineNumbers: document ? "on" : "off",
+        folding: document,
         glyphMargin: false,
-        lineDecorationsWidth: 0,
-        lineNumbersMinChars: 0,
-        renderLineHighlight: "none",
+        lineDecorationsWidth: document ? undefined : 0,
+        lineNumbersMinChars: document ? undefined : 0,
+        renderLineHighlight: document ? "line" : "none",
         overviewRulerLanes: 0,
         scrollbar: { vertical: "auto", horizontal: "auto" },
         fixedOverflowWidgets: true,
@@ -100,10 +126,13 @@ export const CodeEditor = ({
       disposed = true;
       collection.current?.clear();
       collection.current = null;
+      const model =
+        modelUri !== undefined ? (editor.current?.getModel() ?? null) : null;
       editor.current?.dispose();
+      model?.dispose();
       editor.current = null;
     };
-  }, []);
+  }, [modelUri, variant]);
 
   // Follows the document when the change came from somewhere else -- an undo, or the canvas.
   useEffect(() => {

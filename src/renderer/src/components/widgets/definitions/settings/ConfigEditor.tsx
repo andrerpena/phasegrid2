@@ -1,4 +1,7 @@
-import { initializeMonaco } from "@renderer/components/monaco-editor";
+import {
+  initializeMonaco,
+  SETTINGS_MODEL_URI,
+} from "@renderer/components/monaco-editor";
 import { THEME_ID } from "@renderer/components/monaco-theme";
 import type * as monaco from "monaco-editor";
 import { useEffect, useRef } from "react";
@@ -46,10 +49,15 @@ export const ConfigEditor = ({
       // Monaco loads asynchronously; React can unmount, or a second effect can run, in the gap.
       if (disposed || host.current === null || editor.current !== null) return;
 
+      // A model with the settings URI, so the settings schema -- and only that one -- applies to it.
+      const uri = instance.Uri.parse(SETTINGS_MODEL_URI);
+      const model =
+        instance.editor.getModel(uri) ??
+        instance.editor.createModel(latest.current, "json", uri);
+      // The value may have moved on while Monaco was loading.
+      if (model.getValue() !== latest.current) model.setValue(latest.current);
       const created = instance.editor.create(element, {
-        // The value may have moved on while Monaco was loading.
-        value: latest.current,
-        language: "json",
+        model,
         // The application's own palette -- see `monaco-theme.ts`. It re-derives itself when the
         // theme changes, so nothing here has to follow it.
         theme: THEME_ID,
@@ -86,7 +94,9 @@ export const ConfigEditor = ({
 
     return () => {
       disposed = true;
+      const model = editor.current?.getModel() ?? null;
       editor.current?.dispose();
+      model?.dispose();
       editor.current = null;
     };
   }, []);

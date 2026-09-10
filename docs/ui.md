@@ -228,6 +228,16 @@ wide enough for the values is a sidebar that has taken the room the grid wanted.
 
 ## The canvas
 
+**The same project has two views.** The header's Grid | Source toggle (`project.toggleSource`) swaps
+the canvas for the project as the text Save writes -- `projectText`, the one function the save path
+uses, so the view is byte for byte the file -- in the Monaco editor the settings and the pattern fields
+already use, with a JSON schema generated from the project's Zod schema bound to the model's URI
+(`phasegrid://project/<id>.json`; the settings schema is bound to its own). Cmd+Enter parses the
+text, puts it through the schema, and `replace`s the document the way opening a file would, so the
+engine hears the patch and the header follows the tempo; invalid text is reported under the editor and
+changes nothing. The grid stays mounted underneath, invisible, because it owns a canvas and an engine
+subscription that a toggle should not rebuild. `project.revealFile` shows the file itself.
+
 **A module is a face made of blocks.** On the canvas a module is a rectangle of 24 px cells, and
 what it wears is a composition of blocks — the title, a jack, a knob, a wave panel, a scope, a readout — each covering a
 whole number of cells, the way a hardware panel is a grid of tiles. The title is a block like the

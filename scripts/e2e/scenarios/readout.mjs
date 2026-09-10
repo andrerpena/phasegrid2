@@ -50,14 +50,17 @@ export default {
     await evaluate(`openProject("Readout");`);
     await idle();
 
-    const face = await pg('grid.face("readout")');
-    check(
+    // Read once the canvas has built the face, not on the frame the project opened: the output now
+    // carries a meter and a telemetry watch of its own, and the first paint can land a frame later.
+    await checkEventually(
       "the readout's face is its input and the number",
-      Array.isArray(face) &&
-        face.map((b) => `${b.kind}:${b.name}`).join(" ") ===
-          "title:title jack:in value:value",
-      JSON.stringify(face?.map((b) => `${b.kind}:${b.name}`)),
+      `(() => {
+        const face = window.pg.grid.face("readout");
+        return Array.isArray(face) &&
+          face.map((b) => b.kind + ":" + b.name).join(" ") === "title:title jack:in value:value";
+      })()`,
     );
+    const face = await pg('grid.face("readout")');
     check(
       "nothing has been read before the patch plays",
       face?.find((b) => b.kind === "value")?.reading === null,

@@ -14,7 +14,7 @@ function project(name: string, patch: PatchDoc): ProjectDoc {
 }
 
 beforeEach(() => {
-  useProjectStore.setState({ projects: [], activeId: null });
+  useProjectStore.setState({ projects: [], activeId: null, sourceIds: [] });
   usePatchStore.setState({ doc: EMPTY_PATCH, version: 0 });
   useHistoryStore.setState({
     past: [],
@@ -122,5 +122,47 @@ describe("project properties", () => {
     );
     useProjectStore.getState().setTempo(10_000);
     expect(useProjectStore.getState().active()?.tempo).toBeLessThanOrEqual(400);
+  });
+});
+
+describe("source view", () => {
+  it("is a view per project, and closing the project forgets it", () => {
+    const a = project("A", withModule("a"));
+    const b = project("B", withModule("b"));
+    useProjectStore.getState().open(a);
+    useProjectStore.getState().open(b);
+    useProjectStore.getState().toggleSource(a.id);
+    expect(useProjectStore.getState().isSource(a.id)).toBe(true);
+    expect(useProjectStore.getState().isSource(b.id)).toBe(false);
+    useProjectStore.getState().toggleSource(a.id);
+    expect(useProjectStore.getState().isSource(a.id)).toBe(false);
+    useProjectStore.getState().toggleSource(a.id);
+    useProjectStore.getState().close(a.id);
+    expect(useProjectStore.getState().sourceIds).toEqual([]);
+  });
+
+  it("replaces the whole document from text, keeps where it lives, and the engine hears the patch", () => {
+    const a = { ...project("A", withModule("a")), slug: "a-slug" };
+    useProjectStore.getState().open(a);
+    const edited: ProjectDoc = {
+      ...a,
+      id: "someone-elses-id",
+      slug: undefined,
+      name: "A renamed",
+      tempo: 99,
+      patch: withModule("z"),
+    };
+    expect(useProjectStore.getState().replace(a.id, edited)).toBe(true);
+    const after = useProjectStore.getState().active();
+    // The id and the slug are the project's, not the text's: a pasted file cannot move a project.
+    expect(after?.id).toBe(a.id);
+    expect(after?.slug).toBe("a-slug");
+    expect(after?.name).toBe("A renamed");
+    expect(after?.tempo).toBe(99);
+    // The live patch is the new one, so the engine plays it, and the change counts as unsaved.
+    expect(usePatchStore.getState().doc.modules[0].id).toBe("z");
+    expect(useProjectStore.getState().isDirty(a.id)).toBe(true);
+    // An id that is not open is refused rather than invented.
+    expect(useProjectStore.getState().replace("nope", edited)).toBe(false);
   });
 });
