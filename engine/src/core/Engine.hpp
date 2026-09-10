@@ -11,6 +11,7 @@
 #include "core/Scheduler.hpp"
 #include "rt/RtAssert.hpp"
 #include "services/BlockSplitter.hpp"
+#include "services/Transport.hpp"
 
 namespace pg {
 
@@ -92,7 +93,17 @@ public:
   bool hasInstance(const std::string& node) const { return instances_.find(node) != nullptr; }
 
   void renderBlock(float* const* out, uint32_t channels, uint32_t numFrames, const TransportSnapshot& t) noexcept PG_RT_NONBLOCKING;
-  void renderInterleaved(float* out, uint32_t frames, uint32_t channels, const TransportSnapshot& t) noexcept PG_RT_NONBLOCKING;
+  /// The device's entry point. `frames` is whatever period the device runs at; the engine cuts it into
+  /// its own blocks and asks `clock` for a fresh snapshot before EACH of them, so a callback of 512
+  /// frames is eight blocks of advancing musical time and not one block's worth played eight times.
+  /// That was the bug that made every note source retrigger once per engine block: the clock was
+  /// advanced once per callback, and every block saw the same position. The offline renderer drives
+  /// this same function with its own `Transport`, so a render and the device are one path.
+  void renderInterleaved(float* out, uint32_t frames, uint32_t channels, Transport& clock) noexcept PG_RT_NONBLOCKING;
+  /// Blocks whose `samplePos` was not the previous block's plus its frames. Engine time free-runs and
+  /// never seeks, so anything but zero is a fault in whoever is driving the clock, and the command
+  /// loop says so on stderr the first time it sees one.
+  uint64_t clockDiscontinuities() const { return clockFaults_.load(std::memory_order_relaxed); }
 
 private:
   void reconcileParams();
@@ -125,7 +136,11 @@ private:
   BlockSplitter::BlockFn splitterFn_;              // built once in the constructor (no std::function on the audio thread)
   std::array<float, kMaxBlockSize> scratchL_{}, scratchR_{};
   uint32_t interleavedChannels_ = 2;
-  const TransportSnapshot* interleavedTransport_ = nullptr;
+  Transport* interleavedClock_ = nullptr;   // the device's, for the length of one renderInterleaved
+  std::atomic<uint64_t> clockFaults_{0};
+  uint64_t lastSamplePos_ = 0;   // audio thread only: the clock check in renderBlock
+  uint32_t lastFrames_ = 0;
+  bool haveLastBlock_ = false;
 };
 
 }  // namespace pg

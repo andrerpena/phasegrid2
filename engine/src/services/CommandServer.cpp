@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <cerrno>
 #include <chrono>
+#include <cstdio>
 #include <cstring>
 #include <utility>
 
@@ -171,11 +172,21 @@ void CommandServer::run(int timeoutMs) {
   using clock = std::chrono::steady_clock;
   auto nextPosition = clock::now();
   auto nextPreview = clock::now();
+  bool clockFaultReported = false;
   while (step(timeoutMs)) {
     const auto now = clock::now();
     if (now >= nextPosition) {
       nextPosition = now + std::chrono::milliseconds(50);   // about twenty times a second
       if (!tickTransport()) break;
+      // A clock fault is an engine error, said once. The application logs engine stderr as an error, and
+      // the end-to-end harness fails a scenario on any error it did not declare, so this line is what
+      // stops a clock bug shipping unheard a second time.
+      const uint64_t faults = ctx_.engine.clockDiscontinuities();
+      if (faults != 0 && !clockFaultReported) {
+        clockFaultReported = true;
+        std::fprintf(stderr, "transport clock discontinuity: %llu block(s) did not follow the previous one\n",
+                     static_cast<unsigned long long>(faults));
+      }
     }
     // The faces: every watched module's picture, redrawn when its values moved. Faster than the
     // transport because a face is watched the way a knob is, and slower than the display's frame

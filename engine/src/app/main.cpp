@@ -15,6 +15,7 @@
 #include "render/PatchFile.hpp"
 #include "services/BlockSplitter.hpp"
 #include "services/Catalog.hpp"
+#include "services/Capture.hpp"
 #include "services/CommandServer.hpp"
 #include "services/MiniaudioBackend.hpp"
 #include "services/Protocol.hpp"
@@ -27,7 +28,7 @@ static int usage() {
       "phasegrid-engine\n"
       "  --version\n"
       "  --tone [seconds]      play a 440 Hz test tone on the default device\n"
-      "  --render <patch.json> --out <file.wav> [--seconds N] [--sr N] [--block N]\n"
+      "  --render <patch.json> --out <file.wav> [--seconds N | --bars N] [--tempo BPM] [--period FRAMES] [--set m.p=v]\n"
       "  --catalog             print the module catalog as JSON\n"
       "  --socket <path> [--shm <name>] [--device <id|null>]\n"
       "                        open the audio device and take commands on a Unix socket;\n"
@@ -68,8 +69,17 @@ static int runTone(int seconds) {
   return 0;
 }
 
+static constexpr const char* kRenderUsage =
+    "usage: --render <patch.json> --out <file.wav> [--seconds N | --bars N] [--tempo BPM] [--period FRAMES]\n"
+    "                [--set module.param=value ...] [--sr N] [--block N]\n"
+    "  --bars     length in 4/4 bars at --tempo, instead of seconds\n"
+    "  --period   frames per call into the engine: the device callback size this render pretends to have.\n"
+    "             The sound must not depend on it; render at 512 to take exactly the path a device takes\n"
+    "  --set      a parameter override, applied after the patch loads; repeatable, for sweeps\n";
+
 static int runRender(int argc, char** argv) {
-  std::string patch, out; double seconds = 2.0, sr = 48000.0; uint32_t block = 64;
+  std::string patch, out; double seconds = 2.0, bars = 0.0, tempo = 120.0, sr = 48000.0; uint32_t block = 64, period = 0;
+  std::vector<std::pair<std::string, std::string>> sets;   // "module.param" -> "value"
   bool badArgs = false;
   for (int i = 2; i < argc; ++i) {
     const std::string a = argv[i];
@@ -78,18 +88,41 @@ static int runRender(int argc, char** argv) {
     auto hasValue = [&] { return i + 1 < argc && std::strncmp(argv[i + 1], "--", 2) != 0; };
     auto next = [&](double& v) { if (hasValue()) v = std::atof(argv[++i]); else badArgs = true; };
     if (a == "--seconds") next(seconds);
+    else if (a == "--bars") next(bars);
+    else if (a == "--tempo") next(tempo);
     else if (a == "--sr") next(sr);
     else if (a == "--block") { double b = 64; next(b); block = static_cast<uint32_t>(b); }
+    else if (a == "--period") { double p = 0; next(p); period = static_cast<uint32_t>(p); }
     else if (a == "--out") { if (hasValue()) out = argv[++i]; else badArgs = true; }
+    else if (a == "--set") {
+      if (!hasValue()) { badArgs = true; continue; }
+      const std::string kv = argv[++i];
+      const size_t eq = kv.find('=');
+      if (eq == std::string::npos || kv.find('.') == std::string::npos || kv.find('.') > eq) { badArgs = true; continue; }
+      sets.emplace_back(kv.substr(0, eq), kv.substr(eq + 1));
+    }
     else if (patch.empty()) patch = a;
   }
-  if (badArgs || patch.empty() || out.empty()) { std::fprintf(stderr, "usage: --render <patch.json> --out <file.wav> [--seconds N] [--sr N] [--block N]\n"); return 2; }
+  if (badArgs || patch.empty() || out.empty()) { std::fputs(kRenderUsage, stderr); return 2; }
+  if (bars > 0.0) seconds = bars * 4.0 * 60.0 / tempo;
   pg::Registry reg;
   pg::registerBuiltinModules(reg);
   pg::Engine engine{reg, pg::EngineConfig{sr, block}};
   if (pg::Result r = pg::loadPatchFile(patch, reg, engine.model()); !r) { std::fprintf(stderr, "%s: %s\n", r.code.c_str(), r.message.c_str()); return 1; }
+  for (const auto& [target, value] : sets) {
+    const size_t dot = target.find('.');
+    if (pg::Result r = engine.model().setParam(reg, target.substr(0, dot), target.substr(dot + 1), static_cast<float>(std::atof(value.c_str()))); !r) {
+      std::fprintf(stderr, "--set %s: %s: %s\n", target.c_str(), r.code.c_str(), r.message.c_str());
+      return 1;
+    }
+  }
   if (pg::Result r = engine.commit(); !r) { std::fprintf(stderr, "%s: %s\n", r.code.c_str(), r.message.c_str()); return 1; }
-  const std::vector<float> data = pg::renderInterleaved(engine, pg::RenderOptions{seconds, 2});
+  pg::RenderOptions options;
+  options.seconds = seconds;
+  options.channels = 2;
+  options.transport.tempo = tempo;
+  options.period = period;
+  const std::vector<float> data = pg::renderInterleaved(engine, options);
   std::string err;
   if (!pg::writeWav(out, data, 2, sr, err)) { std::fprintf(stderr, "%s\n", err.c_str()); return 1; }
   std::printf("rendered %zu frames to %s\n", data.size() / 2, out.c_str());
@@ -119,6 +152,7 @@ public:
   std::string currentId() const override { return config_.deviceId; }
   double sampleRate() const override { return backend_.sampleRate(); }
   uint32_t channels() const override { return backend_.channels(); }
+  uint32_t periodFrames() const override { return backend_.periodFrames(); }
 
   pg::Result select(const std::string& id) override {
     if (id == config_.deviceId) return {};
@@ -173,15 +207,19 @@ static int runSocket(const std::string& path, const std::string& shmName, const 
   // device negotiated; the callback cannot be written after the device is open, because `open` takes it.
   // So the callback reads the engine through a pointer that is null for the first few milliseconds.
   std::atomic<pg::Engine*> live{nullptr};
+  pg::Capture capture;   // the device's output, recorded on request: what a listener actually gets
   pg::MiniaudioBackend backend{choice.kind};
-  pg::RenderFn render = [&live, &transport](float* out, uint32_t frames, uint32_t channels) {
-    const pg::TransportSnapshot moment = transport.advance(frames);
+  // The transport is handed to the engine, not advanced here: the engine cuts the callback into its
+  // own blocks and ticks the clock once per block. Advancing it once per callback, as this once did,
+  // gave every block of a callback the same musical position, and every note source retriggered.
+  pg::RenderFn render = [&live, &transport, &capture](float* out, uint32_t frames, uint32_t channels) {
     pg::Engine* engine = live.load(std::memory_order_acquire);
     if (engine == nullptr) {
       std::memset(out, 0, static_cast<size_t>(frames) * channels * sizeof(float));
       return;
     }
-    engine->renderInterleaved(out, frames, channels, moment);
+    engine->renderInterleaved(out, frames, channels, transport);
+    capture.push(out, frames, channels);   // after the engine: exactly the buffer the device plays
   };
 
   pg::DeviceConfig config;
@@ -216,7 +254,8 @@ static int runSocket(const std::string& path, const std::string& shmName, const 
                           .transport = transport,
                           .device = &host,
                           .telemetry = telemetry.valid() ? &telemetry : nullptr,
-                          .previews = previews ? &*previews : nullptr};
+                          .previews = previews ? &*previews : nullptr,
+                          .capture = &capture};
   pg::CommandServer server{ctx};
   if (pg::Result r = server.listen(path); !r) {
     std::fprintf(stderr, "%s: %s\n", r.code.c_str(), r.message.c_str());
@@ -234,7 +273,8 @@ static int runSocket(const std::string& path, const std::string& shmName, const 
   server.push("engine.ready", nlohmann::json{{"engineVersion", pg::engineVersion()},
                                              {"sampleRate", backend.sampleRate()},
                                              {"channels", backend.channels()},
-                                             {"blockSize", engine.config().blockSize}});
+                                             {"blockSize", engine.config().blockSize},
+                                             {"periodFrames", backend.periodFrames()}});
   server.flushEvents();
   server.run();
 

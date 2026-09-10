@@ -65,7 +65,7 @@ void Scheduler::run(Program& p, uint32_t numFrames, const TransportSnapshot& t, 
       runSegment(p, seg, numFrames, pass, t, bus, telemetry);
       first = false;
     }
-    activity.settle();
+    activity.settle(numFrames);
   }
 }
 

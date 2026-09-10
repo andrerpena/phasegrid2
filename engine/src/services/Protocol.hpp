@@ -37,6 +37,7 @@ public:
   virtual std::string currentId() const = 0;
   virtual double sampleRate() const = 0;
   virtual uint32_t channels() const = 0;
+  virtual uint32_t periodFrames() const = 0;
   /// Reopens the device. Message thread: the audio thread is stopped for the duration.
   virtual Result select(const std::string& id) = 0;
 };
@@ -53,6 +54,8 @@ struct ProtocolContext {
   /// Publishes watched modules' pictures, when there is a segment to publish into. Ticked by the
   /// command loop; handlers only hand out its slots.
   PreviewPublisher* previews = nullptr;
+  /// Records the device's actual output on request; null in a process with no device callback.
+  class Capture* capture = nullptr;
   /// Filled by handlers, drained by the caller after each dispatch.
   std::vector<ProtocolEvent> events;
   /// Set by `engine.shutdown`. The caller answers first, then closes.

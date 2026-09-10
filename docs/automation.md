@@ -57,8 +57,29 @@ is. `pg.help()` lists them.
   showing: `confirmUnsaved` takes `"save" | "discard" | "cancel"`, `confirmDelete` a boolean,
   `chooseWorkspace` a path (which must exist) or null. Consumed once.
 - **`engine.call(cmd, args)`** — the protocol, raw. **`engine.render({seconds, out}?)`** — the loaded
-  patch rendered offline by a second engine and measured: `rms` and `peak` per channel, `frames`,
-  and a WAV at `out` when given. The engine that is playing is untouched.
+  patch rendered offline by a second engine and measured: `rms`, `peak` and `maxStep` per channel,
+  `frames`, and a WAV at `out` when given. The engine that is playing is untouched.
+  `maxStep` is the largest jump from one sample to the next, and it is how a script hears a click: a
+  wave's own slope bounds it, so a sine at middle C steps by hundredths and anything near full scale is
+  a discontinuity. `rms` and `peak` cannot tell — a signal made of clicks has ordinary values for both.
+  `crest` is peak over RMS, the wave's shape rather than its loudness: 1.41 a sine, 1.73 a sawtooth, 1 a
+  square. It is how a script hears *distortion*, which has an ordinary level and no discontinuity at all;
+  read it on a single voice, since a chord has no one shape. Waveform assertions proper live in the
+  engine tests, where the note being played is known: see `engine/tests/test_osc_purity.cpp`.
+  The render runs under the engine's own transport — its tempo, meter and scale — so it is the
+  performance the instrument is giving, not the same patch at some other speed, and it takes the same
+  code path as the device callback, ticking the clock once per engine block.
+- **`engine.call("audio.capture.start", { path })`** / **`"audio.capture.stop"`** — record what the
+  device is actually handed, to a WAV, until stopped; stop answers `frames` and `droppedFrames`. This is
+  the live output, not a render: the `live-capture` scenario records the null device while a pattern
+  plays and measures the file. **`engine.call("engine.stats", {})`** — `clockDiscontinuities` (must be
+  0 after playing), `blockSize`, `periodFrames` (the callback size the device granted).
+- Measuring, outside the app: `npm run audio:measure -- a.wav [b.wav]` prints level, continuity
+  (`maxStep`) and shape (crest, harmonics, THD) for one file or two side by side; `npm run
+  render:example -- <moduleId> [--bars 2] [--set m.p=v] [--period 512]` renders a built-in example and
+  measures it; `npm run compare:reference [-- module[/case]]` renders every case under
+  `fixtures/reference/` and prints its features against the reference instrument's recording. The
+  engine's `--render` takes `--tempo`, `--bars`, `--period` and repeatable `--set module.param=value`.
 - **`log.tail(n)`**, **`log.clear()`** — what the engine and the application have said. The same
   lines go to the console, so a debugger's console tap sees engine output.
 

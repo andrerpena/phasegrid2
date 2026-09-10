@@ -39,6 +39,7 @@ const cases: Record<CommandName, { valid: unknown; invalid: unknown }> = {
     invalid: { protocolVersion: "1" },
   },
   "engine.ping": { valid: {}, invalid: 42 },
+  "engine.stats": { valid: {}, invalid: 7 },
   "engine.shutdown": { valid: {}, invalid: "now" },
   "catalog.get": { valid: {}, invalid: null },
   "telemetry.subscribe": {
@@ -102,6 +103,11 @@ const cases: Record<CommandName, { valid: unknown; invalid: unknown }> = {
   "transport.seek": { valid: { ppq: 16 }, invalid: { ppq: -1 } },
   "audio.setOutputGain": { valid: { gain: 0 }, invalid: { gain: 4 } },
   "audio.setRunning": { valid: { running: false }, invalid: { running: "no" } },
+  "audio.capture.start": {
+    valid: { path: "/tmp/live.wav" },
+    invalid: { path: 3 },
+  },
+  "audio.capture.stop": { valid: {}, invalid: "now" },
   "device.list": { valid: {}, invalid: "all" },
   "device.select": { valid: { id: "" }, invalid: { id: 3 } },
 };
@@ -111,6 +117,7 @@ describe("command table", () => {
     expect(COMMAND_NAMES).toEqual([
       "hello",
       "engine.ping",
+      "engine.stats",
       "engine.shutdown",
       "catalog.get",
       "telemetry.subscribe",
@@ -135,6 +142,8 @@ describe("command table", () => {
       "transport.seek",
       "audio.setOutputGain",
       "audio.setRunning",
+      "audio.capture.start",
+      "audio.capture.stop",
       "device.list",
       "device.select",
     ]);

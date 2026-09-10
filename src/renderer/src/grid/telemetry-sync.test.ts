@@ -394,21 +394,21 @@ describe("telemetry sync", () => {
   it("turns a published value into a knob position, every frame", async () => {
     const sync = startTelemetrySync(target, schedule);
     await flush();
-    // Fold runs 0..48 semitones; the engine says it is at 12 right now. Slot 1 is the sine's params.
+    // Fold runs 0..36 semitones; the engine says it is at 12 right now. Slot 1 is the sine's params.
     readings.set(1, {
       kind: TelemetryKind.Params,
       blockIndex: 1n,
       values: [12],
     });
     tick?.();
-    expect(live).toEqual([["osc", "fold", 0.25]]);
+    expect(live).toEqual([["osc", "fold", 12 / 36]]);
     readings.set(1, {
       kind: TelemetryKind.Params,
       blockIndex: 2n,
       values: [24],
     });
     tick?.();
-    expect(live.at(-1)).toEqual(["osc", "fold", 0.5]);
+    expect(live.at(-1)).toEqual(["osc", "fold", 24 / 36]);
     sync.stop();
   });
 
@@ -470,7 +470,7 @@ describe("telemetry sync", () => {
       values: [12],
     });
     tick?.();
-    expect(live).toEqual([["osc", "fold", 0.25]]);
+    expect(live).toEqual([["osc", "fold", 12 / 36]]);
 
     useEngineStore.setState({ running: false });
     expect(live.at(-1)).toEqual(["osc", "fold", null]);

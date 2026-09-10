@@ -1,8 +1,10 @@
 #include "core/GraphCompiler.hpp"
 #include <algorithm>
+#include <cmath>
 #include <functional>
 #include <map>
 #include <set>
+#include "core/Voices.hpp"
 
 namespace pg {
 namespace {
@@ -196,7 +198,10 @@ CompileOutput compileGraph(const GraphModel& model, const Registry& registry, In
     for (uint32_t k = 0; k < d.numInputs; ++k)
       if (d.inputs[k].kind == PortKind::Continuous) s.inBuf[k] = kSilentBuffer; else s.inEvt[k] = kEmptyEvents;
   }
-  for (Instrument& inst : instruments) inst.activity = instances.acquireActivity(nodes[inst.entryNode]->id, inst.voices);
+  for (Instrument& inst : instruments) {
+    inst.activity = instances.acquireActivity(nodes[inst.entryNode]->id, inst.voices);
+    inst.activity->setFadeSamples(static_cast<uint32_t>(std::lround(kVoiceFadeSeconds * sampleRate)));
+  }
   p->instruments = instruments;   // a copy: `pairsOf` and `voicesOf` still read the local list below
 
   // 5. Feedback states and read buffers per back edge, then per-group emission.

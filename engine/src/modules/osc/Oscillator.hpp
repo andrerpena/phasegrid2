@@ -127,10 +127,23 @@ void render(ProcessContext& c, OscillatorState& state, MakeShape&& makeShape, Sy
   Sample* out = c.out(0).data;
   const double sampleRate = c.sampleRate;
 
+  // Inside an instrument a lane carries a voice only while the pool says so. A lane whose voice is free
+  // is held at the start of its cycle rather than left to run on unheard, so that when a note does take
+  // that voice the wave begins where a fresh one would. Without this a voice taken back inside a pair
+  // that never went quiet -- which is what full legato does -- opens in the middle of a cycle, and a
+  // wave that starts mid-cycle is a step, which is a click. A global module has no pool and no free
+  // lanes: its upper lanes mirror its lower ones and must keep running.
+  const bool voiced = c.activity != nullptr;
+
   for (uint32_t i = 0; i < c.numFrames; ++i) {
     float lanesOut[kLanes];
     for (uint32_t k = 0; k < kLanes; ++k) {
       Lane& l = state.lane[k];
+      if (voiced && c.voiceMask[k] == 0) {
+        l = Lane{};
+        lanesOut[k] = 0.f;
+        continue;
+      }
       const auto shape = makeShape(i, k);
       // The first two outputs are the ones the delay has nothing real to hold yet. Seeding them with
       // the wave at its start is what the sawtooth did with a literal -1; asking the shape is the same

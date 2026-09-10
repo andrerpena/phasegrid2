@@ -35,9 +35,30 @@ export default {
     const quieter = await pg("engine.render({ seconds: 0.5 })");
     check("turning the output down is measurable", quieter.rms[0] < sound.rms[0] * 0.6, `${sound.rms[0]} -> ${quieter.rms[0]}`);
 
+    // ── The shape of the wave, not just its level ──
+    // A distorted or flattened wave has an ordinary RMS, an ordinary peak and no discontinuity at all,
+    // so every check above passes on one. The crest factor, peak over RMS, is what moves: 1.73 for a
+    // sawtooth, 1.41 for a sine. This is the end-to-end guard for the Sine that shipped as a
+    // soft-clipper and measured 1.24 for three rounds while every test was green.
+    check(
+      "the sawtooth has a sawtooth's shape",
+      Math.abs(quieter.crest[0] - Math.sqrt(3)) < 0.08,
+      `crest ${quieter.crest[0]}`,
+    );
+    // A sine into the other channel, so one render measures both: left is the saw, right the sine.
+    await pg('patch.addModule("osc.sine", { id: "sine", x: 48, y: 240 })');
+    await pg('patch.connect({ module: "sine", port: "out" }, { module: "out", port: "inR" })');
+    await idle();
+    const shapes = await pg("engine.render({ seconds: 0.5 })");
+    check(
+      "and a sine at Fold 0 has a sine's shape",
+      Math.abs(shapes.crest[1] - Math.SQRT2) < 0.03,
+      `crest ${shapes.crest[1]}`,
+    );
+
     // A picture of what was built, for anyone reading the run.
     const nodes = await pg("grid.nodes()");
-    check("both modules are drawn", nodes.length === 2 && nodes.every((n) => n.rect.width > 0), JSON.stringify(nodes));
+    check("every module is drawn", nodes.length === 3 && nodes.every((n) => n.rect.width > 0), JSON.stringify(nodes));
     await screenshot("build-a-patch");
 
     // A WAV on request, for analysis beyond RMS.

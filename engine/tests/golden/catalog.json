@@ -1,5 +1,5 @@
 {
-  "catalogHash": "9711c9c8689a1ae6",
+  "catalogHash": "4e0b14976cd4bbd0",
   "conventions": {
     "blockSize": 128,
     "gateThreshold": 0,
@@ -6027,7 +6027,7 @@
     },
     {
       "category": "Oscillators",
-      "doc": "A sine with a wavefolder. Turning Fold up drives the wave through a sine curve, which folds it back on itself in round lobes and fills the spectrum with odd harmonics. Fold is in semitones, so every twelve doubles the drive: at twelve, two lobes meet at the centre. The face shows the resulting shape.",
+      "doc": "A sine with a wavefolder. Turning Fold up drives the wave through a sine curve, which folds it back on itself in round lobes and fills the spectrum with odd harmonics. At Fold 0 there is no folding and the wave is a plain sine. Fold is in semitones, so every twelve doubles how far the wave is driven: at twelve, two lobes meet at the centre. The face shows the resulting shape.",
       "face": [
         [
           "reset",
@@ -6132,7 +6132,7 @@
             "structural": false
           },
           "id": "fold",
-          "max": 48.0,
+          "max": 36.0,
           "min": 0.0,
           "name": "Fold",
           "uiWidget": "knob",

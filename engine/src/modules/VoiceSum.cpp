@@ -40,9 +40,10 @@ public:
     Sample* out = c.out(0).data;
     if (c.firstPass) std::fill_n(scratch_.data(), c.numFrames, Sample(0.f));
     const bool holds = lanes::lane(c.param(0).at(0), 0) > 0.5f;
+    VoiceGain gain(c.activity, c.voice, c.voiceMask, c.numFrames);
     float peak[2] = {0.f, 0.f};
     for (uint32_t i = 0; i < c.numFrames; ++i) {
-      const Sample masked = in[i] & c.voiceMask;
+      const Sample masked = in[i] * gain.next();
       scratch_[i] += masked;
       peak[0] = std::max(peak[0], std::max(std::fabs(masked[0]), std::fabs(masked[1])));
       peak[1] = std::max(peak[1], std::max(std::fabs(masked[2]), std::fabs(masked[3])));

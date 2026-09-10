@@ -75,6 +75,7 @@ public:
   std::string currentId() const override { return current_; }
   double sampleRate() const override { return 48000.0; }
   uint32_t channels() const override { return 2; }
+  uint32_t periodFrames() const override { return 128; }
   pg::Result select(const std::string& id) override {
     if (!id.empty() && id != "dev-a" && id != "dev-b") return pg::Result::fail("E_NOT_FOUND", "no device " + id);
     current_ = id;

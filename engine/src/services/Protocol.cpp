@@ -1,4 +1,5 @@
 #include "services/Protocol.hpp"
+#include "services/Capture.hpp"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -291,6 +292,9 @@ json helloJson(ProtocolContext& ctx) {
   // Pictures are published by a service the segment alone does not imply; say so separately, so a
   // client on a newer protocol never assumes them from an engine that predates them.
   if (ctx.previews != nullptr) capabilities.push_back("previews");
+  // The live output can be recorded. What a script measures then is the audio the user hears, not a
+  // re-render of the same patch, which is the difference that took four rounds to notice.
+  if (ctx.capture != nullptr) capabilities.push_back("capture");
   // Still no "midi": that command has no handler, and a capability for a command the engine cannot
   // answer is worse than no capability at all.
   json result;
@@ -298,6 +302,9 @@ json helloJson(ProtocolContext& ctx) {
   result["engineVersion"] = engineVersion();
   result["catalogHash"] = catalog["catalogHash"];
   result["conventions"] = catalog["conventions"];
+  // How the device is actually running: the period it granted is how many engine blocks a callback is.
+  result["blockSize"] = ctx.engine.config().blockSize;
+  result["periodFrames"] = ctx.device != nullptr ? ctx.device->periodFrames() : 0u;
   // The segment, when there is one. A client needs the name and the size to map it, and the layout
   // version to refuse a segment it does not know how to read.
   if (ctx.telemetry != nullptr && ctx.telemetry->valid())
@@ -326,6 +333,13 @@ json dispatchCommand(const std::string& cmd, const json& id, const json& args, P
     return okResponse(id, helloJson(ctx));
   }
   if (cmd == "engine.ping") return okResponse(id, json{{"pong", true}, {"revision", ctx.engine.revision()}});
+  // The engine's account of itself: the clock faults it has counted, and the shape of the callbacks it is
+  // fed. A script asserts `clockDiscontinuities === 0` after playing; anything else is a driving fault.
+  if (cmd == "engine.stats")
+    return okResponse(id, json{{"clockDiscontinuities", ctx.engine.clockDiscontinuities()},
+                               {"blockSize", ctx.engine.config().blockSize},
+                               {"sampleRate", ctx.engine.config().sampleRate},
+                               {"periodFrames", ctx.device != nullptr ? ctx.device->periodFrames() : 0u}});
   if (cmd == "engine.shutdown") {
     ctx.shutdownRequested = true;   // answered first, then the caller closes: a clean exit, not a crash
     return okResponse(id, json::object());
@@ -432,21 +446,37 @@ json dispatchCommand(const std::string& cmd, const json& id, const json& args, P
     if (Result r = loadPatchJson(savePatchJson(ctx.engine.model()), ctx.registry, offline.model()); !r) return errorResponse(id, r);
     if (Result r = offline.commit(); !r) return errorResponse(id, r);
     constexpr uint32_t kChannels = 2;
-    const std::vector<float> data = renderInterleaved(offline, RenderOptions{seconds, kChannels});
+    // The engine's own transport, so the render is the performance the instrument is actually giving:
+    // its tempo, its meter, its scale. Only the clocks are the renderer's, since it starts from zero.
+    RenderOptions options{seconds, kChannels, ctx.transport.state()};
+    const std::vector<float> data = renderInterleaved(offline, options);
     double sumSquares[kChannels] = {0.0, 0.0};
     float peak[kChannels] = {0.0f, 0.0f};
+    // The largest step from one sample to the next. A wave's own slope bounds it -- a sine at 260 Hz
+    // moves by hundredths -- so anything larger is a discontinuity, which is what a click is. RMS and
+    // peak cannot see one: a signal made entirely of clicks has perfectly ordinary values for both.
+    float maxStep[kChannels] = {0.0f, 0.0f};
     const size_t frames = data.size() / kChannels;
     for (size_t i = 0; i < frames; ++i)
       for (uint32_t c = 0; c < kChannels; ++c) {
         const float v = data[i * kChannels + c];
         sumSquares[c] += static_cast<double>(v) * v;
         peak[c] = std::max(peak[c], std::fabs(v));
+        if (i > 0) maxStep[c] = std::max(maxStep[c], std::fabs(v - data[(i - 1) * kChannels + c]));
       }
     json rms = json::array();
     json peaks = json::array();
+    json steps = json::array();
+    json crests = json::array();
     for (uint32_t c = 0; c < kChannels; ++c) {
-      rms.push_back(frames == 0 ? 0.0 : std::sqrt(sumSquares[c] / static_cast<double>(frames)));
+      const double r = frames == 0 ? 0.0 : std::sqrt(sumSquares[c] / static_cast<double>(frames));
+      rms.push_back(r);
       peaks.push_back(peak[c]);
+      steps.push_back(maxStep[c]);
+      // Peak over RMS: the shape of the wave, independent of how loud it is. A sine is 1.41, a sawtooth
+      // 1.73, a square 1. It is the cheapest way to ask whether a wave is the shape it claims to be, and
+      // it is what first showed that this instrument's sine was flat-topped: it measured 1.24.
+      crests.push_back(r > 0.0 ? static_cast<double>(peak[c]) / r : 0.0);
     }
     if (!out.empty()) {
       std::string error;
@@ -458,6 +488,8 @@ json dispatchCommand(const std::string& cmd, const json& id, const json& args, P
                                 {"frames", frames},
                                 {"rms", std::move(rms)},
                                 {"peak", std::move(peaks)},
+                                {"maxStep", std::move(steps)},
+                                {"crest", std::move(crests)},
                                 {"out", out.empty() ? json(nullptr) : json(out)}});
   }
   if (cmd == "patch.batch") {
@@ -549,6 +581,20 @@ json dispatchCommand(const std::string& cmd, const json& id, const json& args, P
       return errorResponse(id, "E_SCHEMA", "running must be a boolean");
     ctx.engine.setRunning(args["running"].get<bool>());
     return okResponse(id, json{{"running", ctx.engine.running()}});
+  }
+  if (cmd == "audio.capture.start" || cmd == "audio.capture.stop") {
+    if (ctx.capture == nullptr || ctx.device == nullptr)
+      return errorResponse(id, "E_UNSUPPORTED", "this engine process has no device output to capture");
+    if (cmd == "audio.capture.stop") {
+      const Capture::Summary s = ctx.capture->stop();
+      return okResponse(id, json{{"path", s.path}, {"frames", s.frames}, {"droppedFrames", s.droppedFrames}});
+    }
+    ArgReader a(args);
+    const std::string path = a.str("path");
+    if (!a) return errorResponse(id, a.result());
+    if (path.empty()) return errorResponse(id, "E_SCHEMA", "path must not be empty");
+    if (Result r = ctx.capture->start(path, ctx.device->sampleRate(), ctx.device->channels()); !r) return errorResponse(id, r);
+    return okResponse(id, json{{"path", path}});
   }
   if (cmd == "transport.stop") { ctx.transport.stop(); return okResponse(id, positionJson(ctx.transport)); }
   if (cmd == "transport.setTempo") {

@@ -56,6 +56,9 @@ export const HelloResultSchema = z.object({
   shm: ShmInfoSchema,
   /** Optional features this build has. Absence is the answer to "can it?", never an error. */
   capabilities: z.array(z.string()),
+  /** The engine's block, and the callback size the device actually granted: how many blocks a callback is. */
+  blockSize: z.number().int().positive().optional(),
+  periodFrames: z.number().int().nonnegative().optional(),
 });
 
 /**
@@ -114,6 +117,22 @@ export const COMMANDS = {
       revision: z.number().int().nonnegative(),
     }),
   },
+  /**
+   * The engine's account of itself. `clockDiscontinuities` counts blocks whose engine time did not
+   * follow the previous block's: engine time never seeks, so anything but zero means whoever drives the
+   * clock handed two blocks the same position, and every note source replayed time. That was a live-only
+   * bug for months; a script asserting zero after playing is what keeps it from being one again.
+   * `periodFrames` is the callback size the device granted, i.e. how many engine blocks a callback is.
+   */
+  "engine.stats": {
+    args: NoArgs,
+    result: z.object({
+      clockDiscontinuities: z.number().int().nonnegative(),
+      blockSize: z.number().int().positive(),
+      sampleRate: z.number().positive(),
+      periodFrames: z.number().int().nonnegative(),
+    }),
+  },
   /** Answered before the socket closes, so a deliberate shutdown is distinguishable from a crash. */
   "engine.shutdown": { args: NoArgs, result: z.object({}) },
 
@@ -162,9 +181,22 @@ export const COMMANDS = {
   },
   "patch.clear": { args: NoArgs, result: RevisionResultSchema },
   /**
-   * The loaded patch, rendered offline and measured: RMS and peak per channel, and a WAV at `out`
-   * when a path is given. A second engine is built from the model, so the one playing is untouched.
-   * It is how a script finds out whether what it built makes a sound.
+   * The loaded patch, rendered offline and measured: RMS, peak and the largest sample-to-sample step
+   * per channel, and a WAV at `out` when a path is given. A second engine is built from the model, so
+   * the one playing is untouched. It is how a script finds out whether what it built makes a sound.
+   *
+   * `maxStep` is how a script finds out whether it makes a *clean* sound. A wave's own slope bounds it,
+   * so a step near full scale is a discontinuity -- a voice cut off mid-cycle, an oscillator starting
+   * mid-wave -- which is heard as a click. Neither RMS nor peak can see one.
+   *
+   * `crest` is peak over RMS, the shape of the wave rather than its loudness: 1.41 for a sine, 1.73 for
+   * a sawtooth, 1 for a square. It is how a script finds out whether the sound is the *right* sound. A
+   * flattened or distorted wave has an ordinary peak, an ordinary RMS and no discontinuity at all, and
+   * this is the number that moves. A patch playing more than one note at once has no single shape, so
+   * read it on one voice.
+   *
+   * The render is performed under the engine's own transport -- its tempo, meter and scale -- so it is
+   * the performance the instrument is giving rather than the same patch at some other speed.
    */
   "patch.render": {
     args: z.object({
@@ -178,6 +210,8 @@ export const COMMANDS = {
       frames: z.number().int().nonnegative(),
       rms: z.array(z.number().nonnegative()),
       peak: z.array(z.number().nonnegative()),
+      maxStep: z.array(z.number().nonnegative()),
+      crest: z.array(z.number().nonnegative()),
       out: z.string().nullable(),
     }),
   },
@@ -301,6 +335,25 @@ export const COMMANDS = {
     args: z.object({ running: z.boolean() }),
     result: z.object({ running: z.boolean() }),
   },
+  /**
+   * Records the device's actual output to a WAV until stopped: the buffer the device is handed, copied
+   * on the audio thread into a ring and written by a thread of its own, so what a script measures is
+   * the audio the user hears and not an offline render of the same patch. Only an engine with a device
+   * callback answers (`hello` lists "capture"); `stop` says how many frames were written and how many
+   * the ring had to drop, which should be none.
+   */
+  "audio.capture.start": {
+    args: z.object({ path: z.string().min(1) }),
+    result: z.object({ path: z.string() }),
+  },
+  "audio.capture.stop": {
+    args: NoArgs,
+    result: z.object({
+      path: z.string(),
+      frames: z.number().int().nonnegative(),
+      droppedFrames: z.number().int().nonnegative(),
+    }),
+  },
 
   "device.list": { args: NoArgs, result: DeviceListResultSchema },
   /** Empty id selects the system default. Reopens the device, so the audio stream stops and restarts. */
@@ -347,6 +400,7 @@ export const EVENTS = {
     sampleRate: z.number().positive(),
     channels: z.number().int().positive(),
     blockSize: z.number().int().positive(),
+    periodFrames: z.number().int().nonnegative().optional(),
   }),
   "engine.error": z.object({ code: z.string(), message: z.string() }),
   "engine.log": z.object({

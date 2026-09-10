@@ -9,7 +9,10 @@ Spec: docs/superpowers/specs/2026-09-07-phasegrid2-architecture-design.md. Engin
 - `npm test` — vitest unit project
 - `npx electron-vite build && node scripts/e2e.mjs` — drives the built app over CDP through the workspace, the dock, the settings editor and the canvas. `PG_E2E_SHOTS=<dir>` writes screenshots there.
 - `npm run engine:build` / `npm run engine:test` — CMake build and Catch2 tests; REQUIRED after any C++ change
-- `npm run engine:render -- patch.json --seconds 2 --out out.wav` — headless render
+- `npm run engine:render -- patch.json --out out.wav [--bars 2] [--tempo 120] [--period 512] [--set osc.fold=12]` — headless render, same code path as the device callback; `--period` is the callback size to pretend
+- `npm run render:example -- osc.sine [--bars 2] [--set ...]` — render a built-in example to a WAV and measure it
+- `npm run audio:measure -- ours.wav [reference.wav]` — level, continuity (maxStep) and shape (crest, harmonics, THD); two files side by side
+- `npm run compare:reference [-- module/case]` — render each `fixtures/reference/<module>/<case>` and compare with the reference instrument's recording
 
 ## Testing a change (for an agent)
 - Unit: `npm test`. Engine: `npm run engine:test`. Always, after the relevant change.

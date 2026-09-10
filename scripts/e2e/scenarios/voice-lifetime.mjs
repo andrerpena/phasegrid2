@@ -1,11 +1,16 @@
 import { projectDoc, seedProject } from "../harness.mjs";
 
 /**
- * When a released voice ends. The patch that found the bug: single notes into a converter, a sine that
- * never goes quiet on its own, and the output. With nothing to hold a voice past its note it plays one
- * voice, note after note, and the output never rises above one sine. The same patch with the output
- * asked to affect voice lifetime keeps every released voice alive for as long as it hears it -- which,
- * for a sine, is forever -- so the notes pile up: the drone, but chosen.
+ * When a released voice ends, and how it ends. The patch that found both: single notes into a converter,
+ * a sine that never goes quiet on its own, and the output. With nothing to hold a voice past its note it
+ * plays one voice, note after note, and the output never rises above one sine. The same patch with the
+ * output asked to affect voice lifetime keeps every released voice alive for as long as it hears it --
+ * which, for a sine, is forever -- so the notes pile up: the drone, but chosen.
+ *
+ * The level checks alone would pass on a signal made entirely of clicks, which is exactly what this
+ * patch used to be: every note began on a step to the bottom of the wave and ended on a step to zero.
+ * `maxStep` is what hears that. A sine at these pitches moves by hundredths from one sample to the next,
+ * so anything approaching full scale is a discontinuity rather than a wave.
  */
 const sinePatch = (outParams) => ({
   schemaVersion: 1,
@@ -75,6 +80,11 @@ export default {
     check(
       "and never louder than one sine: each released voice ended with its note",
       run.peak[0] < 1.05,
+      JSON.stringify(run),
+    );
+    check(
+      "and no note begins or ends on a step: the voices ramp in and out",
+      run.maxStep[0] < 0.1,
       JSON.stringify(run),
     );
 

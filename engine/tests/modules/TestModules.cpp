@@ -66,13 +66,14 @@ class Impulse : public VoicedModule<ImpulseState> {
 const ModuleDescriptor kImpulse{kModuleAbiVersion, "test.impulse", "Impulse", "test", "", nullptr, 0, kImpulseOut, 1, nullptr, 0, 0, 0, [] () -> Module* { return new Impulse(); }, nullptr, 0};
 
 const PortDesc kSinkIn[] = {{"in", "In", PortKind::Continuous, 1, SignalRole::Audio, ""}};
-/// An exit that only folds: it never holds a voice, so a released voice is free at the end of its block.
+/// An exit that only folds: it never holds a voice, so a released voice fades out and is free.
 class Sink : public VoicedModule<int> {
   void process(ProcessContext& c) override {
     const Sample* in = c.in(0).readOr();
+    VoiceGain gain(c.activity, c.voice, c.voiceMask, c.numFrames);
     for (uint32_t i = 0; i < c.numFrames; ++i) {
-      // A terminal masks its own contribution: the fold in Engine::renderBlock sees every pair at once.
-      const Sample masked = in[i] & c.voiceMask;
+      // A terminal applies its own voice gain: the fold in Engine::renderBlock sees every pair at once.
+      const Sample masked = in[i] * gain.next();
       if (c.outputBus) c.outputBus->data[i] += masked;
     }
   }

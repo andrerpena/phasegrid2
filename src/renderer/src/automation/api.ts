@@ -213,9 +213,13 @@ export function createAutomationApi() {
       call: <C extends CommandName>(cmd: C, args: CommandArgs<C>) =>
         useEngineStore.getState().call(cmd, args) as Promise<CommandResult<C>>,
       /**
-       * Renders the loaded patch offline and measures it: RMS and peak per channel, and a WAV at
-       * `out` when given. The engine that is playing is untouched. How a script checks that what
-       * it built makes a sound.
+       * Renders the loaded patch offline and measures it: RMS, peak and the largest sample-to-sample
+       * step per channel, and a WAV at `out` when given. The engine that is playing is untouched.
+       *
+       * How a script checks that what it built makes a sound; with `maxStep`, that it makes a clean one
+       * (a large step is a discontinuity, which is a click); and with `crest`, peak over RMS, that it is
+       * the right sound (1.41 a sine, 1.73 a sawtooth, 1 a square). The render uses the engine's own
+       * transport, so it is the performance the instrument is giving.
        */
       render: (options: { seconds?: number; out?: string } = {}) =>
         useEngineStore.getState().call("patch.render", options),
@@ -244,7 +248,7 @@ const HELP = [
   "pg.workspace.openAt(root) / .openProject(slug) / .save() / .saveAs(name) / .closeProject(id?) / .copyExample(moduleId)",
   "pg.dialogs.answer(kind, answer)       the next native dialog of that kind answers this: confirmUnsaved save|discard|cancel, confirmDelete true|false, chooseWorkspace path|null",
   "pg.engine.call(cmd, args)             the protocol, raw",
-  "pg.engine.render({seconds, out}?)     the loaded patch rendered offline: rms and peak per channel, a WAV at out",
+  "pg.engine.render({seconds, out}?)     the loaded patch rendered offline: rms, peak, maxStep and crest per channel, a WAV at out",
   "pg.log.tail(n) / .clear()",
 ];
 

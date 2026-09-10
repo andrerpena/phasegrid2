@@ -72,6 +72,7 @@ bool MiniaudioBackend::open(const DeviceConfig& config, RenderFn render, std::st
   if (ma_device_start(&impl_->device) != MA_SUCCESS) { error = "ma_device_start failed"; close(); return false; }
   sampleRate_ = impl_->device.sampleRate;
   channels_ = impl_->device.playback.channels;
+  periodFrames_ = impl_->device.playback.internalPeriodSizeInFrames;   // what was granted, not what was asked
   open_ = true;
   return true;
 }

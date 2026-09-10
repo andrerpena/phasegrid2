@@ -1,0 +1,95 @@
+{
+  "_about": "The first case, and the one that took four rounds: a run of single notes into a sine with no envelope. reference.wav is the reference instrument's sine playing C3 E3 B3 C4. Only the shape is compared, since the two are not time-aligned; crest and THD say whether ours is a sine, maxStep whether it is clean.",
+  "patch": {
+    "schemaVersion": 1,
+    "feedbackMode": "sample",
+    "modules": [
+      {
+        "id": "pat",
+        "type": "notes.pattern",
+        "params": {
+          "legato": 0.9,
+          "cycle": 4
+        },
+        "data": {
+          "pattern": "c3 e3 b3 c4"
+        },
+        "x": 0,
+        "y": 0
+      },
+      {
+        "id": "poly",
+        "type": "note.toPoly",
+        "params": {
+          "voices": 16
+        },
+        "x": 200,
+        "y": 0
+      },
+      {
+        "id": "osc",
+        "type": "osc.sine",
+        "x": 400,
+        "y": 0
+      },
+      {
+        "id": "out",
+        "type": "io.audioOut",
+        "params": {
+          "gain": 1
+        },
+        "x": 600,
+        "y": 0
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1",
+        "from": {
+          "module": "pat",
+          "port": "notes"
+        },
+        "to": {
+          "module": "poly",
+          "port": "notes"
+        }
+      },
+      {
+        "id": "e2",
+        "from": {
+          "module": "poly",
+          "port": "pitch"
+        },
+        "to": {
+          "module": "osc",
+          "port": "pitch"
+        }
+      },
+      {
+        "id": "e3",
+        "from": {
+          "module": "osc",
+          "port": "out"
+        },
+        "to": {
+          "module": "out",
+          "port": "inL"
+        }
+      }
+    ]
+  },
+  "tempo": 120,
+  "bars": 2,
+  "expect": {
+    "crest": {
+      "near": "reference",
+      "tolerance": 0.05
+    },
+    "maxStep": {
+      "max": 0.1
+    },
+    "thd": {
+      "max": 1.5
+    }
+  }
+}

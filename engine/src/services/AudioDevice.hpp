@@ -32,6 +32,10 @@ public:
   virtual bool isOpen() const = 0;
   virtual double sampleRate() const = 0;   // actual rate after open
   virtual uint32_t channels() const = 0;
+  /// Frames per callback the device actually settled on, which is a request the platform may ignore.
+  /// Worth knowing: the engine cuts every callback into its own blocks, and the first question about
+  /// anything time-related is how many blocks that is.
+  virtual uint32_t periodFrames() const = 0;
 };
 
 }  // namespace pg

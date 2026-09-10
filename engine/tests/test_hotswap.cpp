@@ -11,9 +11,10 @@ struct Rig {
   pg::Registry reg;
   pg::Engine engine{reg, pg::EngineConfig{48000.0, 64}};
   pg::TransportSnapshot t;
+  pg::Transport clock;   // for the interleaved entry point, which ticks the clock itself
   std::vector<float> l = std::vector<float>(64), r = std::vector<float>(64);
   float* out[2] = {l.data(), r.data()};
-  Rig() { pg::test::registerTestModules(reg); }
+  Rig() { pg::test::registerTestModules(reg); clock.prepare(48000.0); }
   void render() { engine.renderBlock(out, 2, 64, t); }
   void add(const std::string& id, const std::string& type, std::map<std::string, float> p = {}) {
     REQUIRE(engine.model().addNode(reg, pg::NodeModel{id, type, std::move(p)}));
@@ -149,8 +150,8 @@ TEST_CASE("engine renders interleaved for arbitrary device periods", "[engine]")
   rig.edge("e", "c", "out", "s", "in");
   REQUIRE(rig.engine.commit());
   std::vector<float> buf(100 * 2);
-  rig.engine.renderInterleaved(buf.data(), 100, 2, rig.t);
-  rig.engine.renderInterleaved(buf.data(), 100, 2, rig.t);
+  rig.engine.renderInterleaved(buf.data(), 100, 2, rig.clock);
+  rig.engine.renderInterleaved(buf.data(), 100, 2, rig.clock);
   REQUIRE(buf[0] == Catch::Approx(0.25f));
   REQUIRE(buf[199] == Catch::Approx(0.25f));
 }

@@ -6,7 +6,7 @@ C++20 process. One message thread (socket/commands, compiles), one audio thread 
 
 The wire signal is `pg::Sample = vital::poly_float`: four float lanes `[voice0.L, voice0.R, voice1.L, voice1.R]`
 (SSE2 on x86-64, NEON on arm64). Every continuous port carries `Sample[numFrames]`; stereo everywhere; mono sources write L = R.
-Voices run in pairs, two per `Sample`, inside an *instrument* (see below); a global signal lives in voice 0's lanes with voice 1's mirroring it, and an exit masks the lanes it folds.
+Voices run in pairs, two per `Sample`, inside an *instrument* (see below); a global signal lives in voice 0's lanes with voice 1's mirroring it, and an exit gains the lanes it folds (`VoiceGain`: the lane mask, and the ramp of a voice on its way out).
 Helpers in `core/Signal.hpp` (`lanes::voice/left/right/mono/stereo/lane`). `kMaxBlockSize = 128`.
 
 Every port declares a `SignalRole` -- `Any`, `Audio`, `Cv`, `Gate`, `Pitch`, `Phase`, `Note` -- which is a UI
@@ -57,12 +57,29 @@ block, through `VoiceActivity::hold(voice)`. An envelope holds its voice until i
 (`env.dahdsr` reads the vendored envelope's stage; its `lifetime` toggle, on by default, takes it out of
 the decision). An exit -- `io.audioOut`, `voices.sum` -- holds a voice while what it hears from it is
 above `kVoiceSilence`, but only with its own `lifetime` toggle on, which is off by default. After the
-passes `settle()` frees every releasing voice nobody held that block. So a voice with an envelope rings
+passes `settle()` starts the outgoing ramp for every releasing voice nobody held that block: a voice is
+not cut off but faded over `kVoiceFadeSeconds`, because a wave stopped mid-cycle is a step and a step is
+a click. The exits apply the ramp and the lane mask together through `VoiceGain`, and the voice is free
+when it has played out. The ramp is committed once it starts -- an exit stops hearing a voice because it
+is fading, and a claim then would restart it -- so only a new note on that voice cancels it. Inside an
+instrument an oscillator also holds a lane whose voice is free at the start of its cycle, so a voice
+taken back inside a pair that never went quiet begins where a fresh one would (docs/adrs/0003). So a voice with an envelope rings
 out; a voice with none ends with its note -- a bare oscillator stops rather than droning, and a run of
 single notes into it plays one voice instead of filling the pool -- and a patch that wants the drone
 held until it is silent asks the exit for it. Allocation takes a free voice first, then the
 longest-releasing, then the longest-held, with the one-frame gate dip on a steal so a downstream envelope
 retriggers.
+
+**The clock.** `Engine::renderInterleaved` is the device's entry point and the offline renderer's alike:
+it takes a `Transport&`, cuts the callback into engine blocks, and calls `advance()` once per block, so a
+512-frame callback is eight blocks of advancing time and never one block's time played eight times.
+Every time-driven module derives its position from `ctx.transport->ppq` (playing) or `samplePos`
+(stopped) plus the frame index, so the clock is the one thing that must be right for all of them at once.
+`renderBlock` counts any block whose `samplePos` does not follow the previous one; the command loop
+reports the first on stderr, `engine.stats` exposes the count, and the device period the platform
+actually granted is in `hello` and `engine.ready`. A test renders one patch at five periods and requires
+identical samples (docs/adrs/0005). `audio.capture.start`/`stop` records exactly what the device is
+handed, so what a scenario measures can be the live output rather than a render of the same patch.
 
 Two rules follow for a module:
 
@@ -73,10 +90,11 @@ Two rules follow for a module:
   node's `PrepareInfo.voiceCount`, which is the instrument's voices for a per-voice node and 1 for a global
   one, so a global LFO holds one state and a vendored oscillator only multiplies inside an instrument
   (`InstanceTable::acquire` rebuilds a node whose count moved and reuses the rest).
-- **An exit masks its own contribution** with `ctx.voiceMask` as it adds. That is the last point at which
-  the pair the lanes belong to is known -- by the time `Engine::renderBlock` folds the bus every pair has
-  added into it and no single mask describes the sum. A global signal arrives with voice 0's mask, so its
-  mirrored half is dropped and it reaches the output once.
+- **An exit gains its own contribution** with a `VoiceGain` built from `ctx` as it adds, never with the
+  raw `ctx.voiceMask`. That is the last point at which the pair the lanes belong to is known -- by the
+  time `Engine::renderBlock` folds the bus every pair has added into it and no single mask describes the
+  sum -- and it is where the outgoing ramp has to go for the same reason. A global signal arrives with
+  voice 0's mask, so its mirrored half is dropped and it reaches the output once.
 
 `Module::reset(uint32_t voicePair)` is called by the scheduler on every module of an instrument when a
 pair that was dead comes back to life, before the pair runs, so a new note starts from clean DSP state

@@ -22,6 +22,9 @@
     "engine:build": "node scripts/build-native.mjs --tests",
     "engine:test": "node scripts/build-native.mjs --tests && ctest --test-dir build --output-on-failure",
     "engine:render": "./build/engine/phasegrid-engine --render",
+    "render:example": "vite-node -c vitest.config.ts scripts/render-example.ts --",
+    "audio:measure": "node scripts/audio-measure.mjs",
+    "compare:reference": "node scripts/compare-reference.mjs",
     "storybook": "storybook dev -p 6006 --no-open",
     "storybook:build": "storybook build"
   },

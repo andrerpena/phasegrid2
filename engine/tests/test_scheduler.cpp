@@ -175,13 +175,15 @@ TEST_CASE("Scheduler frees a released voice nobody holds at the end of its block
   const pg::VoiceActivity& activity = *rig.program->instruments[0].activity;
   REQUIRE(activity.state(0) == pg::VoiceState::Held);
   // The release lands: the voice is releasing through that block, so its pair still runs and anything
-  // that wanted to hold it could. Nothing here does -- the sink only folds -- so it is free when the block
-  // settles, and its pair stops running.
+  // that wanted to hold it could. Nothing here does -- the sink only folds -- so it starts its ramp out,
+  // and its pair goes on running until that has played.
   rig.run(64);
-  REQUIRE(activity.state(0) == pg::VoiceState::Free);
+  REQUIRE(activity.state(0) == pg::VoiceState::Releasing);
   REQUIRE(Counter::runs == 2);
+  for (uint32_t block = 2; block < 6; ++block) rig.run(64 * block);
+  REQUIRE(activity.state(0) == pg::VoiceState::Free);
   Counter::clear();
-  rig.run(128);
+  rig.run(64 * 6);
   REQUIRE(Counter::runs == 0);
   // The next cycle's note revives the pair, and the module is reset before it plays.
   Counter::clear();

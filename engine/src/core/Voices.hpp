@@ -16,6 +16,13 @@
 /// a voice is still going is knowledge the modules that make it going have, and the pool only counts
 /// their claims. Every claim lasts one block and is made again each block the voice is still going.
 ///
+/// A voice does not stop dead when its last holder lets go. It is ramped to silence over
+/// `kVoiceFadeSeconds` first, because a wave cut off mid-cycle is a step to zero and a step is a click:
+/// the patch that made this rule audible had no envelope anywhere, so every note ended at full scale.
+/// The fade is committed once it starts -- a holder cannot take it back, or an exit that stops hearing a
+/// voice *because* it is fading would restart the ramp and click. Only a new note on that voice cancels
+/// it. The exits apply it as they fold (`VoiceGain`); the pool only counts the samples.
+///
 /// Written only on the audio thread -- the entry marks notes on and off in its allocation pass, the
 /// holders claim per pass, the scheduler settles the block -- and built on the message thread by the
 /// compiler. Owned by `InstanceTable`, keyed by the entry node, so it outlives a recompile the way a
@@ -30,6 +37,11 @@ namespace pg {
 /// Quieter than this, an exit that affects voice lifetime calls a voice silent.
 inline constexpr float kVoiceSilence = 1e-4f;
 
+/// How long a voice takes to ramp to silence once nothing holds it. Long enough that the cut-off wave
+/// does not click, short enough to be inaudible as a release and to have the voice back in the pool
+/// before anyone plays another note.
+inline constexpr double kVoiceFadeSeconds = 0.003;
+
 enum class VoiceState : uint8_t { Free = 0, Held, Releasing };
 
 class VoiceActivity {
@@ -38,6 +50,9 @@ public:
 
   uint32_t voices() const { return voices_; }
   uint32_t pairs() const { return (voices_ + 1) / 2; }
+  /// How many samples the outgoing ramp lasts. Set by the compiler, which knows the sample rate; the
+  /// default is `kVoiceFadeSeconds` at 48 kHz so a pool built without one still fades.
+  void setFadeSamples(uint32_t samples) { fadeSamples_ = samples < 1 ? 1 : samples; }
 
   // ---------------------------------------------------------------- the entry, allocation pass
   VoiceState state(uint32_t v) const { return v < voices_ ? state_[v] : VoiceState::Free; }
@@ -46,6 +61,7 @@ public:
     if (v >= voices_) return;
     state_[v] = VoiceState::Held;
     age_[v] = nextAge_++;
+    fade_[v] = 0;   // a voice taken back mid-fade plays its new note at full level
   }
   /// The note is over. The voice goes on running this block so whatever holds it can say so; it is
   /// free at `settle` if nothing does.
@@ -59,6 +75,22 @@ public:
   /// its release, an exit that still hears it. Keeps a releasing voice alive through this block.
   void hold(uint32_t v) {
     if (v < voices_) held_.set(v);
+  }
+
+  // ---------------------------------------------------------------- the exits, folding
+  /// A straight line: the gain voice `v` starts this block at and what to add to it per frame. Flat at
+  /// 1 unless the voice is on its way out, and exactly 1 at the first frame of a fade, so the ramp
+  /// joins what the last block played without a step of its own.
+  struct Ramp {
+    float start = 1.f;
+    float step = 0.f;
+  };
+  Ramp fadeRamp(uint32_t v, uint32_t numFrames) const {
+    if (v >= voices_ || fade_[v] == 0 || numFrames == 0) return {};
+    const float total = static_cast<float>(fadeSamples_);
+    const float start = static_cast<float>(fade_[v]) / total;
+    const uint32_t left = numFrames >= fade_[v] ? 0 : fade_[v] - numFrames;
+    return {start, (static_cast<float>(left) / total - start) / static_cast<float>(numFrames)};
   }
 
   // ---------------------------------------------------------------- the scheduler
@@ -76,26 +108,68 @@ public:
   /// modules are reset before it runs so the new note starts from clean state.
   bool ranLastBlock(uint32_t pair) const { return ran_.test(pair); }
   void markRan(uint32_t pair, bool ran) { ran_.set(pair, ran); }
-  /// End of block: a releasing voice nobody held this block is free again.
-  void settle() {
-    for (uint32_t v = 0; v < voices_; ++v)
-      if (state_[v] == VoiceState::Releasing && !held_.test(v)) state_[v] = VoiceState::Free;
+  /// End of block: a releasing voice nobody held starts its fade, one already fading is that many
+  /// samples further through, and one whose fade has run out is free.
+  void settle(uint32_t numFrames) {
+    for (uint32_t v = 0; v < voices_; ++v) {
+      if (state_[v] != VoiceState::Releasing) continue;
+      if (fade_[v] != 0) {
+        // Committed. `held_` is not consulted: the exits stop hearing a fading voice *because* it is
+        // fading, and letting that restart the ramp would put back the click the ramp is here to remove.
+        fade_[v] = numFrames >= fade_[v] ? 0 : fade_[v] - numFrames;
+        if (fade_[v] == 0) state_[v] = VoiceState::Free;
+      } else if (!held_.test(v)) {
+        fade_[v] = fadeSamples_;
+      }
+    }
     held_.reset();
   }
   /// Every voice free, every pair unrun: what a transport panic would want.
   void clear() {
     state_.fill(VoiceState::Free);
+    fade_.fill(0);
     held_.reset();
     ran_.reset();
   }
 
 private:
   uint32_t voices_;
+  uint32_t fadeSamples_ = static_cast<uint32_t>(kVoiceFadeSeconds * 48000.0);
   std::array<VoiceState, kMaxVoices> state_{};
   std::array<uint64_t, kMaxVoices> age_{};
+  std::array<uint32_t, kMaxVoices> fade_{};   // samples of ramp left; 0 is not fading
   std::bitset<kMaxVoices> held_;
   std::bitset<kMaxVoices / 2> ran_;
   uint64_t nextAge_ = 1;
+};
+
+/// The gain an exit multiplies a pair's lanes by as it folds them: the lane mask -- a voice that does
+/// not exist contributes nothing -- and the ramp of a voice on its way out, in one `Sample`. Built once
+/// per block and advanced once per frame, so the fold keeps no branch and no division in its loop.
+///
+/// Every exit uses this rather than masking, which is what stops the two of them from growing their own
+/// ramp code and drifting apart.
+class VoiceGain {
+public:
+  VoiceGain(const VoiceActivity* activity, uint32_t pair, Mask mask, uint32_t numFrames) {
+    VoiceActivity::Ramp a, b;
+    if (activity != nullptr) {
+      a = activity->fadeRamp(2 * pair, numFrames);
+      b = activity->fadeRamp(2 * pair + 1, numFrames);
+    }
+    gain_ = Sample(a.start, a.start, b.start, b.start) & mask;
+    step_ = Sample(a.step, a.step, b.step, b.step) & mask;
+  }
+  /// This frame's gain, then on to the next.
+  Sample next() {
+    const Sample g = gain_;
+    gain_ += step_;
+    return g;
+  }
+
+private:
+  Sample gain_;
+  Sample step_;
 };
 
 }  // namespace pg

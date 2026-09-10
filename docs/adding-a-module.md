@@ -66,8 +66,13 @@ const char* const kFace[] = {
 | `meter` | the level meter, at least two by two, on a module that `kModulePublishesMeter`; it draws the level the module writes into its telemetry slot |
 | `piano` | the keyboard, at least four cells across by two, on a module that `kModulePublishesKeys`; it lights the keys the module writes into its telemetry slot |
 
+An oscillator gets a case in `engine/tests/test_osc_purity.cpp`, which asserts its harmonic series at the
+setting it ships with: a sine is one partial, a sawtooth the 1/n series, a pulse the odd harmonics. Level
+and continuity tests cannot see a wave that is the wrong shape, and one shipped that way for months.
+
 A module runs once per block when it is global and once per live voice pair when it is inside an instrument;
-`ctx.firstPass` and `ctx.lastPass` say where a pass sits, `ctx.voiceMask` which lanes carry a voice, and
+`ctx.firstPass` and `ctx.lastPass` say where a pass sits, `ctx.voiceMask` which lanes carry a voice (an exit
+folds with a `VoiceGain` rather than that mask, so a voice on its way out ramps instead of stopping), and
 `ctx.activity` is the instrument's pool or null. Per-block work goes on the first pass, a fold clears on the
 first and publishes on the last. `kModuleVoiceEntry` marks a module that starts an instrument (it implements
 `Module::allocate` and has a `voices` param); `kModuleVoiceExit` one that folds the voices to a global signal.

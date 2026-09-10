@@ -26,6 +26,7 @@ public:
   bool isOpen() const override { return open_; }
   double sampleRate() const override { return sampleRate_; }
   uint32_t channels() const override { return channels_; }
+  uint32_t periodFrames() const override { return periodFrames_; }
 
   // Called from the device thread.
   void onData(float* out, uint32_t frames, uint32_t channels) { if (render_) render_(out, frames, channels); }
@@ -38,6 +39,7 @@ private:
   bool open_ = false;
   double sampleRate_ = 0.0;
   uint32_t channels_ = 0;
+  uint32_t periodFrames_ = 0;
 };
 
 }  // namespace pg

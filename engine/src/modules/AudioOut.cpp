@@ -36,17 +36,19 @@ class AudioOut final : public VoicedModule<int> {
     const ParamView g = c.param(0);
     const bool holds = lanes::lane(c.param(1).at(0), 0) > 0.5f;
     const Mask leftMask = lanes::left(), rightMask = lanes::right();
+    VoiceGain gain(c.activity, c.voice, c.voiceMask, c.numFrames);
     float peak[2] = {0.f, 0.f};
     for (uint32_t i = 0; i < c.numFrames; ++i) {
       const Sample left = l.readOr()[i] & leftMask;                               // v0.L, v1.L
       Sample right;
       if (r.empty()) right = vital::utils::swapStereo(left);                      // mirror L into R lanes
       else right = r.data[i] & rightMask;
-      // Mask HERE, not at the fold: the bus has every voice pair's contribution in it by the time
-      // Engine::renderBlock folds it, and no single mask describes that sum. This is the one place
-      // the pair whose lanes these are is still known. A global signal arrives with voice 0's mask,
-      // so its mirrored half is dropped and it reaches the output once.
-      const Sample masked = ((left + right) * g.at(i)) & c.voiceMask;
+      // The voice gain goes on HERE, not at the fold: the bus has every voice pair's contribution in
+      // it by the time Engine::renderBlock folds it, and no single mask describes that sum. This is the
+      // one place the pair whose lanes these are is still known. It carries the lane mask -- a global
+      // signal arrives with voice 0's, so its mirrored half is dropped and it reaches the output once --
+      // and the ramp of a voice on its way out, so a note ends without a step.
+      const Sample masked = (left + right) * g.at(i) * gain.next();
       c.outputBus->data[i] += masked;
       peak[0] = std::max(peak[0], std::max(std::fabs(masked[0]), std::fabs(masked[1])));
       peak[1] = std::max(peak[1], std::max(std::fabs(masked[2]), std::fabs(masked[3])));

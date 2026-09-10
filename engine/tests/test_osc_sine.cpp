@@ -150,15 +150,17 @@ TEST_CASE("the sine sounds like the shape it draws", "[osc][sine]") {
   }
 }
 
-TEST_CASE("the cycle starts at the bottom, like the sawtooth and the pulse", "[osc][sine]") {
-  // A cosine turned upside down rather than a sine, so phase 0 is the bottom of the wave for all three
-  // oscillators. They only agree about what a reset means, or about each other's `phase` input, if the
-  // start of a cycle is the same place in every one of them.
+TEST_CASE("the cycle starts at the rising zero crossing", "[osc][sine]") {
+  // A plain sine, not a cosine turned upside down: phase 0 is where the wave leaves zero going up. The
+  // sawtooth and the pulse still start at their own corner -- a shape with a step in it has nowhere
+  // quiet to begin -- but a sine does, and starting there is what makes a note with no envelope on it
+  // open in silence instead of on a full-scale step.
   Rig rig{kPeriodPitch, 0.f};
   const std::vector<float> arch = rig.preview(240);
-  REQUIRE(arch[0] == Catch::Approx(-1.f).margin(1e-5f));
-  REQUIRE(arch[120] == Catch::Approx(1.f).margin(1e-5f));
-  REQUIRE(arch[60] == Catch::Approx(0.f).margin(1e-5f));
+  REQUIRE(arch[0] == Catch::Approx(0.f).margin(1e-5f));
+  REQUIRE(arch[60] == Catch::Approx(1.f).margin(1e-5f));
+  REQUIRE(arch[120] == Catch::Approx(0.f).margin(1e-5f));
+  REQUIRE(arch[180] == Catch::Approx(-1.f).margin(1e-5f));
 }
 
 TEST_CASE("at twelve semitones two round lobes meet at the centre line", "[osc][sine]") {
@@ -180,7 +182,7 @@ TEST_CASE("at twelve semitones two round lobes meet at the centre line", "[osc][
   REQUIRE(bottom == Catch::Approx(-1.f).margin(0.01f));
 }
 
-TEST_CASE("fold turns one arch into many lobes", "[osc][sine]") {
+TEST_CASE("fold turns one wave into many lobes", "[osc][sine]") {
   // What you see on the face as the knob goes round, counted rather than looked at.
   // Counted on the sign of the slope, skipping the flat stretches: the round curve sits on its peak
   // for several samples at a time, and a turn is where the wave was rising and is next falling, however
@@ -198,8 +200,10 @@ TEST_CASE("fold turns one arch into many lobes", "[osc][sine]") {
     return n;
   };
   Rig plain{kPeriodPitch, 0.f};
-  Rig folded{kPeriodPitch, 48.f};
-  REQUIRE(turns(plain.preview(512)) == 1);
+  Rig folded{kPeriodPitch, 36.f};
+  // A cycle of the unfolded wave turns twice, at its peak and at its trough: it starts at zero going up,
+  // so both of them fall inside the window rather than one sitting on the edge.
+  REQUIRE(turns(plain.preview(512)) == 2);
   REQUIRE(turns(folded.preview(512)) > 6);
 }
 TEST_CASE("a rising edge on Reset restarts the sine", "[osc][sine]") {
@@ -210,11 +214,10 @@ TEST_CASE("a rising edge on Reset restarts the sine", "[osc][sine]") {
   Rig free{0.f, 0.f};
   Rig reset{0.f, 0.f, clock};
   const std::vector<float> a = free.render(0.6), b = reset.render(0.6);
-  // The restarted one is at the bottom of its wave three samples after the edge; the free-running one is
-  // 130.8 cycles into middle C and nowhere near it. Not exactly -1: a cosine leaves its minimum slowly,
-  // so three samples in it has climbed to about -0.974, and the correction delay accounts for the rest.
-  REQUIRE(left(b, 24003) < -0.95f);
-  REQUIRE(left(a, 24003) > -0.9f);
+  // The restarted one has just left zero three samples after the edge; the free-running one is 130.8
+  // cycles into middle C and is wherever that leaves it, which is near the bottom.
+  REQUIRE(std::fabs(left(b, 24003)) < 0.05f);
+  REQUIRE(left(a, 24003) < -0.5f);
 }
 
 TEST_CASE("a connected Phase input replaces the sine's own ramp", "[osc][sine]") {
@@ -222,10 +225,19 @@ TEST_CASE("a connected Phase input replaces the sine's own ramp", "[osc][sine]")
     REQUIRE(r.engine.model().addNode(r.reg, {"ph", "math.scaleOffset", {{"offset", 0.5f}}}));
     REQUIRE(r.engine.model().addEdge(r.reg, {"e3", "ph", "out", "osc", "phase"}));
   };
-  // Halfway through the cycle is the top of the wave, and a ramp that is not moving holds it there.
+  // A quarter of the way through the cycle is the top of the wave, and a ramp that is not moving holds
+  // it there. Not halfway: the wave leaves zero at phase 0, so halfway is where it crosses back down.
+  const auto quarter = [](Rig& r) {
+    REQUIRE(r.engine.model().addNode(r.reg, {"ph", "math.scaleOffset", {{"offset", 0.25f}}}));
+    REQUIRE(r.engine.model().addEdge(r.reg, {"e3", "ph", "out", "osc", "phase"}));
+  };
+  Rig top{0.f, 0.f, quarter};
+  const std::vector<float> t = top.render(0.1);
+  for (size_t i = 100; i < 4800; ++i) REQUIRE(left(t, i) == Catch::Approx(1.f).margin(1e-4f));
+  // And halfway holds it at zero, on its way down.
   Rig rig{0.f, 0.f, phase};
   const std::vector<float> r = rig.render(0.1);
-  for (size_t i = 100; i < 4800; ++i) REQUIRE(left(r, i) == Catch::Approx(1.f).margin(1e-4f));
+  for (size_t i = 100; i < 4800; ++i) REQUIRE(left(r, i) == Catch::Approx(0.f).margin(1e-4f));
 }
 
 TEST_CASE("the folded sine is band-limited", "[osc][sine]") {
@@ -234,11 +246,12 @@ TEST_CASE("the folded sine is band-limited", "[osc][sine]") {
    * itself and there is no correction to apply. Measured, the off-harmonic energy below the harmonics,
    * in decibels:
    *
-   *          0 st   12 st   24 st   36 st   48 st
-   *   220 Hz  99.3    99.3    99.3    99.3    99.3
-   *   439 Hz  99.1    98.3    96.4    92.6    87.4
-   *   879 Hz  99.2    99.0    98.3    96.4    25.5
-   *  2001 Hz  95.9    90.7    66.1     8.4    -3.9
+   *          0 st   12 st   24 st   36 st
+   *   439 Hz  99.1    98.3    94.4    88.5
+   *
+   * Which is also why the knob stops at three octaves. Folding raises the wave's fastest moment to about
+   * the pitch times the drive, so a fourth octave -- a drive of 15pi -- takes A4 past half the sample
+   * rate, and the figure falls off a cliff from 85.5 dB at 42 st to 42.2 dB at 48. Measured, not feared.
    *
    * For the record, the triangle curve this replaced managed 27 dB at A4 fully folded and 6.5 dB at
    * 2 kHz; and averaging each sample across its phase interval, tried on top of `sin`, moved only the
@@ -248,7 +261,7 @@ TEST_CASE("the folded sine is band-limited", "[osc][sine]") {
    * bar is set where the instrument is played: every fold setting at A4, and a plain sine at any pitch.
    */
   const pg::test::OnBin a4 = pg::test::onBin(150, kSampleRate);   // 439 Hz
-  for (const float fold : {0.f, 12.f, 24.f, 36.f, 48.f}) {
+  for (const float fold : {0.f, 6.f, 12.f, 18.f, 24.f, 30.f, 36.f}) {
     Rig rig{a4.pitch, fold};
     const double db = aliasDb(rig.render(1.0), a4.bin);
     INFO("fold " << fold << " st: off-harmonic energy is " << db << " dB below the harmonics");

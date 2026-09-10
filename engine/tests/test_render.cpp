@@ -1,6 +1,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <nlohmann/json.hpp>
+#include <algorithm>
 #include <cstdio>
 #include <filesystem>
 #include "core/Engine.hpp"
@@ -211,17 +212,64 @@ TEST_CASE("the master output level silences both render paths", "[render]") {
   float* planar[2] = {l.data(), r.data()};
   std::vector<float> interleaved(128);
   pg::TransportSnapshot t;
+  pg::Transport clock;
+  clock.prepare(48000.0);
 
   engine.renderBlock(planar, 2, 64, t);
   REQUIRE(l[0] != 0.f);
-  engine.renderInterleaved(interleaved.data(), 64, 2, t);
+  engine.renderInterleaved(interleaved.data(), 64, 2, clock);
   REQUIRE(interleaved[0] != 0.f);
 
   engine.setOutputGain(0.f);
   engine.renderBlock(planar, 2, 64, t);
   REQUIRE(l[0] == 0.f);
   std::fill(interleaved.begin(), interleaved.end(), 1.f);
-  engine.renderInterleaved(interleaved.data(), 64, 2, t);
+  engine.renderInterleaved(interleaved.data(), 64, 2, clock);
   REQUIRE(interleaved[0] == 0.f);
   REQUIRE(interleaved[63] == 0.f);
+}
+
+TEST_CASE("the device period does not change the sound", "[render][clock]") {
+  /*
+   * The bug this guards. The transport used to be advanced once per DEVICE CALLBACK, and every engine
+   * block inside that callback was handed the same snapshot, so a note source replayed the same 64
+   * frames of musical time once per block and retriggered every note it was holding -- a creak, live,
+   * on any device period above one block. Nothing offline could see it: the offline renderer advanced
+   * per block and never went through the splitter. Now both go through Engine::renderInterleaved, and
+   * this asks the only question that matters: is the audio identical whatever the callback size?
+   * Identical means identical -- same code, same 64-frame blocks inside, same clock -- not close.
+   */
+  auto render = [](uint32_t period) {
+    pg::Registry reg;
+    pg::registerBuiltinModules(reg);
+    pg::Engine engine{reg, pg::EngineConfig{48000.0, 64}};
+    REQUIRE(engine.model().addNode(reg, {"pat", "notes.pattern", {{"legato", 0.9f}, {"cycle", 4.f}}}));
+    REQUIRE(engine.model().setNodeData("pat", nlohmann::json{{"pattern", "c3 e3 b3 c4"}}));
+    REQUIRE(engine.model().addNode(reg, {"poly", "note.toPoly", {}}));
+    REQUIRE(engine.model().addNode(reg, {"osc", "osc.sine", {}}));
+    REQUIRE(engine.model().addNode(reg, {"out", "io.audioOut", {}}));
+    REQUIRE(engine.model().addEdge(reg, {"e1", "pat", "notes", "poly", "notes"}));
+    REQUIRE(engine.model().addEdge(reg, {"e2", "poly", "pitch", "osc", "pitch"}));
+    REQUIRE(engine.model().addEdge(reg, {"e3", "osc", "out", "out", "inL"}));
+    REQUIRE(engine.commit());
+    pg::RenderOptions o;
+    o.seconds = 2.0;
+    o.period = period;
+    std::vector<float> out = pg::renderInterleaved(engine, o);
+    // And the engine itself agrees the clock it was fed was contiguous.
+    REQUIRE(engine.clockDiscontinuities() == 0);
+    return out;
+  };
+  const std::vector<float> reference = render(64);
+  REQUIRE(*std::max_element(reference.begin(), reference.end()) > 0.5f);   // it plays at all
+  for (const uint32_t period : {100u, 128u, 512u, 1024u}) {
+    INFO("device period " << period << " frames");
+    const std::vector<float> other = render(period);
+    REQUIRE(other.size() == reference.size());
+    size_t firstDifference = reference.size();
+    for (size_t i = 0; i < reference.size(); ++i)
+      if (other[i] != reference[i]) { firstDifference = i; break; }
+    INFO("first differing sample: " << firstDifference << " of " << reference.size());
+    REQUIRE(firstDifference == reference.size());
+  }
 }

@@ -17,7 +17,10 @@ Engine::Engine(Registry& registry, EngineConfig config) : registry_(registry), c
   splitter_.prepare(config_.blockSize, kMaxChannelsOut);
   splitterFn_ = [this](float* block, uint32_t n) {
     float* planar[2] = {scratchL_.data(), scratchR_.data()};
-    renderBlock(planar, 2, n, *interleavedTransport_);
+    // One snapshot PER BLOCK. The clock is the device's transport, advanced here rather than once per
+    // callback, so consecutive blocks see consecutive time whatever period the device chose.
+    const TransportSnapshot t = interleavedClock_->advance(n);
+    renderBlock(planar, 2, n, t);
     for (uint32_t i = 0; i < n; ++i)
       for (uint32_t c = 0; c < interleavedChannels_; ++c) block[i * interleavedChannels_ + c] = planar[c < 2 ? c : 1][i];
   };
@@ -165,6 +168,12 @@ void Engine::drainParams() {
 void Engine::renderBlock(float* const* out, uint32_t channels, uint32_t numFrames, const TransportSnapshot& t) noexcept {
   assert(numFrames <= kMaxBlockSize);
   numFrames = std::min(numFrames, kMaxBlockSize);
+  // Engine time must be contiguous from one block to the next: a stall or a jump here means whoever is
+  // driving the clock handed two blocks the same position, and every note source will replay time.
+  if (haveLastBlock_ && t.samplePos != lastSamplePos_ + lastFrames_) clockFaults_.fetch_add(1, std::memory_order_relaxed);
+  lastSamplePos_ = t.samplePos;
+  lastFrames_ = numFrames;
+  haveLastBlock_ = true;
   swapIfPending();
   drainParams();
   // Held: the two lines above still run, so a program compiled and a knob turned while the patch is
@@ -193,9 +202,9 @@ void Engine::renderBlock(float* const* out, uint32_t channels, uint32_t numFrame
   }
 }
 
-void Engine::renderInterleaved(float* out, uint32_t frames, uint32_t channels, const TransportSnapshot& t) noexcept {
+void Engine::renderInterleaved(float* out, uint32_t frames, uint32_t channels, Transport& clock) noexcept {
   interleavedChannels_ = channels;
-  interleavedTransport_ = &t;
+  interleavedClock_ = &clock;
   if (channels != kMaxChannelsOut) { std::fill_n(out, static_cast<size_t>(frames) * channels, 0.f); return; }   // other counts wired in phase 4
   splitter_.render(out, frames, splitterFn_);
 }

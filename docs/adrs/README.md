@@ -14,3 +14,6 @@ already say: a record points at those for the mechanism and keeps only the reaso
 |---|---|---|
 | [0001](0001-bitwig-grid-is-the-reference-for-voice-semantics.md) | Bitwig's Grid is the reference for voice semantics | 2026-09-10 |
 | [0002](0002-a-released-voice-lives-only-while-a-module-holds-it.md) | A released voice lives only while a module holds it | 2026-09-10 |
+| [0003](0003-a-voice-fades-out-and-the-sine-starts-at-zero.md) | A voice fades out, and the sine starts at zero | 2026-09-10 |
+| [0004](0004-a-waveform-is-measured-by-its-shape.md) | A waveform is measured by its shape, and Fold 0 is a sine | 2026-09-10 |
+| [0005](0005-the-transport-ticks-per-engine-block.md) | The transport ticks per engine block, and the live output is capturable | 2026-09-10 |
