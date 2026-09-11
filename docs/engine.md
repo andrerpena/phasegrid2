@@ -185,10 +185,13 @@ Built-ins are registered in `engine/src/modules/builtin.cpp`, one line each. Own
 
 - own: `io.audioOut`, `note.toCv`, `note.toPoly`, `notes.clip`, `notes.pattern`, `phase.clock`, `math.scaleOffset`,
   `mix.mixer`, `amp.vca`, `osc.sawtooth`, `osc.pulse`, `osc.sine`, `mod.lfo`, `display.meter`, `display.scope`,
-  `display.value`, `display.piano`, `voices.sum`, `env.adsr`, `fx.reverb`, and the four note effects `notefx.chord`, `notefx.quantize`, `notefx.arp`, `notefx.humanize`
-- vendored-backed: `osc.wavetable`, `sampler.player`, `filter.multi`, `mod.random`, and the
-  seven audio effects `fx.delay`, `fx.chorus`, `fx.flanger`, `fx.phaser`, `fx.distortion`,
-  `fx.compressor`, `fx.eq`.
+  `display.value`, `display.piano`, `voices.sum`, `env.adsr`, and the four note effects `notefx.chord`, `notefx.quantize`, `notefx.arp`, `notefx.humanize`
+- Vital-backed (`engine/src/vital`): `osc.wavetable`, `sampler.player`, `filter.multi`, `mod.random`,
+  and the three audio effects with no sst equivalent yet, `fx.chorus`, `fx.compressor`, `fx.eq`.
+- sst-backed (`engine/src/sst`): the eight audio effects `fx.reverb`, `fx.reverb.hall`, `fx.delay`,
+  `fx.delay.floaty`, `fx.flanger`, `fx.phaser`, `fx.bonsai`, `fx.rotary`. Their descriptors are
+  generated from the effect's own `ParamMetaData`, so unlike the Vital-backed ones their ranges,
+  units and tapers are the real thing (docs/adrs/0010).
 
 A descriptor's `category` is the heading a catalogue shows the module under, written as a person reads it --
 "Oscillators", "Audio FX", "Note FX" -- so an interface shows it as it is and adds nothing. Ids stay slugs.

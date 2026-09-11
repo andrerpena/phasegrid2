@@ -26,7 +26,8 @@
     "audio:measure": "node scripts/audio-measure.mjs",
     "compare:reference": "node scripts/compare-reference.mjs",
     "storybook": "storybook dev -p 6006 --no-open",
-    "storybook:build": "storybook build"
+    "storybook:build": "storybook build",
+    "module:probe": "vite-node -c vitest.config.ts scripts/module-probe.ts --"
   },
   "dependencies": {
     "@radix-ui/react-dropdown-menu": "^2.1.24",

@@ -1,5 +1,5 @@
 {
-  "catalogHash": "a97c2777db3ccc74",
+  "catalogHash": "1a63b37eec28e419",
   "conventions": {
     "blockSize": 128,
     "gateThreshold": 0,
@@ -1149,6 +1149,361 @@
     },
     {
       "category": "Audio FX",
+      "doc": "Tape. It boosts the bass, saturates, adds the noise a tape has and dulls the top, and each of those is its own control.",
+      "face": null,
+      "flags": {
+        "needsTransport": false,
+        "previewsEnvelope": false,
+        "previewsWave": false,
+        "publishesKeys": false,
+        "publishesMeter": false,
+        "publishesNotes": false,
+        "publishesScope": false,
+        "publishesValue": false,
+        "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
+        "writesTelemetry": false
+      },
+      "id": "fx.bonsai",
+      "inputs": [
+        {
+          "doc": "Audio input. Stereo: the left and right lanes stay apart throughout",
+          "id": "in",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "In",
+          "role": "audio"
+        },
+        {
+          "doc": "Gain",
+          "id": "param:gain",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Gain",
+          "param": "gain",
+          "role": "cv"
+        },
+        {
+          "doc": "Amount",
+          "id": "param:amount",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Amount",
+          "param": "amount",
+          "role": "cv"
+        },
+        {
+          "doc": "Distort",
+          "id": "param:distort",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Distort",
+          "param": "distort",
+          "role": "cv"
+        },
+        {
+          "doc": "Amount",
+          "id": "param:amount_2",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Amount",
+          "param": "amount_2",
+          "role": "cv"
+        },
+        {
+          "doc": "Sensitivity",
+          "id": "param:sensitivity",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Sensitivity",
+          "param": "sensitivity",
+          "role": "cv"
+        },
+        {
+          "doc": "Gain",
+          "id": "param:gain_2",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Gain",
+          "param": "gain_2",
+          "role": "cv"
+        },
+        {
+          "doc": "Dull",
+          "id": "param:dull",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Dull",
+          "param": "dull",
+          "role": "cv"
+        },
+        {
+          "doc": "Gain",
+          "id": "param:gain_3",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Gain",
+          "param": "gain_3",
+          "role": "cv"
+        },
+        {
+          "doc": "Mix",
+          "id": "param:mix",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Mix",
+          "param": "mix",
+          "role": "cv"
+        }
+      ],
+      "name": "Bonsai",
+      "outputs": [
+        {
+          "doc": "The processed signal",
+          "id": "out",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Out",
+          "role": "audio"
+        }
+      ],
+      "params": [
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Gain",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "id": "gain",
+          "max": 24.0,
+          "min": -24.0,
+          "name": "Gain",
+          "uiWidget": "knob",
+          "unit": "db"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Amount",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "amount",
+          "max": 24.0,
+          "min": -24.0,
+          "name": "Amount",
+          "uiWidget": "knob",
+          "unit": "db"
+        },
+        {
+          "curve": "linear",
+          "default": 25.0,
+          "doc": "Distort",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "id": "distort",
+          "max": 100.0,
+          "min": 0.0,
+          "name": "Distort",
+          "uiWidget": "knob",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Bias Filter",
+          "enumLabels": [
+            "Tilt",
+            "Pull Mids"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "primary": false,
+            "structural": false
+          },
+          "id": "bias_filter",
+          "max": 1.0,
+          "min": 0.0,
+          "name": "Bias Filter",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Type",
+          "enumLabels": [
+            "Gentle",
+            "Normal",
+            "Hard",
+            "Harsh"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "primary": false,
+            "structural": false
+          },
+          "id": "type",
+          "max": 3.0,
+          "min": 0.0,
+          "name": "Type",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 25.0,
+          "doc": "Amount",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "amount_2",
+          "max": 100.0,
+          "min": 0.0,
+          "name": "Amount",
+          "uiWidget": "knob",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 25.0,
+          "doc": "Sensitivity",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "sensitivity",
+          "max": 100.0,
+          "min": 0.0,
+          "name": "Sensitivity",
+          "uiWidget": "knob",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": -12.0,
+          "doc": "Gain",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "gain_2",
+          "max": 24.0,
+          "min": -24.0,
+          "name": "Gain",
+          "uiWidget": "knob",
+          "unit": "db"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Dull",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "id": "dull",
+          "max": 100.0,
+          "min": 0.0,
+          "name": "Dull",
+          "uiWidget": "knob",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Gain",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "gain_3",
+          "max": 24.0,
+          "min": -24.0,
+          "name": "Gain",
+          "uiWidget": "knob",
+          "unit": "db"
+        },
+        {
+          "curve": "linear",
+          "default": 100.0,
+          "doc": "Mix",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "id": "mix",
+          "max": 100.0,
+          "min": 0.0,
+          "name": "Mix",
+          "uiWidget": "knob",
+          "unit": "percent"
+        }
+      ],
+      "texts": []
+    },
+    {
+      "category": "Audio FX",
       "doc": "Chorus built from up to four modulated delay pairs sharing one rate. Frequency is a power of two in hertz; Delay 1 and Delay 2 set the range the pairs are spread across.",
       "face": null,
       "flags": {
@@ -2036,7 +2391,7 @@
     },
     {
       "category": "Audio FX",
-      "doc": "Stereo / ping-pong delay with a filtered feedback path. Frequency is a power of two in hertz and is the inverse of the delay time (3 = 8 Hz = 125 ms); Sync switches it to tempo divisions instead.",
+      "doc": "A stereo delay. Left and Right set the two times, Feedback how many repeats there are and Crossfeed how much each side feeds the other; Low Cut and High Cut shape the repeats as they fade, and Rate and Depth wobble the line.",
       "face": null,
       "flags": {
         "needsTransport": false,
@@ -2055,7 +2410,7 @@
       "id": "fx.delay",
       "inputs": [
         {
-          "doc": "Audio input",
+          "doc": "Audio input. Stereo: the left and right lanes stay apart throughout",
           "id": "in",
           "implicit": false,
           "kind": "continuous",
@@ -2063,64 +2418,109 @@
           "role": "audio"
         },
         {
-          "doc": "Delay Frequency 2",
-          "id": "param:aux_frequency",
+          "doc": "Left",
+          "id": "param:left",
           "implicit": true,
           "kind": "continuous",
-          "name": "Delay Frequency 2",
-          "param": "aux_frequency",
+          "name": "Left",
+          "param": "left",
           "role": "cv"
         },
         {
-          "doc": "Delay Mix",
-          "id": "param:dry_wet",
+          "doc": "Right",
+          "id": "param:right",
           "implicit": true,
           "kind": "continuous",
-          "name": "Delay Mix",
-          "param": "dry_wet",
+          "name": "Right",
+          "param": "right",
           "role": "cv"
         },
         {
-          "doc": "Delay Feedback",
+          "doc": "Feedback",
           "id": "param:feedback",
           "implicit": true,
           "kind": "continuous",
-          "name": "Delay Feedback",
+          "name": "Feedback",
           "param": "feedback",
           "role": "cv"
         },
         {
-          "doc": "Delay Filter Cutoff",
-          "id": "param:filter_cutoff",
+          "doc": "Crossfeed",
+          "id": "param:crossfeed",
           "implicit": true,
           "kind": "continuous",
-          "name": "Delay Filter Cutoff",
-          "param": "filter_cutoff",
+          "name": "Crossfeed",
+          "param": "crossfeed",
           "role": "cv"
         },
         {
-          "doc": "Delay Filter Spread",
-          "id": "param:filter_spread",
+          "doc": "Low Cut",
+          "id": "param:low_cut",
           "implicit": true,
           "kind": "continuous",
-          "name": "Delay Filter Spread",
-          "param": "filter_spread",
+          "name": "Low Cut",
+          "param": "low_cut",
           "role": "cv"
         },
         {
-          "doc": "Delay Frequency",
-          "id": "param:frequency",
+          "doc": "High Cut",
+          "id": "param:high_cut",
           "implicit": true,
           "kind": "continuous",
-          "name": "Delay Frequency",
-          "param": "frequency",
+          "name": "High Cut",
+          "param": "high_cut",
+          "role": "cv"
+        },
+        {
+          "doc": "Rate",
+          "id": "param:rate",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Rate",
+          "param": "rate",
+          "role": "cv"
+        },
+        {
+          "doc": "Depth",
+          "id": "param:depth",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Depth",
+          "param": "depth",
+          "role": "cv"
+        },
+        {
+          "doc": "Channel",
+          "id": "param:channel",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Channel",
+          "param": "channel",
+          "role": "cv"
+        },
+        {
+          "doc": "Mix",
+          "id": "param:mix",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Mix",
+          "param": "mix",
+          "role": "cv"
+        },
+        {
+          "doc": "Width",
+          "id": "param:width",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Width",
+          "param": "width",
           "role": "cv"
         }
       ],
       "name": "Delay",
       "outputs": [
         {
-          "doc": "Dry/wet delay output",
+          "doc": "The processed signal",
           "id": "out",
           "implicit": false,
           "kind": "continuous",
@@ -2130,86 +2530,9 @@
       ],
       "params": [
         {
-          "curve": "linear",
-          "default": 2.0,
-          "doc": "Delay Frequency 2",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": false,
-            "structural": false
-          },
-          "id": "aux_frequency",
-          "max": 9.0,
-          "min": -2.0,
-          "name": "Delay Frequency 2",
-          "uiWidget": "slider",
-          "unit": "seconds"
-        },
-        {
-          "curve": "linear",
-          "default": 1.0,
-          "doc": "Delay Sync 2",
-          "enumLabels": [
-            "Seconds",
-            "Tempo",
-            "Tempo Dotted",
-            "Tempo Triplets"
-          ],
-          "flags": {
-            "enum": true,
-            "hidden": false,
-            "integer": true,
-            "modulatable": false,
-            "noSmooth": true,
-            "primary": false,
-            "structural": false
-          },
-          "id": "aux_sync",
-          "max": 3.0,
-          "min": 0.0,
-          "name": "Delay Sync 2",
-          "uiWidget": "select",
-          "unit": "none"
-        },
-        {
-          "curve": "linear",
-          "default": 9.0,
-          "doc": "Delay Tempo 2",
-          "enumLabels": [
-            "4/1",
-            "2/1",
-            "1/1",
-            "1/2",
-            "1/4",
-            "1/8",
-            "1/16",
-            "1/32",
-            "1/64"
-          ],
-          "flags": {
-            "enum": true,
-            "hidden": false,
-            "integer": true,
-            "modulatable": false,
-            "noSmooth": true,
-            "primary": false,
-            "structural": false
-          },
-          "id": "aux_tempo",
-          "max": 12.0,
-          "min": 4.0,
-          "name": "Delay Tempo 2",
-          "uiWidget": "select",
-          "unit": "none"
-        },
-        {
-          "curve": "linear",
-          "default": 0.33340001106262207,
-          "doc": "Delay Mix",
+          "curve": "log",
+          "default": 0.5,
+          "doc": "Left",
           "flags": {
             "enum": false,
             "hidden": false,
@@ -2219,17 +2542,37 @@
             "primary": true,
             "structural": false
           },
-          "id": "dry_wet",
-          "max": 1.0,
-          "min": 0.0,
-          "name": "Delay Mix",
-          "uiWidget": "slider",
-          "unit": "percent"
+          "id": "left",
+          "max": 32.0,
+          "min": 0.00390625,
+          "name": "Left",
+          "uiWidget": "knob",
+          "unit": "seconds"
+        },
+        {
+          "curve": "log",
+          "default": 0.5,
+          "doc": "Right",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "id": "right",
+          "max": 32.0,
+          "min": 0.00390625,
+          "name": "Right",
+          "uiWidget": "knob",
+          "unit": "seconds"
         },
         {
           "curve": "linear",
-          "default": 0.5,
-          "doc": "Delay Feedback",
+          "default": 0.0,
+          "doc": "Feedback",
           "flags": {
             "enum": false,
             "hidden": false,
@@ -2240,36 +2583,16 @@
             "structural": false
           },
           "id": "feedback",
-          "max": 1.0,
-          "min": -1.0,
-          "name": "Delay Feedback",
-          "uiWidget": "slider",
+          "max": 100.0,
+          "min": 0.0,
+          "name": "Feedback",
+          "uiWidget": "knob",
           "unit": "percent"
         },
         {
           "curve": "linear",
-          "default": 60.0,
-          "doc": "Delay Filter Cutoff",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": true,
-            "structural": false
-          },
-          "id": "filter_cutoff",
-          "max": 136.0,
-          "min": 8.0,
-          "name": "Delay Filter Cutoff",
-          "uiWidget": "slider",
-          "unit": "none"
-        },
-        {
-          "curve": "linear",
-          "default": 1.0,
-          "doc": "Delay Filter Spread",
+          "default": 0.0,
+          "doc": "Crossfeed",
           "flags": {
             "enum": false,
             "hidden": false,
@@ -2279,115 +2602,515 @@
             "primary": false,
             "structural": false
           },
-          "id": "filter_spread",
-          "max": 1.0,
+          "id": "crossfeed",
+          "max": 100.0,
           "min": 0.0,
-          "name": "Delay Filter Spread",
-          "uiWidget": "slider",
-          "unit": "none"
+          "name": "Crossfeed",
+          "uiWidget": "knob",
+          "unit": "percent"
         },
         {
-          "curve": "linear",
-          "default": 2.0,
-          "doc": "Delay Frequency",
+          "curve": "log",
+          "default": 13.75,
+          "doc": "Low Cut",
           "flags": {
             "enum": false,
             "hidden": false,
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
-            "primary": true,
+            "primary": false,
             "structural": false
           },
-          "id": "frequency",
-          "max": 9.0,
-          "min": -2.0,
-          "name": "Delay Frequency",
-          "uiWidget": "slider",
-          "unit": "seconds"
+          "id": "low_cut",
+          "max": 25087.7109375,
+          "min": 13.75,
+          "name": "Low Cut",
+          "uiWidget": "knob",
+          "unit": "hz"
+        },
+        {
+          "curve": "log",
+          "default": 25087.7109375,
+          "doc": "High Cut",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "high_cut",
+          "max": 25087.7109375,
+          "min": 13.75,
+          "name": "High Cut",
+          "uiWidget": "knob",
+          "unit": "hz"
+        },
+        {
+          "curve": "log",
+          "default": 1.0,
+          "doc": "Rate",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "rate",
+          "max": 512.0,
+          "min": 0.0078125,
+          "name": "Rate",
+          "uiWidget": "knob",
+          "unit": "hz"
         },
         {
           "curve": "linear",
           "default": 0.0,
-          "doc": "Delay Style",
-          "enumLabels": [
-            "Mono",
-            "Stereo",
-            "Ping Pong",
-            "Mid Ping Pong"
-          ],
+          "doc": "Depth",
           "flags": {
-            "enum": true,
+            "enum": false,
             "hidden": false,
-            "integer": true,
-            "modulatable": false,
-            "noSmooth": true,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
             "primary": false,
             "structural": false
           },
-          "id": "style",
-          "max": 3.0,
+          "id": "depth",
+          "max": 200.0,
           "min": 0.0,
-          "name": "Delay Style",
-          "uiWidget": "select",
+          "name": "Depth",
+          "uiWidget": "knob",
           "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Channel",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "channel",
+          "max": 100.0,
+          "min": -100.0,
+          "name": "Channel",
+          "uiWidget": "knob",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 50.0,
+          "doc": "Mix",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "id": "mix",
+          "max": 100.0,
+          "min": 0.0,
+          "name": "Mix",
+          "uiWidget": "knob",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Width",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "width",
+          "max": 24.0,
+          "min": -24.0,
+          "name": "Width",
+          "uiWidget": "knob",
+          "unit": "db"
+        }
+      ],
+      "texts": []
+    },
+    {
+      "category": "Audio FX",
+      "doc": "A tape delay that wanders. Playrate runs the repeats faster or slower than what went in, so they drift in pitch; Pitch Depth and Filter Depth set how far the wander goes.",
+      "face": null,
+      "flags": {
+        "needsTransport": false,
+        "previewsEnvelope": false,
+        "previewsWave": false,
+        "publishesKeys": false,
+        "publishesMeter": false,
+        "publishesNotes": false,
+        "publishesScope": false,
+        "publishesValue": false,
+        "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
+        "writesTelemetry": false
+      },
+      "id": "fx.delay.floaty",
+      "inputs": [
+        {
+          "doc": "Audio input. Stereo: the left and right lanes stay apart throughout",
+          "id": "in",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "In",
+          "role": "audio"
+        },
+        {
+          "doc": "Time",
+          "id": "param:time",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Time",
+          "param": "time",
+          "role": "cv"
+        },
+        {
+          "doc": "Playrate",
+          "id": "param:playrate",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Playrate",
+          "param": "playrate",
+          "role": "cv"
+        },
+        {
+          "doc": "Feedback",
+          "id": "param:feedback",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Feedback",
+          "param": "feedback",
+          "role": "cv"
+        },
+        {
+          "doc": "Cutoff",
+          "id": "param:cutoff",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Cutoff",
+          "param": "cutoff",
+          "role": "cv"
+        },
+        {
+          "doc": "Resonance",
+          "id": "param:resonance",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Resonance",
+          "param": "resonance",
+          "role": "cv"
+        },
+        {
+          "doc": "Rate",
+          "id": "param:rate",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Rate",
+          "param": "rate",
+          "role": "cv"
+        },
+        {
+          "doc": "Width",
+          "id": "param:width",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Width",
+          "param": "width",
+          "role": "cv"
+        },
+        {
+          "doc": "Pitch Depth",
+          "id": "param:pitch_depth",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Pitch Depth",
+          "param": "pitch_depth",
+          "role": "cv"
+        },
+        {
+          "doc": "Filter Depth",
+          "id": "param:filter_depth",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Filter Depth",
+          "param": "filter_depth",
+          "role": "cv"
+        },
+        {
+          "doc": "Low Cut",
+          "id": "param:low_cut",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Low Cut",
+          "param": "low_cut",
+          "role": "cv"
+        },
+        {
+          "doc": "Mix",
+          "id": "param:mix",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Mix",
+          "param": "mix",
+          "role": "cv"
+        }
+      ],
+      "name": "Floaty Delay",
+      "outputs": [
+        {
+          "doc": "The processed signal",
+          "id": "out",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Out",
+          "role": "audio"
+        }
+      ],
+      "params": [
+        {
+          "curve": "log",
+          "default": 0.29999908804893494,
+          "doc": "Time",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "id": "time",
+          "max": 8.0,
+          "min": 0.019999949261546135,
+          "name": "Time",
+          "uiWidget": "knob",
+          "unit": "seconds"
         },
         {
           "curve": "linear",
           "default": 1.0,
-          "doc": "Delay Sync",
-          "enumLabels": [
-            "Seconds",
-            "Tempo",
-            "Tempo Dotted",
-            "Tempo Triplets"
-          ],
+          "doc": "Playrate",
           "flags": {
-            "enum": true,
+            "enum": false,
             "hidden": false,
-            "integer": true,
-            "modulatable": false,
-            "noSmooth": true,
-            "primary": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
             "structural": false
           },
-          "id": "sync",
-          "max": 3.0,
-          "min": 0.0,
-          "name": "Delay Sync",
-          "uiWidget": "select",
-          "unit": "none"
+          "id": "playrate",
+          "max": 5.0,
+          "min": -5.0,
+          "name": "Playrate",
+          "uiWidget": "knob",
+          "unit": "ratio"
         },
         {
           "curve": "linear",
-          "default": 9.0,
-          "doc": "Delay Tempo",
-          "enumLabels": [
-            "4/1",
-            "2/1",
-            "1/1",
-            "1/2",
-            "1/4",
-            "1/8",
-            "1/16",
-            "1/32",
-            "1/64"
-          ],
+          "default": 50.0,
+          "doc": "Feedback",
           "flags": {
-            "enum": true,
+            "enum": false,
             "hidden": false,
-            "integer": true,
-            "modulatable": false,
-            "noSmooth": true,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "id": "feedback",
+          "max": 100.0,
+          "min": 0.0,
+          "name": "Feedback",
+          "uiWidget": "knob",
+          "unit": "percent"
+        },
+        {
+          "curve": "log",
+          "default": 1396.9129638671875,
+          "doc": "Cutoff",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
             "primary": false,
             "structural": false
           },
-          "id": "tempo",
-          "max": 12.0,
-          "min": 4.0,
-          "name": "Delay Tempo",
-          "uiWidget": "select",
-          "unit": "none"
+          "id": "cutoff",
+          "max": 25087.7109375,
+          "min": 13.75,
+          "name": "Cutoff",
+          "uiWidget": "knob",
+          "unit": "hz"
+        },
+        {
+          "curve": "linear",
+          "default": 50.0,
+          "doc": "Resonance",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "resonance",
+          "max": 100.0,
+          "min": 0.0,
+          "name": "Resonance",
+          "uiWidget": "knob",
+          "unit": "percent"
+        },
+        {
+          "curve": "log",
+          "default": 1.0,
+          "doc": "Rate",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "rate",
+          "max": 16.0,
+          "min": 0.125,
+          "name": "Rate",
+          "uiWidget": "knob",
+          "unit": "hz"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Width",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "width",
+          "max": 100.0,
+          "min": 0.0,
+          "name": "Width",
+          "uiWidget": "knob",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Pitch Depth",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "pitch_depth",
+          "max": 100.0,
+          "min": 0.0,
+          "name": "Pitch Depth",
+          "uiWidget": "knob",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Filter Depth",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "filter_depth",
+          "max": 100.0,
+          "min": 0.0,
+          "name": "Filter Depth",
+          "uiWidget": "knob",
+          "unit": "percent"
+        },
+        {
+          "curve": "log",
+          "default": 13.75,
+          "doc": "Low Cut",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "low_cut",
+          "max": 25087.7109375,
+          "min": 13.75,
+          "name": "Low Cut",
+          "uiWidget": "knob",
+          "unit": "hz"
+        },
+        {
+          "curve": "linear",
+          "default": 30.000001907348633,
+          "doc": "Mix",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "id": "mix",
+          "max": 100.0,
+          "min": 0.0,
+          "name": "Mix",
+          "uiWidget": "knob",
+          "unit": "percent"
         }
       ],
       "texts": []
@@ -3013,7 +3736,7 @@
     },
     {
       "category": "Audio FX",
-      "doc": "Flanger: a short feedback delay swept by a triangle around Center. Center is a MIDI note number, Frequency a power of two in hertz.",
+      "doc": "A bank of tuned comb filters. Count is how many, Base Pitch where the lowest sits and Spacing how far apart they are; Rate and Depth move them, and Feedback sharpens each one.",
       "face": null,
       "flags": {
         "needsTransport": false,
@@ -3032,7 +3755,7 @@
       "id": "fx.flanger",
       "inputs": [
         {
-          "doc": "Audio input",
+          "doc": "Audio input. Stereo: the left and right lanes stay apart throughout",
           "id": "in",
           "implicit": false,
           "kind": "continuous",
@@ -3040,104 +3763,157 @@
           "role": "audio"
         },
         {
-          "doc": "Flanger Center",
-          "id": "param:center",
+          "doc": "Rate",
+          "id": "param:rate",
           "implicit": true,
           "kind": "continuous",
-          "name": "Flanger Center",
-          "param": "center",
+          "name": "Rate",
+          "param": "rate",
           "role": "cv"
         },
         {
-          "doc": "Flanger Mix",
-          "id": "param:dry_wet",
+          "doc": "Depth",
+          "id": "param:depth",
           "implicit": true,
           "kind": "continuous",
-          "name": "Flanger Mix",
-          "param": "dry_wet",
+          "name": "Depth",
+          "param": "depth",
           "role": "cv"
         },
         {
-          "doc": "Flanger Feedback",
+          "doc": "Count",
+          "id": "param:count",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Count",
+          "param": "count",
+          "role": "cv"
+        },
+        {
+          "doc": "Base Pitch",
+          "id": "param:base_pitch",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Base Pitch",
+          "param": "base_pitch",
+          "role": "cv"
+        },
+        {
+          "doc": "Spacing",
+          "id": "param:spacing",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Spacing",
+          "param": "spacing",
+          "role": "cv"
+        },
+        {
+          "doc": "Feedback",
           "id": "param:feedback",
           "implicit": true,
           "kind": "continuous",
-          "name": "Flanger Feedback",
+          "name": "Feedback",
           "param": "feedback",
           "role": "cv"
         },
         {
-          "doc": "Flanger Frequency",
-          "id": "param:frequency",
+          "doc": "HF Damping",
+          "id": "param:hf_damping",
           "implicit": true,
           "kind": "continuous",
-          "name": "Flanger Frequency",
-          "param": "frequency",
+          "name": "HF Damping",
+          "param": "hf_damping",
           "role": "cv"
         },
         {
-          "doc": "Flanger Mod Depth",
-          "id": "param:mod_depth",
+          "doc": "Width",
+          "id": "param:width",
           "implicit": true,
           "kind": "continuous",
-          "name": "Flanger Mod Depth",
-          "param": "mod_depth",
+          "name": "Width",
+          "param": "width",
           "role": "cv"
         },
         {
-          "doc": "Flanger Phase Offset",
-          "id": "param:phase_offset",
+          "doc": "Mix",
+          "id": "param:mix",
           "implicit": true,
           "kind": "continuous",
-          "name": "Flanger Phase Offset",
-          "param": "phase_offset",
+          "name": "Mix",
+          "param": "mix",
           "role": "cv"
         }
       ],
       "name": "Flanger",
       "outputs": [
         {
-          "doc": "Dry/wet flanger output",
+          "doc": "The processed signal",
           "id": "out",
           "implicit": false,
           "kind": "continuous",
           "name": "Out",
           "role": "audio"
-        },
-        {
-          "doc": "The delay rate the sweep landed on this block, in hertz",
-          "id": "frequency",
-          "implicit": false,
-          "kind": "continuous",
-          "name": "Frequency",
-          "role": "cv"
         }
       ],
       "params": [
         {
           "curve": "linear",
-          "default": 64.0,
-          "doc": "Flanger Center",
+          "default": 0.0,
+          "doc": "Mode",
+          "enumLabels": [
+            "Dry + Combs",
+            "Combs Only",
+            "Dry + Arp Combs",
+            "Arp Combs Only"
+          ],
           "flags": {
-            "enum": false,
+            "enum": true,
             "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
             "primary": false,
             "structural": false
           },
-          "id": "center",
-          "max": 136.0,
-          "min": 8.0,
-          "name": "Flanger Center",
-          "uiWidget": "slider",
-          "unit": "semitones"
+          "id": "mode",
+          "max": 3.0,
+          "min": 0.0,
+          "name": "Mode",
+          "uiWidget": "select",
+          "unit": "none"
         },
         {
           "curve": "linear",
-          "default": 0.5,
-          "doc": "Flanger Mix",
+          "default": 0.0,
+          "doc": "Waveform",
+          "enumLabels": [
+            "Sine",
+            "Triangle",
+            "Sawtooth",
+            "Noise",
+            "Sample & Hold",
+            "Square"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "primary": false,
+            "structural": false
+          },
+          "id": "waveform",
+          "max": 5.0,
+          "min": 0.0,
+          "name": "Waveform",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "log",
+          "default": 0.25,
+          "doc": "Rate",
           "flags": {
             "enum": false,
             "hidden": false,
@@ -3147,17 +3923,97 @@
             "primary": true,
             "structural": false
           },
-          "id": "dry_wet",
-          "max": 0.5,
+          "id": "rate",
+          "max": 512.0,
+          "min": 0.0078125,
+          "name": "Rate",
+          "uiWidget": "knob",
+          "unit": "hz"
+        },
+        {
+          "curve": "linear",
+          "default": 100.0,
+          "doc": "Depth",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "id": "depth",
+          "max": 100.0,
           "min": 0.0,
-          "name": "Flanger Mix",
-          "uiWidget": "slider",
+          "name": "Depth",
+          "uiWidget": "knob",
           "unit": "percent"
         },
         {
           "curve": "linear",
-          "default": 0.5,
-          "doc": "Flanger Feedback",
+          "default": 4.0,
+          "doc": "Count",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "count",
+          "max": 4.0,
+          "min": 1.0,
+          "name": "Count",
+          "uiWidget": "knob",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 60.0,
+          "doc": "Base Pitch",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "base_pitch",
+          "max": 127.0,
+          "min": 0.0,
+          "name": "Base Pitch",
+          "uiWidget": "knob",
+          "unit": "semitones"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Spacing",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "spacing",
+          "max": 12.0,
+          "min": 0.0,
+          "name": "Spacing",
+          "uiWidget": "knob",
+          "unit": "semitones"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Feedback",
           "flags": {
             "enum": false,
             "hidden": false,
@@ -3168,16 +4024,56 @@
             "structural": false
           },
           "id": "feedback",
-          "max": 1.0,
-          "min": -1.0,
-          "name": "Flanger Feedback",
-          "uiWidget": "slider",
+          "max": 100.0,
+          "min": 0.0,
+          "name": "Feedback",
+          "uiWidget": "knob",
           "unit": "percent"
         },
         {
           "curve": "linear",
-          "default": 2.0,
-          "doc": "Flanger Frequency",
+          "default": 10.0,
+          "doc": "HF Damping",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "hf_damping",
+          "max": 100.0,
+          "min": 0.0,
+          "name": "HF Damping",
+          "uiWidget": "knob",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Width",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "width",
+          "max": 24.0,
+          "min": -24.0,
+          "name": "Width",
+          "uiWidget": "knob",
+          "unit": "db"
+        },
+        {
+          "curve": "linear",
+          "default": 80.0,
+          "doc": "Mix",
           "flags": {
             "enum": false,
             "hidden": false,
@@ -3187,118 +4083,19 @@
             "primary": true,
             "structural": false
           },
-          "id": "frequency",
-          "max": 2.0,
-          "min": -5.0,
-          "name": "Flanger Frequency",
-          "uiWidget": "slider",
-          "unit": "seconds"
-        },
-        {
-          "curve": "linear",
-          "default": 0.5,
-          "doc": "Flanger Mod Depth",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": true,
-            "structural": false
-          },
-          "id": "mod_depth",
-          "max": 1.0,
-          "min": 0.0,
-          "name": "Flanger Mod Depth",
-          "uiWidget": "slider",
+          "id": "mix",
+          "max": 100.0,
+          "min": -100.0,
+          "name": "Mix",
+          "uiWidget": "knob",
           "unit": "percent"
-        },
-        {
-          "curve": "linear",
-          "default": 0.3333333432674408,
-          "doc": "Flanger Phase Offset",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": false,
-            "structural": false
-          },
-          "id": "phase_offset",
-          "max": 1.0,
-          "min": 0.0,
-          "name": "Flanger Phase Offset",
-          "uiWidget": "slider",
-          "unit": "none"
-        },
-        {
-          "curve": "linear",
-          "default": 1.0,
-          "doc": "Flanger Sync",
-          "enumLabels": [
-            "Seconds",
-            "Tempo",
-            "Tempo Dotted",
-            "Tempo Triplets"
-          ],
-          "flags": {
-            "enum": true,
-            "hidden": false,
-            "integer": true,
-            "modulatable": false,
-            "noSmooth": true,
-            "primary": false,
-            "structural": false
-          },
-          "id": "sync",
-          "max": 3.0,
-          "min": 0.0,
-          "name": "Flanger Sync",
-          "uiWidget": "select",
-          "unit": "none"
-        },
-        {
-          "curve": "linear",
-          "default": 4.0,
-          "doc": "Flanger Tempo",
-          "enumLabels": [
-            "Freeze",
-            "32/1",
-            "16/1",
-            "8/1",
-            "4/1",
-            "2/1",
-            "1/1",
-            "1/2",
-            "1/4",
-            "1/8",
-            "1/16"
-          ],
-          "flags": {
-            "enum": true,
-            "hidden": false,
-            "integer": true,
-            "modulatable": false,
-            "noSmooth": true,
-            "primary": false,
-            "structural": false
-          },
-          "id": "tempo",
-          "max": 10.0,
-          "min": 0.0,
-          "name": "Flanger Tempo",
-          "uiWidget": "select",
-          "unit": "none"
         }
       ],
       "texts": []
     },
     {
       "category": "Audio FX",
-      "doc": "Phaser: all-pass stages swept around Center by their own oscillator. Center and Mod Depth are in semitones, Frequency is a power of two in hertz.",
+      "doc": "Allpass stages swept through the signal. Count is how many notches there are, Center and Spread where they sit, Rate and Depth how they move, and Feedback how deep they cut.",
       "face": null,
       "flags": {
         "needsTransport": false,
@@ -3317,7 +4114,7 @@
       "id": "fx.phaser",
       "inputs": [
         {
-          "doc": "Audio input",
+          "doc": "Audio input. Stereo: the left and right lanes stay apart throughout",
           "id": "in",
           "implicit": false,
           "kind": "continuous",
@@ -3325,497 +4122,61 @@
           "role": "audio"
         },
         {
-          "doc": "Phaser Blend",
-          "id": "param:blend",
-          "implicit": true,
-          "kind": "continuous",
-          "name": "Phaser Blend",
-          "param": "blend",
-          "role": "cv"
-        },
-        {
-          "doc": "Phaser Center",
+          "doc": "Center",
           "id": "param:center",
           "implicit": true,
           "kind": "continuous",
-          "name": "Phaser Center",
+          "name": "Center",
           "param": "center",
           "role": "cv"
         },
         {
-          "doc": "Phaser Mix",
-          "id": "param:dry_wet",
-          "implicit": true,
-          "kind": "continuous",
-          "name": "Phaser Mix",
-          "param": "dry_wet",
-          "role": "cv"
-        },
-        {
-          "doc": "Phaser Feedback",
+          "doc": "Feedback",
           "id": "param:feedback",
           "implicit": true,
           "kind": "continuous",
-          "name": "Phaser Feedback",
+          "name": "Feedback",
           "param": "feedback",
           "role": "cv"
         },
         {
-          "doc": "Phaser Frequency",
-          "id": "param:frequency",
+          "doc": "Sharpness",
+          "id": "param:sharpness",
           "implicit": true,
           "kind": "continuous",
-          "name": "Phaser Frequency",
-          "param": "frequency",
+          "name": "Sharpness",
+          "param": "sharpness",
           "role": "cv"
         },
         {
-          "doc": "Phaser Mod Depth",
-          "id": "param:mod_depth",
+          "doc": "Rate",
+          "id": "param:rate",
           "implicit": true,
           "kind": "continuous",
-          "name": "Phaser Mod Depth",
-          "param": "mod_depth",
+          "name": "Rate",
+          "param": "rate",
           "role": "cv"
         },
         {
-          "doc": "Phaser Phase Offset",
-          "id": "param:phase_offset",
+          "doc": "Depth",
+          "id": "param:depth",
           "implicit": true,
           "kind": "continuous",
-          "name": "Phaser Phase Offset",
-          "param": "phase_offset",
+          "name": "Depth",
+          "param": "depth",
           "role": "cv"
-        }
-      ],
-      "name": "Phaser",
-      "outputs": [
-        {
-          "doc": "Dry/wet phaser output",
-          "id": "out",
-          "implicit": false,
-          "kind": "continuous",
-          "name": "Out",
-          "role": "audio"
         },
         {
-          "doc": "Where the sweep left the all-pass cutoff at the end of the block, as a MIDI note",
-          "id": "cutoff",
-          "implicit": false,
-          "kind": "continuous",
-          "name": "Cutoff",
-          "role": "cv"
-        }
-      ],
-      "params": [
-        {
-          "curve": "linear",
-          "default": 1.0,
-          "doc": "Phaser Blend",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": false,
-            "structural": false
-          },
-          "id": "blend",
-          "max": 2.0,
-          "min": 0.0,
-          "name": "Phaser Blend",
-          "uiWidget": "slider",
-          "unit": "none"
-        },
-        {
-          "curve": "linear",
-          "default": 80.0,
-          "doc": "Phaser Center",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": false,
-            "structural": false
-          },
-          "id": "center",
-          "max": 136.0,
-          "min": 8.0,
-          "name": "Phaser Center",
-          "uiWidget": "slider",
-          "unit": "semitones"
-        },
-        {
-          "curve": "linear",
-          "default": 1.0,
-          "doc": "Phaser Mix",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": true,
-            "structural": false
-          },
-          "id": "dry_wet",
-          "max": 1.0,
-          "min": 0.0,
-          "name": "Phaser Mix",
-          "uiWidget": "slider",
-          "unit": "percent"
-        },
-        {
-          "curve": "linear",
-          "default": 0.5,
-          "doc": "Phaser Feedback",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": true,
-            "structural": false
-          },
-          "id": "feedback",
-          "max": 1.0,
-          "min": 0.0,
-          "name": "Phaser Feedback",
-          "uiWidget": "slider",
-          "unit": "percent"
-        },
-        {
-          "curve": "linear",
-          "default": -3.0,
-          "doc": "Phaser Frequency",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": true,
-            "structural": false
-          },
-          "id": "frequency",
-          "max": 2.0,
-          "min": -5.0,
-          "name": "Phaser Frequency",
-          "uiWidget": "slider",
-          "unit": "seconds"
-        },
-        {
-          "curve": "linear",
-          "default": 24.0,
-          "doc": "Phaser Mod Depth",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": true,
-            "structural": false
-          },
-          "id": "mod_depth",
-          "max": 48.0,
-          "min": 0.0,
-          "name": "Phaser Mod Depth",
-          "uiWidget": "slider",
-          "unit": "semitones"
-        },
-        {
-          "curve": "linear",
-          "default": 0.3333333432674408,
-          "doc": "Phaser Phase Offset",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": false,
-            "structural": false
-          },
-          "id": "phase_offset",
-          "max": 1.0,
-          "min": 0.0,
-          "name": "Phaser Phase Offset",
-          "uiWidget": "slider",
-          "unit": "none"
-        },
-        {
-          "curve": "linear",
-          "default": 1.0,
-          "doc": "Phaser Sync",
-          "enumLabels": [
-            "Seconds",
-            "Tempo",
-            "Tempo Dotted",
-            "Tempo Triplets"
-          ],
-          "flags": {
-            "enum": true,
-            "hidden": false,
-            "integer": true,
-            "modulatable": false,
-            "noSmooth": true,
-            "primary": false,
-            "structural": false
-          },
-          "id": "sync",
-          "max": 3.0,
-          "min": 0.0,
-          "name": "Phaser Sync",
-          "uiWidget": "select",
-          "unit": "none"
-        },
-        {
-          "curve": "linear",
-          "default": 3.0,
-          "doc": "Phaser Tempo",
-          "enumLabels": [
-            "Freeze",
-            "32/1",
-            "16/1",
-            "8/1",
-            "4/1",
-            "2/1",
-            "1/1",
-            "1/2",
-            "1/4",
-            "1/8",
-            "1/16"
-          ],
-          "flags": {
-            "enum": true,
-            "hidden": false,
-            "integer": true,
-            "modulatable": false,
-            "noSmooth": true,
-            "primary": false,
-            "structural": false
-          },
-          "id": "tempo",
-          "max": 10.0,
-          "min": 0.0,
-          "name": "Phaser Tempo",
-          "uiWidget": "select",
-          "unit": "none"
-        }
-      ],
-      "texts": []
-    },
-    {
-      "category": "Audio FX",
-      "doc": "An algorithmic reverb: early reflections whose Mode and Size say what room this is, a tail whose Reverb Time is split into three bands so the low end can ring on after the top has gone, a Late Mix between the two, and Width and Mix on the way out. It is a global effect: put it after voices.sum so it runs once on the whole chord rather than once per voice.",
-      "face": [
-        [
-          "in",
-          "select:mode",
-          "size",
-          "size",
-          "predelay",
-          "predelay",
-          "diffusion",
-          "diffusion",
-          "buildup",
-          "buildup",
-          "time",
-          "time",
-          "time",
-          "time",
-          "meter",
-          "meter",
-          "out"
-        ],
-        [
-          ".",
-          "select:mode",
-          "size",
-          "size",
-          "predelay",
-          "predelay",
-          "diffusion",
-          "diffusion",
-          "buildup",
-          "buildup",
-          "time",
-          "time",
-          "time",
-          "time",
-          "meter",
-          "meter",
-          "."
-        ],
-        [
-          ".",
-          ".",
-          "low_freq",
-          "low_freq",
-          "low_factor",
-          "low_factor",
-          "high_freq",
-          "high_freq",
-          "high_factor",
-          "high_factor",
-          "late_mix",
-          "late_mix",
-          "width",
-          "width",
-          "mix",
-          "mix",
-          "."
-        ],
-        [
-          ".",
-          ".",
-          "low_freq",
-          "low_freq",
-          "low_factor",
-          "low_factor",
-          "high_freq",
-          "high_freq",
-          "high_factor",
-          "high_factor",
-          "late_mix",
-          "late_mix",
-          "width",
-          "width",
-          "mix",
-          "mix",
-          "."
-        ]
-      ],
-      "flags": {
-        "needsTransport": false,
-        "previewsEnvelope": false,
-        "previewsWave": false,
-        "publishesKeys": false,
-        "publishesMeter": true,
-        "publishesNotes": false,
-        "publishesScope": false,
-        "publishesValue": false,
-        "terminal": false,
-        "voiceEntry": false,
-        "voiceExit": false,
-        "writesTelemetry": true
-      },
-      "id": "fx.reverb",
-      "inputs": [
-        {
-          "doc": "Audio to be reverberated. Stereo: the left and right lanes stay apart the whole way through",
-          "id": "in",
-          "implicit": false,
-          "kind": "continuous",
-          "name": "In",
-          "role": "audio"
-        },
-        {
-          "doc": "How big that space is, as a proportion of its usual size. It moves the early reflections; the tail's length is Reverb Time and its density is Buildup",
-          "id": "param:size",
+          "doc": "Stereo",
+          "id": "param:stereo",
           "implicit": true,
           "kind": "continuous",
-          "name": "Size",
-          "param": "size",
+          "name": "Stereo",
+          "param": "stereo",
           "role": "cv"
         },
         {
-          "doc": "Silence between the dry sound and the first reflection, in milliseconds",
-          "id": "param:predelay",
-          "implicit": true,
-          "kind": "continuous",
-          "name": "Pre-delay",
-          "param": "predelay",
-          "role": "cv"
-        },
-        {
-          "doc": "How smoothly the early reflections are spread. At zero they are discrete taps; turned up they smear into one another",
-          "id": "param:diffusion",
-          "implicit": true,
-          "kind": "continuous",
-          "name": "Diffusion",
-          "param": "diffusion",
-          "role": "cv"
-        },
-        {
-          "doc": "How smoothly the tail's reflections are spread, by diffusing what goes into the tank",
-          "id": "param:buildup",
-          "implicit": true,
-          "kind": "continuous",
-          "name": "Buildup",
-          "param": "buildup",
-          "role": "cv"
-        },
-        {
-          "doc": "How long the tail takes to fall by 60 dB. The wet level does not change with it",
-          "id": "param:time",
-          "implicit": true,
-          "kind": "continuous",
-          "name": "Reverb Time",
-          "param": "time",
-          "role": "cv"
-        },
-        {
-          "doc": "Where the low band ends",
-          "id": "param:low_freq",
-          "implicit": true,
-          "kind": "continuous",
-          "name": "Low Band Split",
-          "param": "low_freq",
-          "role": "cv"
-        },
-        {
-          "doc": "The low band's reverb time, relative to Reverb Time. Above 1 the low end rings on after the rest",
-          "id": "param:low_factor",
-          "implicit": true,
-          "kind": "continuous",
-          "name": "Low Band Factor",
-          "param": "low_factor",
-          "role": "cv"
-        },
-        {
-          "doc": "Where the high band begins",
-          "id": "param:high_freq",
-          "implicit": true,
-          "kind": "continuous",
-          "name": "High Band Split",
-          "param": "high_freq",
-          "role": "cv"
-        },
-        {
-          "doc": "The high band's reverb time, relative to Reverb Time. Below 1 the top decays away first, which is what the air in a real room does",
-          "id": "param:high_factor",
-          "implicit": true,
-          "kind": "continuous",
-          "name": "High Band Factor",
-          "param": "high_factor",
-          "role": "cv"
-        },
-        {
-          "doc": "Blends the early reflections (0%) with the tail (100%). It is a crossfade inside the wet signal; Mix still decides how much of that is heard",
-          "id": "param:late_mix",
-          "implicit": true,
-          "kind": "continuous",
-          "name": "Late Mix",
-          "param": "late_mix",
-          "role": "cv"
-        },
-        {
-          "doc": "Stereo width of the wet signal. 0% is mono, 100% is as the network made it",
-          "id": "param:width",
-          "implicit": true,
-          "kind": "continuous",
-          "name": "Width",
-          "param": "width",
-          "role": "cv"
-        },
-        {
-          "doc": "How much of the output is the reverb rather than the signal that came in",
+          "doc": "Mix",
           "id": "param:mix",
           "implicit": true,
           "kind": "continuous",
@@ -3824,28 +4185,37 @@
           "role": "cv"
         },
         {
-          "doc": "How far the tank's delays drift. A little of it keeps a long tail from ringing metallically. The reference instrument has no such control; this is the one place this module goes past its panel",
-          "id": "param:mod_amount",
+          "doc": "Width",
+          "id": "param:width",
           "implicit": true,
           "kind": "continuous",
-          "name": "Modulation",
-          "param": "mod_amount",
+          "name": "Width",
+          "param": "width",
           "role": "cv"
         },
         {
-          "doc": "How fast that drift moves",
-          "id": "param:mod_rate",
+          "doc": "Spread",
+          "id": "param:spread",
           "implicit": true,
           "kind": "continuous",
-          "name": "Modulation Rate",
-          "param": "mod_rate",
+          "name": "Spread",
+          "param": "spread",
+          "role": "cv"
+        },
+        {
+          "doc": "Tone",
+          "id": "param:tone",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Tone",
+          "param": "tone",
           "role": "cv"
         }
       ],
-      "name": "Reverb",
+      "name": "Phaser",
       "outputs": [
         {
-          "doc": "The dry signal blended with the wet one by Mix",
+          "doc": "The processed signal",
           "id": "out",
           "implicit": false,
           "kind": "continuous",
@@ -3857,32 +4227,7 @@
         {
           "curve": "linear",
           "default": 0.0,
-          "doc": "The kind of space the early reflections describe: a Room's arrive early and close together, a Hall's later and further apart",
-          "enumLabels": [
-            "Room",
-            "Hall"
-          ],
-          "flags": {
-            "enum": true,
-            "hidden": false,
-            "integer": true,
-            "modulatable": false,
-            "noSmooth": true,
-            "primary": true,
-            "structural": false
-          },
-          "group": "Early",
-          "id": "mode",
-          "max": 1.0,
-          "min": 0.0,
-          "name": "Mode",
-          "uiWidget": "select",
-          "unit": "none"
-        },
-        {
-          "curve": "linear",
-          "default": 100.0,
-          "doc": "How big that space is, as a proportion of its usual size. It moves the early reflections; the tail's length is Reverb Time and its density is Buildup",
+          "doc": "Center",
           "flags": {
             "enum": false,
             "hidden": false,
@@ -3892,123 +4237,57 @@
             "primary": true,
             "structural": false
           },
-          "group": "Early",
-          "id": "size",
-          "max": 200.0,
-          "min": 0.0,
-          "name": "Size",
-          "uiWidget": "knob",
-          "unit": "percent"
-        },
-        {
-          "curve": "quartic",
-          "default": 4.0,
-          "doc": "Silence between the dry sound and the first reflection, in milliseconds",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": true,
-            "structural": false
-          },
-          "group": "Early",
-          "id": "predelay",
+          "id": "center",
           "max": 100.0,
-          "min": 0.0,
-          "name": "Pre-delay",
-          "uiWidget": "knob",
-          "unit": "milliseconds"
-        },
-        {
-          "curve": "linear",
-          "default": 70.0,
-          "doc": "How smoothly the early reflections are spread. At zero they are discrete taps; turned up they smear into one another",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": true,
-            "structural": false
-          },
-          "group": "Early",
-          "id": "diffusion",
-          "max": 100.0,
-          "min": 0.0,
-          "name": "Diffusion",
+          "min": -100.0,
+          "name": "Center",
           "uiWidget": "knob",
           "unit": "percent"
         },
         {
           "curve": "linear",
-          "default": 70.0,
-          "doc": "How smoothly the tail's reflections are spread, by diffusing what goes into the tank",
+          "default": 0.0,
+          "doc": "Feedback",
           "flags": {
             "enum": false,
             "hidden": false,
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
-            "primary": true,
+            "primary": false,
             "structural": false
           },
-          "group": "Late",
-          "id": "buildup",
+          "id": "feedback",
           "max": 100.0,
-          "min": 0.0,
-          "name": "Buildup",
+          "min": -100.0,
+          "name": "Feedback",
           "uiWidget": "knob",
           "unit": "percent"
         },
         {
-          "curve": "log",
-          "default": 1.2599999904632568,
-          "doc": "How long the tail takes to fall by 60 dB. The wet level does not change with it",
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Sharpness",
           "flags": {
             "enum": false,
             "hidden": false,
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
-            "primary": true,
+            "primary": false,
             "structural": false
           },
-          "group": "Late",
-          "id": "time",
-          "max": 31.600000381469727,
-          "min": 0.3160000145435333,
-          "name": "Reverb Time",
+          "id": "sharpness",
+          "max": 100.0,
+          "min": -100.0,
+          "name": "Sharpness",
           "uiWidget": "knob",
-          "unit": "seconds"
-        },
-        {
-          "curve": "log",
-          "default": 298.0,
-          "doc": "Where the low band ends",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": true,
-            "structural": false
-          },
-          "group": "Late",
-          "id": "low_freq",
-          "max": 1480.0,
-          "min": 65.4000015258789,
-          "name": "Low Band Split",
-          "uiWidget": "knob",
-          "unit": "hz"
+          "unit": "percent"
         },
         {
           "curve": "log",
           "default": 1.0,
-          "doc": "The low band's reverb time, relative to Reverb Time. Above 1 the low end rings on after the rest",
+          "doc": "Rate",
           "flags": {
             "enum": false,
             "hidden": false,
@@ -4018,60 +4297,17 @@
             "primary": true,
             "structural": false
           },
-          "group": "Late",
-          "id": "low_factor",
-          "max": 1.7799999713897705,
-          "min": 0.5619999766349792,
-          "name": "Low Band Factor",
-          "uiWidget": "knob",
-          "unit": "ratio"
-        },
-        {
-          "curve": "log",
-          "default": 4000.0,
-          "doc": "Where the high band begins",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": true,
-            "structural": false
-          },
-          "group": "Late",
-          "id": "high_freq",
-          "max": 11200.0,
-          "min": 831.0,
-          "name": "High Band Split",
+          "id": "rate",
+          "max": 512.0,
+          "min": 0.0078125,
+          "name": "Rate",
           "uiWidget": "knob",
           "unit": "hz"
         },
         {
-          "curve": "log",
-          "default": 1.0,
-          "doc": "The high band's reverb time, relative to Reverb Time. Below 1 the top decays away first, which is what the air in a real room does",
-          "flags": {
-            "enum": false,
-            "hidden": false,
-            "integer": false,
-            "modulatable": true,
-            "noSmooth": false,
-            "primary": true,
-            "structural": false
-          },
-          "group": "Late",
-          "id": "high_factor",
-          "max": 1.7799999713897705,
-          "min": 0.5619999766349792,
-          "name": "High Band Factor",
-          "uiWidget": "knob",
-          "unit": "ratio"
-        },
-        {
           "curve": "linear",
-          "default": 75.0,
-          "doc": "Blends the early reflections (0%) with the tail (100%). It is a crossfade inside the wet signal; Mix still decides how much of that is heard",
+          "default": 0.0,
+          "doc": "Depth",
           "flags": {
             "enum": false,
             "hidden": false,
@@ -4081,39 +4317,37 @@
             "primary": true,
             "structural": false
           },
-          "group": "Late",
-          "id": "late_mix",
+          "id": "depth",
           "max": 100.0,
           "min": 0.0,
-          "name": "Late Mix",
+          "name": "Depth",
           "uiWidget": "knob",
           "unit": "percent"
         },
         {
           "curve": "linear",
-          "default": 100.0,
-          "doc": "Stereo width of the wet signal. 0% is mono, 100% is as the network made it",
+          "default": 0.0,
+          "doc": "Stereo",
           "flags": {
             "enum": false,
             "hidden": false,
             "integer": false,
             "modulatable": true,
             "noSmooth": false,
-            "primary": true,
+            "primary": false,
             "structural": false
           },
-          "group": "Output",
-          "id": "width",
-          "max": 150.0,
+          "id": "stereo",
+          "max": 100.0,
           "min": 0.0,
-          "name": "Width",
+          "name": "Stereo",
           "uiWidget": "knob",
           "unit": "percent"
         },
         {
           "curve": "linear",
           "default": 50.0,
-          "doc": "How much of the output is the reverb rather than the signal that came in",
+          "doc": "Mix",
           "flags": {
             "enum": false,
             "hidden": false,
@@ -4123,7 +4357,6 @@
             "primary": true,
             "structural": false
           },
-          "group": "Output",
           "id": "mix",
           "max": 100.0,
           "min": 0.0,
@@ -4133,8 +4366,8 @@
         },
         {
           "curve": "linear",
-          "default": 20.0,
-          "doc": "How far the tank's delays drift. A little of it keeps a long tail from ringing metallically. The reference instrument has no such control; this is the one place this module goes past its panel",
+          "default": 0.0,
+          "doc": "Width",
           "flags": {
             "enum": false,
             "hidden": false,
@@ -4144,8 +4377,415 @@
             "primary": false,
             "structural": false
           },
-          "group": "Modulation",
-          "id": "mod_amount",
+          "id": "width",
+          "max": 24.0,
+          "min": -24.0,
+          "name": "Width",
+          "uiWidget": "knob",
+          "unit": "db"
+        },
+        {
+          "curve": "linear",
+          "default": 4.0,
+          "doc": "Count",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "primary": false,
+            "structural": false
+          },
+          "id": "count",
+          "max": 16.0,
+          "min": 1.0,
+          "name": "Count",
+          "uiWidget": "knob",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Spread",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "spread",
+          "max": 100.0,
+          "min": 0.0,
+          "name": "Spread",
+          "uiWidget": "knob",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Waveform",
+          "enumLabels": [
+            "Sine",
+            "Triangle",
+            "Ramp",
+            "Saw",
+            "Square",
+            "Noise",
+            "Sample & Hold"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "primary": false,
+            "structural": false
+          },
+          "id": "waveform",
+          "max": 6.0,
+          "min": 0.0,
+          "name": "Waveform",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Tone",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "tone",
+          "max": 100.0,
+          "min": -100.0,
+          "name": "Tone",
+          "uiWidget": "knob",
+          "unit": "percent"
+        }
+      ],
+      "texts": []
+    },
+    {
+      "category": "Audio FX",
+      "doc": "An algorithmic reverb. Room Size and Decay Time set the space and how long it rings; Diffusion and Buildup how smoothly the early and late reflections spread; LF and HF Damping which end of the spectrum dies away first; Pre-Delay the gap before it starts, Modulation how much the tail drifts, Width its stereo spread and Mix how much of it you hear.",
+      "face": [
+        [
+          "in",
+          "pre_delay",
+          "pre_delay",
+          "room_size",
+          "room_size",
+          "decay_time",
+          "decay_time",
+          "decay_time",
+          "decay_time",
+          "diffusion",
+          "diffusion",
+          "buildup",
+          "buildup",
+          "out"
+        ],
+        [
+          ".",
+          "pre_delay",
+          "pre_delay",
+          "room_size",
+          "room_size",
+          "decay_time",
+          "decay_time",
+          "decay_time",
+          "decay_time",
+          "diffusion",
+          "diffusion",
+          "buildup",
+          "buildup",
+          "."
+        ],
+        [
+          ".",
+          "modulation",
+          "modulation",
+          "lf_damping",
+          "lf_damping",
+          "hf_damping",
+          "hf_damping",
+          "width",
+          "width",
+          "mix",
+          "mix",
+          ".",
+          ".",
+          "."
+        ],
+        [
+          ".",
+          "modulation",
+          "modulation",
+          "lf_damping",
+          "lf_damping",
+          "hf_damping",
+          "hf_damping",
+          "width",
+          "width",
+          "mix",
+          "mix",
+          ".",
+          ".",
+          "."
+        ]
+      ],
+      "flags": {
+        "needsTransport": false,
+        "previewsEnvelope": false,
+        "previewsWave": false,
+        "publishesKeys": false,
+        "publishesMeter": false,
+        "publishesNotes": false,
+        "publishesScope": false,
+        "publishesValue": false,
+        "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
+        "writesTelemetry": false
+      },
+      "id": "fx.reverb",
+      "inputs": [
+        {
+          "doc": "Audio input. Stereo: the left and right lanes stay apart throughout",
+          "id": "in",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "In",
+          "role": "audio"
+        },
+        {
+          "doc": "Pre-Delay",
+          "id": "param:pre_delay",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Pre-Delay",
+          "param": "pre_delay",
+          "role": "cv"
+        },
+        {
+          "doc": "Room Size",
+          "id": "param:room_size",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Room Size",
+          "param": "room_size",
+          "role": "cv"
+        },
+        {
+          "doc": "Decay Time",
+          "id": "param:decay_time",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Decay Time",
+          "param": "decay_time",
+          "role": "cv"
+        },
+        {
+          "doc": "Diffusion",
+          "id": "param:diffusion",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Diffusion",
+          "param": "diffusion",
+          "role": "cv"
+        },
+        {
+          "doc": "Buildup",
+          "id": "param:buildup",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Buildup",
+          "param": "buildup",
+          "role": "cv"
+        },
+        {
+          "doc": "Modulation",
+          "id": "param:modulation",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Modulation",
+          "param": "modulation",
+          "role": "cv"
+        },
+        {
+          "doc": "LF Damping",
+          "id": "param:lf_damping",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "LF Damping",
+          "param": "lf_damping",
+          "role": "cv"
+        },
+        {
+          "doc": "HF Damping",
+          "id": "param:hf_damping",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "HF Damping",
+          "param": "hf_damping",
+          "role": "cv"
+        },
+        {
+          "doc": "Width",
+          "id": "param:width",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Width",
+          "param": "width",
+          "role": "cv"
+        },
+        {
+          "doc": "Mix",
+          "id": "param:mix",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Mix",
+          "param": "mix",
+          "role": "cv"
+        }
+      ],
+      "name": "Reverb",
+      "outputs": [
+        {
+          "doc": "The processed signal",
+          "id": "out",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Out",
+          "role": "audio"
+        }
+      ],
+      "params": [
+        {
+          "curve": "log",
+          "default": 0.0625,
+          "doc": "Pre-Delay",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "pre_delay",
+          "max": 2.0,
+          "min": 0.00390625,
+          "name": "Pre-Delay",
+          "uiWidget": "knob",
+          "unit": "seconds"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Room Size",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "id": "room_size",
+          "max": 100.0,
+          "min": -100.0,
+          "name": "Room Size",
+          "uiWidget": "knob",
+          "unit": "percent"
+        },
+        {
+          "curve": "log",
+          "default": 1.6817928552627563,
+          "doc": "Decay Time",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "id": "decay_time",
+          "max": 64.0,
+          "min": 0.0625,
+          "name": "Decay Time",
+          "uiWidget": "knob",
+          "unit": "seconds"
+        },
+        {
+          "curve": "linear",
+          "default": 100.0,
+          "doc": "Diffusion",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "id": "diffusion",
+          "max": 100.0,
+          "min": 0.0,
+          "name": "Diffusion",
+          "uiWidget": "knob",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 100.0,
+          "doc": "Buildup",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "buildup",
+          "max": 100.0,
+          "min": 0.0,
+          "name": "Buildup",
+          "uiWidget": "knob",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 50.0,
+          "doc": "Modulation",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "modulation",
           "max": 100.0,
           "min": 0.0,
           "name": "Modulation",
@@ -4153,9 +4793,9 @@
           "unit": "percent"
         },
         {
-          "curve": "log",
-          "default": 0.25,
-          "doc": "How fast that drift moves",
+          "curve": "linear",
+          "default": 20.0,
+          "doc": "LF Damping",
           "flags": {
             "enum": false,
             "hidden": false,
@@ -4165,13 +4805,709 @@
             "primary": false,
             "structural": false
           },
-          "group": "Modulation",
-          "id": "mod_rate",
-          "max": 8.0,
-          "min": 0.009999999776482582,
-          "name": "Modulation Rate",
+          "id": "lf_damping",
+          "max": 100.0,
+          "min": 0.0,
+          "name": "LF Damping",
+          "uiWidget": "knob",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 20.0,
+          "doc": "HF Damping",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "hf_damping",
+          "max": 100.0,
+          "min": 0.0,
+          "name": "HF Damping",
+          "uiWidget": "knob",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Width",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "width",
+          "max": 24.0,
+          "min": -24.0,
+          "name": "Width",
+          "uiWidget": "knob",
+          "unit": "db"
+        },
+        {
+          "curve": "linear",
+          "default": 33.0,
+          "doc": "Mix",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "id": "mix",
+          "max": 100.0,
+          "min": 0.0,
+          "name": "Mix",
+          "uiWidget": "knob",
+          "unit": "percent"
+        }
+      ],
+      "texts": []
+    },
+    {
+      "category": "Audio FX",
+      "doc": "A plate reverb. Room Shape and Size choose the space, Decay Time how long it rings, and the Low Cut, Peak and High Cut shape the tail as it goes.",
+      "face": null,
+      "flags": {
+        "needsTransport": false,
+        "previewsEnvelope": false,
+        "previewsWave": false,
+        "publishesKeys": false,
+        "publishesMeter": false,
+        "publishesNotes": false,
+        "publishesScope": false,
+        "publishesValue": false,
+        "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
+        "writesTelemetry": false
+      },
+      "id": "fx.reverb.hall",
+      "inputs": [
+        {
+          "doc": "Audio input. Stereo: the left and right lanes stay apart throughout",
+          "id": "in",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "In",
+          "role": "audio"
+        },
+        {
+          "doc": "Pre-Delay",
+          "id": "param:pre_delay",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Pre-Delay",
+          "param": "pre_delay",
+          "role": "cv"
+        },
+        {
+          "doc": "Size",
+          "id": "param:size",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Size",
+          "param": "size",
+          "role": "cv"
+        },
+        {
+          "doc": "Decay Time",
+          "id": "param:decay_time",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Decay Time",
+          "param": "decay_time",
+          "role": "cv"
+        },
+        {
+          "doc": "HF Damping",
+          "id": "param:hf_damping",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "HF Damping",
+          "param": "hf_damping",
+          "role": "cv"
+        },
+        {
+          "doc": "Low Cut",
+          "id": "param:low_cut",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Low Cut",
+          "param": "low_cut",
+          "role": "cv"
+        },
+        {
+          "doc": "Peak Freq",
+          "id": "param:peak_freq",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Peak Freq",
+          "param": "peak_freq",
+          "role": "cv"
+        },
+        {
+          "doc": "Peak Gain",
+          "id": "param:peak_gain",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Peak Gain",
+          "param": "peak_gain",
+          "role": "cv"
+        },
+        {
+          "doc": "High Cut",
+          "id": "param:high_cut",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "High Cut",
+          "param": "high_cut",
+          "role": "cv"
+        },
+        {
+          "doc": "Mix",
+          "id": "param:mix",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Mix",
+          "param": "mix",
+          "role": "cv"
+        },
+        {
+          "doc": "Width",
+          "id": "param:width",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Width",
+          "param": "width",
+          "role": "cv"
+        }
+      ],
+      "name": "Reverb Hall",
+      "outputs": [
+        {
+          "doc": "The processed signal",
+          "id": "out",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Out",
+          "role": "audio"
+        }
+      ],
+      "params": [
+        {
+          "curve": "log",
+          "default": 0.0625,
+          "doc": "Pre-Delay",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "pre_delay",
+          "max": 32.0,
+          "min": 0.00390625,
+          "name": "Pre-Delay",
+          "uiWidget": "knob",
+          "unit": "seconds"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Room Shape",
+          "enumLabels": [
+            "Type 1",
+            "Type 2",
+            "Type 3",
+            "Type 4"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "primary": false,
+            "structural": false
+          },
+          "id": "room_shape",
+          "max": 3.0,
+          "min": 0.0,
+          "name": "Room Shape",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 50.0,
+          "doc": "Size",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "id": "size",
+          "max": 100.0,
+          "min": 0.0,
+          "name": "Size",
+          "uiWidget": "knob",
+          "unit": "percent"
+        },
+        {
+          "curve": "log",
+          "default": 2.0,
+          "doc": "Decay Time",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "id": "decay_time",
+          "max": 64.0,
+          "min": 0.0625,
+          "name": "Decay Time",
+          "uiWidget": "knob",
+          "unit": "seconds"
+        },
+        {
+          "curve": "linear",
+          "default": 20.0,
+          "doc": "HF Damping",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "id": "hf_damping",
+          "max": 100.0,
+          "min": 0.0,
+          "name": "HF Damping",
+          "uiWidget": "knob",
+          "unit": "percent"
+        },
+        {
+          "curve": "log",
+          "default": 110.0,
+          "doc": "Low Cut",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "low_cut",
+          "max": 25087.7109375,
+          "min": 13.75,
+          "name": "Low Cut",
           "uiWidget": "knob",
           "unit": "hz"
+        },
+        {
+          "curve": "log",
+          "default": 440.0,
+          "doc": "Peak Freq",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "peak_freq",
+          "max": 25087.7109375,
+          "min": 13.75,
+          "name": "Peak Freq",
+          "uiWidget": "knob",
+          "unit": "hz"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Peak Gain",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "peak_gain",
+          "max": 48.0,
+          "min": -48.0,
+          "name": "Peak Gain",
+          "uiWidget": "knob",
+          "unit": "db"
+        },
+        {
+          "curve": "log",
+          "default": 25087.7109375,
+          "doc": "High Cut",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "high_cut",
+          "max": 25087.7109375,
+          "min": 13.75,
+          "name": "High Cut",
+          "uiWidget": "knob",
+          "unit": "hz"
+        },
+        {
+          "curve": "linear",
+          "default": 50.0,
+          "doc": "Mix",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "id": "mix",
+          "max": 100.0,
+          "min": 0.0,
+          "name": "Mix",
+          "uiWidget": "knob",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Width",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "width",
+          "max": 24.0,
+          "min": -24.0,
+          "name": "Width",
+          "uiWidget": "knob",
+          "unit": "db"
+        }
+      ],
+      "texts": []
+    },
+    {
+      "category": "Audio FX",
+      "doc": "A speaker on a turntable. The horn and the rotor turn at their own rates; Doppler is the pitch shift that causes and Tremolo the loudness swing.",
+      "face": null,
+      "flags": {
+        "needsTransport": false,
+        "previewsEnvelope": false,
+        "previewsWave": false,
+        "publishesKeys": false,
+        "publishesMeter": false,
+        "publishesNotes": false,
+        "publishesScope": false,
+        "publishesValue": false,
+        "terminal": false,
+        "voiceEntry": false,
+        "voiceExit": false,
+        "writesTelemetry": false
+      },
+      "id": "fx.rotary",
+      "inputs": [
+        {
+          "doc": "Audio input. Stereo: the left and right lanes stay apart throughout",
+          "id": "in",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "In",
+          "role": "audio"
+        },
+        {
+          "doc": "Horn Rate",
+          "id": "param:horn_rate",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Horn Rate",
+          "param": "horn_rate",
+          "role": "cv"
+        },
+        {
+          "doc": "Doppler",
+          "id": "param:doppler",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Doppler",
+          "param": "doppler",
+          "role": "cv"
+        },
+        {
+          "doc": "Tremolo",
+          "id": "param:tremolo",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Tremolo",
+          "param": "tremolo",
+          "role": "cv"
+        },
+        {
+          "doc": "Rotor Rate",
+          "id": "param:rotor_rate",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Rotor Rate",
+          "param": "rotor_rate",
+          "role": "cv"
+        },
+        {
+          "doc": "Drive",
+          "id": "param:drive",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Drive",
+          "param": "drive",
+          "role": "cv"
+        },
+        {
+          "doc": "Width",
+          "id": "param:width",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Width",
+          "param": "width",
+          "role": "cv"
+        },
+        {
+          "doc": "Mix",
+          "id": "param:mix",
+          "implicit": true,
+          "kind": "continuous",
+          "name": "Mix",
+          "param": "mix",
+          "role": "cv"
+        }
+      ],
+      "name": "Rotary Speaker",
+      "outputs": [
+        {
+          "doc": "The processed signal",
+          "id": "out",
+          "implicit": false,
+          "kind": "continuous",
+          "name": "Out",
+          "role": "audio"
+        }
+      ],
+      "params": [
+        {
+          "curve": "log",
+          "default": 1.0,
+          "doc": "Horn Rate",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "id": "horn_rate",
+          "max": 512.0,
+          "min": 0.0078125,
+          "name": "Horn Rate",
+          "uiWidget": "knob",
+          "unit": "hz"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Doppler",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "id": "doppler",
+          "max": 100.0,
+          "min": 0.0,
+          "name": "Doppler",
+          "uiWidget": "knob",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Tremolo",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "id": "tremolo",
+          "max": 100.0,
+          "min": 0.0,
+          "name": "Tremolo",
+          "uiWidget": "knob",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Rotor Rate",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "rotor_rate",
+          "max": 200.0,
+          "min": 0.0,
+          "name": "Rotor Rate",
+          "uiWidget": "knob",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Drive",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "drive",
+          "max": 100.0,
+          "min": 0.0,
+          "name": "Drive",
+          "uiWidget": "knob",
+          "unit": "percent"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Model",
+          "enumLabels": [
+            "Soft",
+            "Hard",
+            "Asymmetric",
+            "Sine",
+            "Digital",
+            "OJD",
+            "Full Wave",
+            "Fuzz Soft Clip"
+          ],
+          "flags": {
+            "enum": true,
+            "hidden": false,
+            "integer": true,
+            "modulatable": false,
+            "noSmooth": true,
+            "primary": false,
+            "structural": false
+          },
+          "id": "model",
+          "max": 7.0,
+          "min": 0.0,
+          "name": "Model",
+          "uiWidget": "select",
+          "unit": "none"
+        },
+        {
+          "curve": "linear",
+          "default": 0.0,
+          "doc": "Width",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": false,
+            "structural": false
+          },
+          "id": "width",
+          "max": 24.0,
+          "min": -24.0,
+          "name": "Width",
+          "uiWidget": "knob",
+          "unit": "db"
+        },
+        {
+          "curve": "linear",
+          "default": 33.0,
+          "doc": "Mix",
+          "flags": {
+            "enum": false,
+            "hidden": false,
+            "integer": false,
+            "modulatable": true,
+            "noSmooth": false,
+            "primary": true,
+            "structural": false
+          },
+          "id": "mix",
+          "max": 100.0,
+          "min": 0.0,
+          "name": "Mix",
+          "uiWidget": "knob",
+          "unit": "percent"
         }
       ],
       "texts": []

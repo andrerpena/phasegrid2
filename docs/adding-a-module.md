@@ -128,6 +128,36 @@ nothing, so every delay line is sized in `prepare` for the longest setting the k
 `reset(voicePair)` zeroes them in place; and a param declares the unit and taper it really has, since
 there is no vendored table to inherit a wrong one from.
 
+## An sst-backed effect
+
+The shortest path there is, and the first one to try for an audio effect: a file in
+`engine/src/modules/sst` and a line in `builtin.cpp`.
+
+```cpp
+const ModuleDescriptor& fxThing() {
+  static const ModuleDescriptor& desc = []() -> const ModuleDescriptor& {
+    sstfx::EffectSpec spec = sstfx::effectSpec<sst::effects::thing::Thing<sstfx::Config>>(
+      "fx.thing", "Thing", "What it does, as a person would say it.");
+    spec.face = {"amount", "mix"};          // the handful worth a knob on the module's face
+    return sstfx::buildDescriptor(spec);
+  }();
+  return desc;
+}
+```
+
+Everything else is generated. The ports are always stereo in, stereo out; the parameters come from
+the effect's own `paramAt`, with the ranges, units and tapers it describes, which is the whole reason
+this layer exists (docs/adrs/0010). What you write is the id, the name, the sentence and the face.
+
+Two things to know. A display scaling the generator has not met **throws at registry time** rather
+than publishing a knob whose label does not match its value -- add it to `rangeOf` in
+`engine/src/sst/Descriptors.cpp`. And an effect's parameter list can have holes in it and repeated
+names, so ids are made unique and dead slots skipped (`publishable`); `WrappedEffect` keeps the map
+back to the effect's own indices.
+
+Then **probe it**: `npm run module:probe -- fx.thing`. It audits the example and sweeps every knob,
+and a knob that does not change the sound fails. A module is not done before that passes.
+
 ## Wrapping a vendored module
 
 A module built on the vendored DSP (`engine/vendor/vital`) has no class of its own. It is one `ModuleSpec` value in a

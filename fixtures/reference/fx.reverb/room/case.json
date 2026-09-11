@@ -1,5 +1,5 @@
 {
-  "_about": "Plucked sawtooth chords through the reverb, fully wet, so what is compared is the reverb and not the sound going into it. Export the same thing from the reference instrument -- its Reverb on a plucked saw, Room preset values below, Mix 100% -- and drop it here as reference.wav; then `npm run compare:reference -- fx.reverb` decides. Only shape and level are compared, since the two are not sample-aligned: crest says how dense the tail is, maxStep whether it is continuous, and overs that neither of them clips. The early tap sets in engine/src/modules/FxReverb.cpp are OUR reading of two words, Room and Hall (docs/adrs/0009); this is where that reading gets checked.",
+  "_about": "Plucked sawtooth chords through fx.reverb (Reverb 2), fully wet, so what is compared is the reverb and not the sound going into it. Export the same thing from the reference instrument -- its Reverb on a plucked saw, Mix 100%, a decay close to the Decay Time below -- and drop it here as reference.wav; then `npm run compare:reference -- fx.reverb` decides. Only shape and level are compared, since the two are not sample-aligned: crest says how dense the tail is, maxStep whether it is continuous, and overs that neither of them clips. These are the Surge Synth Team's reverbs rather than anything written here (docs/adrs/0010), so what this case checks is how close that choice lands to the reference, not an implementation of our own.",
   "tempo": 120,
   "bars": 8,
   "expect": {
@@ -73,16 +73,16 @@
         "id": "verb",
         "type": "fx.reverb",
         "params": {
-          "mode": 0,
-          "size": 100,
-          "predelay": 4,
-          "diffusion": 70,
-          "buildup": 70,
-          "time": 1.26,
-          "late_mix": 75,
-          "width": 100,
           "mix": 100,
-          "mod_amount": 0
+          "decay_time": 1.5,
+          "room_size": 0,
+          "diffusion": 100,
+          "buildup": 100,
+          "pre_delay": 0.02,
+          "lf_damping": 20,
+          "hf_damping": 30,
+          "modulation": 0,
+          "width": 0
         },
         "x": 1000,
         "y": 0

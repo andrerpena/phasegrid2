@@ -22,14 +22,20 @@ extern const ModuleDescriptor kValue;
 extern const ModuleDescriptor kPiano;
 extern const ModuleDescriptor kVoiceSum;
 extern const ModuleDescriptor kEnvAdsr;
-extern const ModuleDescriptor kFxReverb;
 const ModuleDescriptor& filterMulti();   // generated at first call; process lifetime
 const ModuleDescriptor& oscWavetable();
 const ModuleDescriptor& modRandom();
+// sst-backed effects; see engine/src/sst and engine/src/modules/sst
+const ModuleDescriptor& fxReverb();
+const ModuleDescriptor& fxReverbHall();
 const ModuleDescriptor& fxDelay();
-const ModuleDescriptor& fxChorus();
+const ModuleDescriptor& fxDelayFloaty();
 const ModuleDescriptor& fxFlanger();
 const ModuleDescriptor& fxPhaser();
+const ModuleDescriptor& fxBonsai();
+const ModuleDescriptor& fxRotary();
+// still Vital-backed: sst-effects has no equivalent yet
+const ModuleDescriptor& fxChorus();
 const ModuleDescriptor& fxDistortion();
 const ModuleDescriptor& fxCompressor();
 const ModuleDescriptor& fxEq();
@@ -45,11 +51,12 @@ void registerBuiltinModules(Registry& r) {
     &modules::kAudioOut, &modules::kNoteToCv, &modules::kNoteToPoly, &modules::kNotesClip, &modules::kNotesPattern,
     &modules::kPhaseClock, &modules::kOscSawtooth, &modules::kOscPulse, &modules::kOscSine, &modules::kModLfo, &modules::kScaleOffset, &modules::kMixer, &modules::kVca,
     &modules::kMeter, &modules::kScope, &modules::kValue, &modules::kPiano, &modules::kVoiceSum,
-    &modules::kEnvAdsr, &modules::kFxReverb,
+    &modules::kEnvAdsr,
     &modules::filterMulti(), &modules::oscWavetable(),
     &modules::modRandom(),
-    &modules::fxDelay(), &modules::fxChorus(), &modules::fxFlanger(),
-    &modules::fxPhaser(), &modules::fxDistortion(), &modules::fxCompressor(), &modules::fxEq(),
+    &modules::fxReverb(), &modules::fxReverbHall(), &modules::fxDelay(), &modules::fxDelayFloaty(),
+    &modules::fxFlanger(), &modules::fxPhaser(), &modules::fxBonsai(), &modules::fxRotary(),
+    &modules::fxChorus(), &modules::fxDistortion(), &modules::fxCompressor(), &modules::fxEq(),
     &modules::samplerPlayer(),
     &modules::noteFxChord(), &modules::noteFxQuantize(), &modules::noteFxArp(), &modules::noteFxHumanize(),
   };

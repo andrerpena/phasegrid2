@@ -11,10 +11,9 @@
 
 namespace {
 
-// `fx.reverb` is not here: it is not a vendored-adapter module any more, and
-// `test_fx_reverb.cpp` holds its tests.
-const char* kEffects[] = {"fx.delay",      "fx.chorus",     "fx.flanger", "fx.phaser",
-                          "fx.distortion", "fx.compressor", "fx.eq"};
+// The reverb, the delays, the flanger and the phaser left this list when they moved to
+// sst-effects; `test_sst_effects.cpp` covers them now. What is here is what is still Vital's.
+const char* kEffects[] = {"fx.chorus", "fx.distortion", "fx.compressor", "fx.eq"};
 
 using pg::test::Fx;
 
@@ -53,34 +52,6 @@ TEST_CASE("every effect passes audio and is allocation free", "[vital][rt]") {
   }
 }
 
-TEST_CASE("fx.delay repeats its input after the time its frequency knob asks for", "[vital]") {
-  // Frequency is a power of two in hertz and the delay time is its inverse, so 3 -> 8 Hz -> 6000 samples at
-  // 48 kHz. Fully wet with no feedback, the output is silent until that step arrives. The delay line is left
-  // to settle on silence first: on its very first block it is still ramping its own wet mix in from zero.
-  auto measure = [](float frequency) {
-    Fx fx("fx.delay", {{"sync", 0.f}, {"frequency", frequency}, {"feedback", 0.f}, {"dry_wet", 1.f},
-                       {"style", 0.f}, {"filter_cutoff", 136.f}, {"filter_spread", 0.f}},
-          /*sine=*/false, /*level=*/0.f);
-    fx.run(400);
-    REQUIRE(fx.at(63) == Catch::Approx(0.f).margin(1e-4));   // silent while the input is silent
-
-    REQUIRE(fx.f.model.removeEdge("in"));
-    fx.f.node("hi", "test.const", {{"value", 1.f}});
-    fx.f.edge("in", "hi.out", "fx.in");
-    fx.program = fx.f.compile();
-
-    for (int b = 0; b < 500; ++b) {
-      fx.f.run(*fx.program, 64);
-      for (uint32_t i = 0; i < 64; ++i)
-        if (fx.at(i) > 0.1f) return b * 64 + static_cast<int>(i);
-    }
-    return -1;
-  };
-
-  REQUIRE(measure(3.f) == Catch::Approx(6000).margin(120));   // 8 Hz
-  REQUIRE(measure(4.f) == Catch::Approx(3000).margin(120));   // 16 Hz: half the time, so the knob is live
-}
-
 TEST_CASE("fx.distortion clips harder as its drive knob rises", "[vital]") {
   // Hard clip with no filter: a steady 0.5 passes untouched at 0 dB and is driven into the ceiling at 30 dB.
   Fx clean("fx.distortion", {{"type", 1.f}, {"drive", 0.f}, {"mix", 1.f}, {"filter_order", 0.f}},
@@ -106,9 +77,10 @@ TEST_CASE("fx.eq attenuates by the amount its gain knob asks for", "[vital]") {
 }
 
 TEST_CASE("effect readout outputs carry their value across the whole block", "[vital]") {
-  // The compressor's six level meters and the flanger's and phaser's sweep readouts are full-size Outputs the
-  // vendored code writes at [0] only, once per block. They have to be broadcast across the block; copying the
-  // buffer would leave every frame but the first at zero.
+  // The compressor's six level meters are full-size Outputs the vendored code writes at [0] only, once
+  // per block. They have to be broadcast across the block; copying the buffer would leave every frame
+  // but the first at zero. (The flanger's and phaser's sweep readouts were the other two cases, and
+  // both are sst-backed now.)
   Fx comp("fx.compressor", {}, /*sine=*/true);
   comp.run(100);
   for (const char* port : {"low_in", "band_in", "high_in", "low_out", "band_out", "high_out"}) {
@@ -117,35 +89,21 @@ TEST_CASE("effect readout outputs carry their value across the whole block", "[v
     REQUIRE(comp.at(63, port) == comp.at(0, port));
   }
 
-  Fx flanger("fx.flanger", {{"sync", 0.f}, {"frequency", 0.f}}, /*sine=*/true);
-  flanger.run(100);
-  REQUIRE(flanger.at(0, "frequency") > 0.f);
-  REQUIRE(flanger.at(63, "frequency") == flanger.at(0, "frequency"));
-
-  Fx phaser("fx.phaser", {{"sync", 0.f}, {"frequency", 0.f}}, /*sine=*/true);
-  phaser.run(100);
-  REQUIRE(phaser.at(0, "cutoff") > 0.f);
-  REQUIRE(phaser.at(63, "cutoff") == phaser.at(0, "cutoff"));
 }
 
 TEST_CASE("effect params are generated from the vendored parameter table", "[vital]") {
   pg::Registry reg;
   pg::registerBuiltinModules(reg);
 
-  // The tempo divisions the delay offers start at 4/1, because its own `tempo` control runs 4..12 rather than
-  // 0..12: the labels have to be read from that offset, not from the start of the vendored name table.
-  const pg::RegisteredModule* delay = reg.find("fx.delay");
-  const pg::ParamDesc& tempo = delay->desc->params[delay->findParam("tempo")];
-  REQUIRE(tempo.min == Catch::Approx(4.f));
-  REQUIRE(tempo.enumCount == 9);
-  REQUIRE(std::string(tempo.enumLabels[0]) == "4/1");
-  REQUIRE(std::string(tempo.enumLabels[8]) == "1/64");
-
-  // A tempo control that does start at zero still reads from the start of the table.
-  const pg::RegisteredModule* phaser = reg.find("fx.phaser");
-  const pg::ParamDesc& phaserTempo = phaser->desc->params[phaser->findParam("tempo")];
-  REQUIRE(phaserTempo.min == Catch::Approx(0.f));
-  REQUIRE(std::string(phaserTempo.enumLabels[0]) == "Freeze");
+  // A tempo control's labels are read from the vendored name table at the control's OWN offset: the
+  // chorus's runs 0..12, so it starts at the first name. (The delay's ran 4..12 and was the sharper
+  // case, but the delay is sst-backed now; the rule is the same and this is what still exercises it.)
+  const pg::RegisteredModule* chorus = reg.find("fx.chorus");
+  const pg::ParamDesc& tempo = chorus->desc->params[chorus->findParam("tempo")];
+  REQUIRE(tempo.min == Catch::Approx(0.f));
+  REQUIRE(tempo.enumCount == 11);
+  REQUIRE(std::string(tempo.enumLabels[0]) == "Freeze");
+  REQUIRE(std::string(tempo.enumLabels[10]) == "1/16");
 
   const pg::RegisteredModule* dist = reg.find("fx.distortion");
   const pg::ParamDesc& type = dist->desc->params[dist->findParam("type")];

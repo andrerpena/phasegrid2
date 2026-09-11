@@ -267,6 +267,44 @@ const edge = (id: string, from: [string, string], to: [string, string]) => ({
  * Three modules is the smallest patch that can demonstrate an effect: without a source there is
  * nothing to hear it act on, and without an output there is nothing to hear.
  */
+/** Four notes, a beat apart: enough to hear pitch change and a rhythm. */
+const ARPEGGIO = {
+  notes: [60, 64, 67, 72].map((pitch, step) => ({
+    start: step,
+    length: 0.9,
+    pitch,
+    velocity: 0.8,
+  })),
+};
+
+/**
+ * A clip driving an oscillator's pitch through a note-to-voice converter.
+ *
+ * Three of the note modules are demonstrated by the same shape, because that shape is the smallest
+ * one in which any of them does anything: a clip with nothing to convert its notes is silent, and a
+ * converter with no clip has nothing to convert.
+ */
+/** The clip every note example is built around, unless one asks for a different source. */
+const CLIP_SOURCE: Omit<PatchModule, "id" | "x" | "y"> = {
+  type: "notes.clip",
+  params: { length: 4, loop: 1 },
+  data: ARPEGGIO,
+};
+
+/**
+ * A signal through the module under test: how an audio effect is demonstrated.
+ *
+ * The source is GATED -- a pattern, a converter, an oscillator and an envelope -- and not a held
+ * oscillator, which is the whole difference between an example that shows an effect and one that
+ * hides it. A reverb tail, a delay repeat and a flanger sweep are all heard in the gaps between
+ * notes; with a tone that never stops there are no gaps, and every time-domain control on the module
+ * is genuinely inaudible. That is what `npm run module:probe` checks before it measures anything,
+ * and what it caught when the reverb's example was a bare oscillator (docs/adrs/0010).
+ *
+ * The voices are summed before the effect, so it runs once on the whole chord rather than once per
+ * voice, and its output goes to BOTH channels: `io.audioOut` mirrors inL when inR is empty, which
+ * would throw away the stereo image an effect had just made.
+ */
 function throughExample(args: {
   moduleId: string;
   name: string;
@@ -282,19 +320,42 @@ function throughExample(args: {
       schemaVersion: 1,
       feedbackMode: "sample",
       modules: [
-        source("osc", args.sourceParams),
+        { id: "clip", ...CLIP_SOURCE, x: col(2), y: col(2) },
+        { id: "voices", type: "note.toPoly", x: col(11), y: col(2) },
+        {
+          id: "osc",
+          type: "osc.wavetable",
+          x: col(15),
+          y: col(2),
+          params: { level: 0.7, ...args.sourceParams },
+        },
+        {
+          id: "env",
+          type: "env.adsr",
+          x: col(28),
+          y: col(2),
+          // Short and plucked on purpose: the point is the silence after each note.
+          params: { attack: 0.002, decay: 0.25, sustain: 0, release: 0.08 },
+        },
+        { id: "sum", type: "voices.sum", x: col(40), y: col(2) },
         {
           id: "unit",
           type: args.moduleId,
-          x: col(13),
+          x: col(44),
           y: col(2),
           params: args.params ?? {},
         },
-        OUT,
+        { ...OUT, x: col(58) },
       ],
       edges: [
-        edge("e1", ["osc", "out"], ["unit", "in"]),
-        edge("e2", ["unit", "out"], ["out", "inL"]),
+        edge("e1", ["clip", "notes"], ["voices", "notes"]),
+        edge("e2", ["voices", "pitch"], ["osc", "pitch"]),
+        edge("e3", ["voices", "gate"], ["env", "gate"]),
+        edge("e4", ["osc", "out"], ["env", "signal"]),
+        edge("e5", ["env", "signal"], ["sum", "in"]),
+        edge("e6", ["sum", "out"], ["unit", "in"]),
+        edge("e7", ["unit", "out"], ["out", "inL"]),
+        edge("e8", ["unit", "out"], ["out", "inR"]),
       ],
     },
   };
@@ -408,36 +469,73 @@ register(
 );
 
 const EFFECTS: [string, string, string, Record<string, number>][] = [
+  // --- sst-backed (engine/src/modules/sst) ---------------------------------------------------
   [
     "fx.reverb",
     "Reverb",
-    "Reverb on a bare tone. Turn Mix for how much of it you hear, Reverb Time for how long the " +
-      "tail lasts, and Late Mix to move between the early reflections and that tail.",
-    { mix: 60 },
+    "A reverb on plucked chords. Turn Mix for how much of it you hear, Decay Time for how long the " +
+      "tail rings on after each note, and Room Size for how big the space is.",
+    { mix: 60, decay_time: 3 },
+  ],
+  [
+    "fx.reverb.hall",
+    "Reverb Hall",
+    "The plainer of the two reverbs. Turn Decay Time and Size, then Room Shape to change the space.",
+    { mix: 60, decay_time: 3, size: 70, peak_gain: 12 },
   ],
   [
     "fx.delay",
     "Delay",
-    "A delay line. Turn Dry/Wet for how much, Frequency for the time, Feedback for repeats.",
-    { dry_wet: 0.5, feedback: 0.5 },
+    "A stereo delay. Turn Feedback for more repeats, and Left and Right apart from each other to " +
+      "put the repeats on opposite sides.",
+    { mix: 50, feedback: 45, left: 0.3, right: 0.45, rate: 0.4, depth: 30 },
   ],
   [
-    "fx.chorus",
-    "Chorus",
-    "Chorus on a bare tone. Turn Dry/Wet, then Mod Depth and Frequency.",
-    { dry_wet: 0.6 },
+    "fx.delay.floaty",
+    "Floaty Delay",
+    "A tape delay that wanders. Turn Playrate away from the middle and the repeats drift in pitch " +
+      "as they fade.",
+    {
+      mix: 35,
+      feedback: 65,
+      time: 0.35,
+      rate: 0.5,
+      pitch_depth: 40,
+      filter_depth: 40,
+      width: 60,
+    },
   ],
   [
     "fx.flanger",
     "Flanger",
-    "Flanger on a bare tone. Turn Feedback for the sweep to bite.",
-    { dry_wet: 0.6, feedback: 0.6 },
+    "A bank of tuned combs. Turn Feedback for the sweep to bite, then Count and Spacing.",
+    { mix: 80, feedback: 60, depth: 60, rate: 0.4 },
   ],
   [
     "fx.phaser",
     "Phaser",
-    "Phaser on a bare tone. Turn Mod Depth and Frequency to hear it move.",
-    { dry_wet: 0.7 },
+    "Notches swept through the sound. Turn Rate and Depth to hear them move, Count for how many.",
+    { mix: 80, depth: 60, stereo: 50, feedback: 40, rate: 0.5, spread: 40 },
+  ],
+  [
+    "fx.bonsai",
+    "Bonsai",
+    "Tape saturation. Turn Distort for how hard it is driven and Dull for how much top it loses.",
+    { mix: 100, distort: 60, dull: 40, sensitivity: 60, gain_2: 0 },
+  ],
+  [
+    "fx.rotary",
+    "Rotary Speaker",
+    "A speaker on a turntable. Turn Horn Rate to change how fast it spins, and Doppler for the " +
+      "pitch shift that causes.",
+    { mix: 100, doppler: 60, tremolo: 60, rotor_rate: 80, drive: 30 },
+  ],
+  // --- still Vital-backed: sst-effects has no equivalent yet ----------------------------------
+  [
+    "fx.chorus",
+    "Chorus",
+    "Chorus on plucked chords. Turn Dry/Wet, then Mod Depth and Frequency.",
+    { dry_wet: 0.6 },
   ],
   [
     "fx.distortion",
@@ -454,7 +552,7 @@ const EFFECTS: [string, string, string, Record<string, number>][] = [
   [
     "fx.compressor",
     "Compressor",
-    "Compression on a steady tone. Turn Mix, then Attack and Release.",
+    "Compression on plucked chords. Turn Mix, then Attack and Release.",
     { mix: 1 },
   ],
 ];
@@ -534,30 +632,6 @@ register(
 );
 
 // --- Notes -------------------------------------------------------------------------------------
-
-/** Four notes, a beat apart: enough to hear pitch change and a rhythm. */
-const ARPEGGIO = {
-  notes: [60, 64, 67, 72].map((pitch, step) => ({
-    start: step,
-    length: 0.9,
-    pitch,
-    velocity: 0.8,
-  })),
-};
-
-/**
- * A clip driving an oscillator's pitch through a note-to-voice converter.
- *
- * Three of the note modules are demonstrated by the same shape, because that shape is the smallest
- * one in which any of them does anything: a clip with nothing to convert its notes is silent, and a
- * converter with no clip has nothing to convert.
- */
-/** The clip every note example is built around, unless one asks for a different source. */
-const CLIP_SOURCE: Omit<PatchModule, "id" | "x" | "y"> = {
-  type: "notes.clip",
-  params: { length: 4, loop: 1 },
-  data: ARPEGGIO,
-};
 
 function noteExample(args: {
   moduleId: string;

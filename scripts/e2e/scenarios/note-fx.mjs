@@ -81,7 +81,8 @@ export default {
     check(
       "the audio effects sit under Audio FX",
       inGroup("Audio FX").join(" ") ===
-        "fx.chorus fx.compressor fx.delay fx.distortion fx.eq fx.flanger fx.phaser fx.reverb",
+        "fx.bonsai fx.chorus fx.compressor fx.delay fx.delay.floaty fx.distortion " +
+          "fx.eq fx.flanger fx.phaser fx.reverb fx.reverb.hall fx.rotary",
       JSON.stringify(inGroup("Audio FX")),
     );
     check(

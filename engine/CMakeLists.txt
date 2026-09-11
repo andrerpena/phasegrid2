@@ -4,11 +4,12 @@ add_subdirectory(vendor/vital)
 
 file(GLOB_RECURSE PG_CORE_SOURCES CONFIGURE_DEPENDS
   src/core/*.cpp src/services/*.cpp src/render/*.cpp src/modules/*.cpp
-  src/dsp/*.cpp src/pattern/*.cpp src/protocol/*.cpp src/platform/*.cpp src/vital/*.cpp)
+  src/dsp/*.cpp src/pattern/*.cpp src/protocol/*.cpp src/platform/*.cpp src/vital/*.cpp
+  src/sst/*.cpp)
 
 add_library(pg_core STATIC ${PG_CORE_SOURCES})
 target_include_directories(pg_core PUBLIC src)
-target_link_libraries(pg_core PUBLIC vital_dsp readerwriterqueue nlohmann_json::nlohmann_json miniaudio_headers)
+target_link_libraries(pg_core PUBLIC vital_dsp sst_headers readerwriterqueue nlohmann_json::nlohmann_json miniaudio_headers)
 pg_apply_warnings(pg_core)
 set_source_files_properties(src/services/MiniaudioImpl.cpp PROPERTIES COMPILE_OPTIONS "-w")
 if(APPLE)

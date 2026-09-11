@@ -20,4 +20,5 @@ already say: a record points at those for the mechanism and keeps only the reaso
 | [0006](0006-the-output-clips-like-the-reference-instrument.md) | The output clips like the reference instrument's, and says so | 2026-09-10 |
 | [0007](0007-what-we-take-from-vcv-rack.md) | What we take from VCV Rack, and what we leave | 2026-09-10 |
 | [0008](0008-the-envelope-is-the-reference-instrument-s-adsr.md) | The envelope is the reference instrument's ADSR, on the vendored envelope | 2026-09-10 |
-| [0009](0009-the-reverb-is-the-reference-instrument-s.md) | The reverb is the reference instrument's, on our own network | 2026-09-10 |
+| [0009](0009-the-reverb-is-the-reference-instrument-s.md) | ~~The reverb is the reference instrument's, on our own network~~ (superseded by 0010) | 2026-09-10 |
+| [0010](0010-the-effects-come-from-a-library.md) | The effects come from a library, not from us | 2026-09-11 |
