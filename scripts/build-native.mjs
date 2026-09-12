@@ -43,9 +43,12 @@ if (werror || !existsSync(resolve(buildDir, "CMakeCache.txt"))) {
 // returns rather than failing, so asking for the target would then be an error. `npm install` runs this
 // after installing dependencies, so the normal path has them.
 const addonAvailable = existsSync(resolve(root, "node_modules/node-addon-api/napi.h"));
+// `pg-sst-ref` runs an sst effect outside the engine, which is how a suspected adapter bug is told
+// apart from the effect simply doing that (engine/tools/SstReference.cpp). It is small and it is
+// only useful when it is already built, so it is built every time.
 const targets = process.argv.includes("--tests")
-  ? ["phasegrid-engine", "pg_tests"]
-  : ["phasegrid-engine"];
+  ? ["phasegrid-engine", "pg_tests", "pg-sst-ref"]
+  : ["phasegrid-engine", "pg-sst-ref"];
 if (addonAvailable) targets.push("pg_telemetry");
 cmake(["--build", buildDir, "--target", ...targets, "--parallel"]);
 console.log(

@@ -65,6 +65,18 @@ struct ParamOverride {
   std::string param;      ///< the generated id, e.g. "decay_time"
   uint32_t addFlags = 0;
   const char* doc = nullptr;
+  /**
+   * A default of our own, in the DISPLAY units the descriptor publishes.
+   *
+   * An effect's own default is the one its author chose for its own host, and that is not always a
+   * default that shows what the module does the moment it is dropped on the canvas. Reverb 2 ships
+   * LF Damping at 20 %, which on anything with low end in it removes most of the tail -- measured at
+   * 7.7 dB and half the decay on a plucked sine (docs/adrs/0010). A module a person adds should
+   * sound like the thing it is named after, so where the shipped default does not do that, this
+   * says what does. Measure before changing one.
+   */
+  bool hasDefault = false;
+  float def = 0.f;
   /// Set when this control does nothing until another one is off its neutral setting -- a band split
   /// while its factor is 1.0. `module:probe` reads it, so a control that is inert ON PURPOSE is
   /// declared rather than silently dead, which is the whole point of the probe.

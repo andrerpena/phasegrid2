@@ -11,6 +11,8 @@ Spec: docs/superpowers/specs/2026-09-07-phasegrid2-architecture-design.md. Engin
 - `npm run engine:build` / `npm run engine:test` — CMake build and Catch2 tests; REQUIRED after any C++ change
 - `npm run engine:render -- patch.json --out out.wav [--bars 2] [--tempo 120] [--period 512] [--set osc.fold=12]` — headless render, same code path as the device callback; `--period` is the callback size to pretend
 - `npm run render:example -- osc.sine [--bars 2] [--set ...]` — render a built-in example to a WAV and measure it
+- `npm run sst:ref -- <effect> dry.wav ref.wav [param=nativeValue ...]` (`--list` for the effects and their params) — runs an sst effect OUTSIDE the engine over a WAV. Render the same dry signal through the engine and through this and compare: matching output means `engine/src/sst` is faithful and the problem is the parameters or the patch, differing output means the adapter. Values are the effect's own, not the display units the descriptor publishes.
+- `npm run module:probe -- <moduleId> [--tail]` (`--all`) — audits a module's example and sweeps every knob, reporting how much the sound actually changes; a knob that does nothing fails.
 - `npm run audio:measure -- ours.wav [reference.wav]` — level, continuity (maxStep) and shape (crest, harmonics, THD); two files side by side
 - `npm run compare:reference [-- module/case]` — render each `fixtures/reference/<module>/<case>` and compare with the reference instrument's recording
 

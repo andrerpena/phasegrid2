@@ -1,5 +1,5 @@
 {
-  "catalogHash": "1a63b37eec28e419",
+  "catalogHash": "f80097de035f5f0a",
   "conventions": {
     "blockSize": 128,
     "gateThreshold": 0,
@@ -2531,7 +2531,7 @@
       "params": [
         {
           "curve": "log",
-          "default": 0.5,
+          "default": 0.375,
           "doc": "Left",
           "flags": {
             "enum": false,
@@ -2571,7 +2571,7 @@
         },
         {
           "curve": "linear",
-          "default": 0.0,
+          "default": 40.0,
           "doc": "Feedback",
           "flags": {
             "enum": false,
@@ -2894,7 +2894,7 @@
       "params": [
         {
           "curve": "log",
-          "default": 0.29999908804893494,
+          "default": 0.4000000059604645,
           "doc": "Time",
           "flags": {
             "enum": false,
@@ -2954,7 +2954,7 @@
         },
         {
           "curve": "log",
-          "default": 1396.9129638671875,
+          "default": 6000.0,
           "doc": "Cutoff",
           "flags": {
             "enum": false,
@@ -3094,7 +3094,7 @@
         },
         {
           "curve": "linear",
-          "default": 30.000001907348633,
+          "default": 50.0,
           "doc": "Mix",
           "flags": {
             "enum": false,
@@ -4694,7 +4694,7 @@
         },
         {
           "curve": "linear",
-          "default": 0.0,
+          "default": 50.0,
           "doc": "Room Size",
           "flags": {
             "enum": false,
@@ -4714,7 +4714,7 @@
         },
         {
           "curve": "log",
-          "default": 1.6817928552627563,
+          "default": 8.0,
           "doc": "Decay Time",
           "flags": {
             "enum": false,
@@ -4794,7 +4794,7 @@
         },
         {
           "curve": "linear",
-          "default": 20.0,
+          "default": 0.0,
           "doc": "LF Damping",
           "flags": {
             "enum": false,
@@ -4854,7 +4854,7 @@
         },
         {
           "curve": "linear",
-          "default": 33.0,
+          "default": 50.0,
           "doc": "Mix",
           "flags": {
             "enum": false,

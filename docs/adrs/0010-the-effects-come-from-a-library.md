@@ -70,6 +70,17 @@ no sst equivalent yet.
 both output channels — and then sweeps every parameter across its own taper, comparing each render
 with the untouched one. A knob whose whole range barely moves the output is reported DEAD.
 
+**And "is it us, or is it the effect?" is one command.** `engine/tools/SstReference.cpp` builds
+`pg-sst-ref`, which runs an sst effect over a WAV outside the engine. Render the same dry signal both
+ways and compare. That question came up the day this landed: `fx.reverb` sounded thin and
+indistinct and the block adaptation was the obvious suspect. The two renders matched to three decimal
+places, which ruled the adapter out in one step and left the real cause in plain sight — the effect's
+own shipped defaults. **LF Damping at 20 % costs 7.7 dB and half the tail** on anything with low end
+in it, and the shipped Decay Time leaves a T60 of about 1.5 s whatever the knob says. So a module may
+override the defaults it publishes (`ParamOverride::def`), and `fx.reverb` does: LF Damping 0,
+Decay Time 8 s, Room Size 50 %, Mix 50 %, which is a T60 of 5 s at 11 dB more level. A default is the
+sound a person gets before they touch anything, and it has to be the sound the module is named after.
+
 ## Consequences
 
 - **Vital shrinks to the voice path** — the `poly_float` wire type, `osc.wavetable`, the envelope
@@ -86,6 +97,23 @@ with the untouched one. A knob whose whole range barely moves the output is repo
   exactly as completely as a sustained tone hid the reverb. Those examples are fixed, and the fixing
   is the point: an example is what a person clicks, so an example that does not demonstrate its
   module is a bug in the module's surface.
+- **An effect is one instance per VOICE, not per voice pair, and it holds its voice while it rings.**
+  The vendored effects read the pair's first voice and mirror the result onto the second, which is
+  free and right for a global effect and silently wrong inside an instrument: half the notes of a
+  chord never reach it. `fx.reverb` patched straight after an oscillator -- with no `voices.sum`,
+  which is the first way anyone patches one -- produced a sound that stopped dead with the note. No
+  tail, indistinguishable from no reverb, and it is what the reverb was reported broken for a second
+  time. Two faults met there: the dropped lane, and nothing claiming the voice, so the pool freed it
+  and the scheduler stopped running the pair while the tail was still sounding.
+
+  The ring-out condition is worth writing down, because neither obvious version works. Holding
+  whenever the OUTPUT is audible latches -- the effect keeps its own voice alive, the voice goes on
+  feeding it, and a patch with no envelope never releases a note again. Holding once the INPUT is
+  silent is too late: `VoiceActivity::settle` commits a voice to its fade after one block with nothing
+  holding it and does not consult the holders again, and by the time a release has reached true
+  silence that block has gone. So the test is whether the input is FALLING AWAY -- quiet relative to
+  how loud this voice has lately been. An envelope in its release passes that while it still has a
+  way to go; an oscillator running flat out never does.
 - **Treemonster is deferred, and so is Nimbus.** Treemonster's pitch detector does not fire under our
   config — Threshold, Speed and both filter controls measure dead at every setting — and shipping it
   would be the exact thing this record exists to stop. Nimbus needs Surge's vendored `eurorack`.

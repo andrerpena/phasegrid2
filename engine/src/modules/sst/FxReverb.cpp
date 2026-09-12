@@ -28,6 +28,21 @@ const ModuleDescriptor& fxReverb() {
       "Diffusion and Buildup how smoothly the early and late reflections spread; LF and HF Damping "
       "which end of the spectrum dies away first; Pre-Delay the gap before it starts, Modulation "
       "how much the tail drifts, Width its stereo spread and Mix how much of it you hear.");
+    /*
+     * Our defaults, not the effect's, and each one measured.
+     *
+     * Reverb 2 ships the settings its author chose inside Surge, where you dial it before you judge
+     * it. Dropped on a canvas as-is over a plucked C3 sine it is a quiet, indistinct wash: LF
+     * Damping at 20 % takes 7.7 dB and half the tail off anything with low end in it, and the
+     * shipped Decay Time leaves a T60 of about 1.5 s. Together these give a T60 of 5 s at 11 dB
+     * more level -- a reverb that sounds like one before you touch it. See docs/adrs/0010.
+     */
+    spec.overrides = {
+      {.param = "lf_damping", .hasDefault = true, .def = 0.f},
+      {.param = "decay_time", .hasDefault = true, .def = 8.f},
+      {.param = "room_size", .hasDefault = true, .def = 50.f},
+      {.param = "mix", .hasDefault = true, .def = 50.f},
+    };
     spec.face = {"room_size", "decay_time", "diffusion", "mix"};
     spec.faceRows = {
       "in pre_delay pre_delay room_size room_size decay_time decay_time decay_time decay_time diffusion diffusion buildup buildup out",

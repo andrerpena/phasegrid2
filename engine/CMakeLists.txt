@@ -20,6 +20,12 @@ add_executable(phasegrid-engine src/app/main.cpp)
 target_link_libraries(phasegrid-engine PRIVATE pg_core)
 pg_apply_warnings(phasegrid-engine)
 
+# Runs an sst effect outside the engine, so "is the adapter wrong or is this what the effect does?"
+# is one command rather than an argument. See the header of the source.
+add_executable(pg-sst-ref tools/SstReference.cpp)
+target_link_libraries(pg-sst-ref PRIVATE pg_core)
+pg_apply_warnings(pg-sst-ref)
+
 if(PG_BUILD_TESTS)
   file(GLOB_RECURSE PG_TEST_SOURCES CONFIGURE_DEPENDS tests/*.cpp)
   add_executable(pg_tests ${PG_TEST_SOURCES})

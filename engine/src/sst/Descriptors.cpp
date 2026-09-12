@@ -196,6 +196,7 @@ const ModuleDescriptor& buildDescriptor(const EffectSpec& specIn) {
     if (const ParamOverride* over = findOverride(b->spec, id)) {
       p.flags |= over->addFlags;
       if (over->doc) p.doc = over->doc;
+      if (over->hasDefault) p.def = std::clamp(over->def, p.min, p.max);
     }
     if (std::find(b->spec.face.begin(), b->spec.face.end(), id) != b->spec.face.end())
       p.flags |= kParamPrimary;

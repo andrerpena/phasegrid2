@@ -2,7 +2,9 @@
 #include <catch2/catch_test_macros.hpp>
 #include <cmath>
 #include <map>
+#include <algorithm>
 #include <string>
+#include <nlohmann/json.hpp>
 #include "core/Registry.hpp"
 #include "modules/builtin.hpp"
 #include "sst/Descriptors.hpp"
@@ -169,4 +171,55 @@ TEST_CASE("an sst effect works a frame at a time, inside a feedback cluster", "[
   INFO("rms " << rms);
   REQUIRE(rms > 1e-4);           // it made sound
   REQUIRE(std::isfinite(rms));   // and the feedback did not run away
+}
+
+/**
+ * A reverb placed INSIDE an instrument rings out after the note ends.
+ *
+ * This is the bug the whole rack was reported for, and it looked like the effect not working at all:
+ * an oscillator patched straight into `fx.reverb` -- no `voices.sum` between them, which is the first
+ * way anyone patches one -- produced a sound that stopped dead with the note. No tail, indistinguishable
+ * from no reverb.
+ *
+ * Two faults met there. The wrapper read only the pair's first voice, so half the notes never reached
+ * the effect and the ring-out test below was being evaluated on a lane belonging to a different note;
+ * and nothing claimed the voice, so the pool freed it and the scheduler stopped running the pair while
+ * the tail was still sounding. Both are fixed in `WrappedEffect`; this is here so neither comes back.
+ */
+TEST_CASE("an sst effect inside an instrument rings out after its note", "[sst]") {
+  pg::test::GraphFixture f;
+  pg::registerBuiltinModules(f.reg);
+  f.node("pat", "notes.pattern", {{"legato", 0.2f}, {"cycle", 8.f}});
+  REQUIRE(f.model.setNodeData("pat", nlohmann::json{{"pattern", "c3 ~ ~ ~ ~ ~ ~ ~"}}));
+  f.node("poly", "note.toPoly", {{"voices", 4.f}});
+  f.node("osc", "osc.sine");
+  f.node("env", "env.adsr", {{"attack", 0.002f}, {"decay", 0.15f}, {"sustain", 0.f}, {"release", 0.05f}});
+  f.node("fx", "fx.reverb", {{"mix", 100.f}, {"decay_time", 8.f}});
+  f.node("out", "io.audioOut", {{"gain", 1.f}});
+  f.edge("e1", "pat.notes", "poly.notes");
+  f.edge("e2", "poly.pitch", "osc.pitch");
+  f.edge("e3", "poly.gate", "env.gate");
+  f.edge("e4", "osc.out", "env.signal");
+  f.edge("e5", "env.signal", "fx.in");     // straight in: no voices.sum
+  f.edge("e6", "fx.out", "out.inL");
+  auto program = f.compile();
+
+  // A tempo where one beat is a handful of blocks, so the note is over well inside the run.
+  f.transport.tempo = 3000.0;
+  f.transport.playing = true;
+
+  // The note, then a long silence after it. What matters is the second half.
+  double duringNote = 0, afterNote = 0;
+  for (int b = 0; b < 400; ++b) {
+    f.run(*program, 64);
+    double peak = 0;
+    for (uint32_t i = 0; i < 64; ++i)
+      peak = std::max(peak, static_cast<double>(std::fabs(f.out(*program, "fx", "out", i))));
+    if (b < 40) duringNote = std::max(duringNote, peak);
+    else if (b > 80) afterNote = std::max(afterNote, peak);
+  }
+  INFO("during " << duringNote << ", long after " << afterNote);
+  REQUIRE(duringNote > 0.001);
+  // Still ringing well after the envelope has finished. Before the fix this was exactly zero.
+  REQUIRE(afterNote > duringNote * 1e-3);
 }

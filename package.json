@@ -27,7 +27,8 @@
     "compare:reference": "node scripts/compare-reference.mjs",
     "storybook": "storybook dev -p 6006 --no-open",
     "storybook:build": "storybook build",
-    "module:probe": "vite-node -c vitest.config.ts scripts/module-probe.ts --"
+    "module:probe": "vite-node -c vitest.config.ts scripts/module-probe.ts --",
+    "sst:ref": "./build/engine/pg-sst-ref"
   },
   "dependencies": {
     "@radix-ui/react-dropdown-menu": "^2.1.24",
