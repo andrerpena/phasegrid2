@@ -1,0 +1,105 @@
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* The window is the viewport. Nothing above the dock ever scrolls. */
+    overflow: hidden;
+    height: 100%;
+  }
+
+  /* `data-theme` is written by `theming/apply-theme.ts`. The bare `:root` case is the
+     dark theme, so the window never flashes light before the store has run. */
+  :root,
+  [data-theme="dark"],
+  [data-theme="terminal"] {
+    color-scheme: dark;
+  }
+
+  [data-theme="light"] {
+    color-scheme: light;
+  }
+
+  body {
+    font-family: "Source Code Pro", ui-monospace, Menlo, monospace;
+    background-color: var(--background);
+    color: var(--foreground);
+    /* A grid editor is dragged on constantly; a stray text selection mid-drag is noise. */
+    -webkit-user-select: none;
+    user-select: none;
+    overflow: hidden;
+    height: 100%;
+    margin: 0;
+    /* Pan and pinch on the canvas are handled in JS, so the browser must not claim them. */
+    touch-action: none;
+  }
+
+  #root {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  /* Text that is meant to be read and copied — a path, a log line, an error — opts back in. */
+  .selectable {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  /*
+    Scrollbars in the theme's own colours, on a transparent track.
+
+    The platform's are sized for a document and drawn in the platform's greys, which in a dark
+    window with narrow panels reads as a light stripe down the edge of every list. Thin, and only
+    the thumb.
+  */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--muted-foreground) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-track,
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    /* Inset by a transparent border, so the thumb reads as narrower than the track it can be
+       grabbed in -- a 4px thumb is correct to look at and hard to hit. */
+    background: var(--muted-foreground);
+    background-clip: content-box;
+    border: 3px solid transparent;
+    border-radius: 5px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--foreground);
+    background-clip: content-box;
+  }
+}
+
+@layer components {
+  /**
+   * The step of a pattern that is sounding right now, in the pattern editor.
+   *
+   * A wash behind the characters rather than a colour on them: the text has already been coloured
+   * by the language, and recolouring it as it plays would make the notation itself flicker. Monaco
+   * owns the element, so this is a class it is handed rather than a style on a component.
+   */
+  .pg-step-sounding {
+    background-color: color-mix(
+      in oklch,
+      var(--color-signal-note) 40%,
+      transparent
+    );
+    border-radius: 2px;
+  }
+}

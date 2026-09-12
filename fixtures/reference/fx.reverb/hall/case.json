@@ -1,0 +1,191 @@
+{
+  "_about": "Plucked sawtooth chords through fx.reverb.hall (Reverb 1), fully wet, so what is compared is the reverb and not the sound going into it. Export the same thing from the reference instrument -- its Reverb on a plucked saw, Mix 100%, a decay close to the Decay Time below -- and drop it here as reference.wav; then `npm run compare:reference -- fx.reverb` decides. Only shape and level are compared, since the two are not sample-aligned: crest says how dense the tail is, maxStep whether it is continuous, and overs that neither of them clips. These are the Surge Synth Team's reverbs rather than anything written here (docs/adrs/0010), so what this case checks is how close that choice lands to the reference, not an implementation of our own.",
+  "tempo": 120,
+  "bars": 8,
+  "expect": {
+    "maxStep": {
+      "max": 0.1
+    },
+    "overs": {
+      "max": 0.0
+    },
+    "crest": {
+      "near": "reference",
+      "tolerance": 0.5
+    },
+    "rms": {
+      "near": "reference",
+      "tolerance": 0.25
+    }
+  },
+  "patch": {
+    "schemaVersion": 1,
+    "feedbackMode": "sample",
+    "modules": [
+      {
+        "id": "pat",
+        "type": "notes.pattern",
+        "params": {
+          "legato": 0.3,
+          "cycle": 4
+        },
+        "data": {
+          "pattern": "c3 e3 g3 b3"
+        },
+        "x": 0,
+        "y": 0
+      },
+      {
+        "id": "poly",
+        "type": "note.toPoly",
+        "params": {
+          "voices": 16
+        },
+        "x": 200,
+        "y": 0
+      },
+      {
+        "id": "osc",
+        "type": "osc.sawtooth",
+        "x": 400,
+        "y": 0
+      },
+      {
+        "id": "env",
+        "type": "env.adsr",
+        "params": {
+          "attack": 0.001,
+          "decay": 0.15,
+          "sustain": 0,
+          "release": 0.05,
+          "model": 2
+        },
+        "x": 600,
+        "y": 0
+      },
+      {
+        "id": "sum",
+        "type": "voices.sum",
+        "x": 800,
+        "y": 0
+      },
+      {
+        "id": "verb",
+        "type": "fx.reverb.hall",
+        "params": {
+          "mix": 100,
+          "decay_time": 6,
+          "size": 80,
+          "pre_delay": 0.03,
+          "hf_damping": 35,
+          "low_cut": 110,
+          "high_cut": 12000,
+          "peak_gain": 0,
+          "width": 0
+        },
+        "x": 1000,
+        "y": 0
+      },
+      {
+        "id": "out",
+        "type": "io.audioOut",
+        "params": {
+          "gain": 1,
+          "clip": 0
+        },
+        "x": 1200,
+        "y": 0
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1",
+        "from": {
+          "module": "pat",
+          "port": "notes"
+        },
+        "to": {
+          "module": "poly",
+          "port": "notes"
+        }
+      },
+      {
+        "id": "e2",
+        "from": {
+          "module": "poly",
+          "port": "pitch"
+        },
+        "to": {
+          "module": "osc",
+          "port": "pitch"
+        }
+      },
+      {
+        "id": "e3",
+        "from": {
+          "module": "poly",
+          "port": "gate"
+        },
+        "to": {
+          "module": "env",
+          "port": "gate"
+        }
+      },
+      {
+        "id": "e4",
+        "from": {
+          "module": "osc",
+          "port": "out"
+        },
+        "to": {
+          "module": "env",
+          "port": "signal"
+        }
+      },
+      {
+        "id": "e5",
+        "from": {
+          "module": "env",
+          "port": "signal"
+        },
+        "to": {
+          "module": "sum",
+          "port": "in"
+        }
+      },
+      {
+        "id": "e6",
+        "from": {
+          "module": "sum",
+          "port": "out"
+        },
+        "to": {
+          "module": "verb",
+          "port": "in"
+        }
+      },
+      {
+        "id": "e7",
+        "from": {
+          "module": "verb",
+          "port": "out"
+        },
+        "to": {
+          "module": "out",
+          "port": "inL"
+        }
+      },
+      {
+        "id": "e8",
+        "from": {
+          "module": "verb",
+          "port": "out"
+        },
+        "to": {
+          "module": "out",
+          "port": "inR"
+        }
+      }
+    ]
+  }
+}

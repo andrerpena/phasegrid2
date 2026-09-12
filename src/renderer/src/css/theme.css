@@ -1,0 +1,109 @@
+/*
+  The palettes, as CSS.
+
+  This file and `theming/themes/*.ts` hold the same values. CSS needs them so Tailwind's `@theme`
+  block can turn each one into a utility class; the TypeScript needs them because the Pixi canvas
+  cannot read a stylesheet. `theming/theme-parity.test.ts` fails if the two ever disagree, so change
+  one and the test will name the other.
+
+  Adding a colour means four edits: the `UIColors` or `GridColors` interface, all three theme
+  objects, the `@theme` mapping below, and all three blocks below that. The test checks the last
+  three against the first.
+*/
+
+@theme {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /*
+    The type scale, in rem against a 16px root, with a line height paired to each step.
+
+    Tailwind's defaults start at `text-xs` (12px), and a dense editor wants one step below that --
+    a port label, a unit suffix, a badge. Those were being written as `text-[10px]`, which is a
+    literal in the markup and a value nothing else can agree with.
+  */
+  --text-2xs: 0.625rem; /* 10px -- badges, units, port labels */
+  --text-2xs--line-height: 0.875rem;
+  --text-xs: 0.75rem; /* 12px -- panels, dense rows */
+  --text-xs--line-height: 1rem;
+  --text-sm: 0.875rem; /* 14px -- body, form labels */
+  --text-sm--line-height: 1.25rem;
+  --text-base: 1rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.75rem;
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl: 1.5rem; /* 24px -- the one heading, on the workspace gate */
+  --text-2xl--line-height: 2rem;
+
+  /* Interface roles. `--color-x` is what makes `bg-x` / `text-x` / `border-x` exist. */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-log-info: var(--log-info);
+  --color-log-warn: var(--log-warn);
+  --color-log-error: var(--log-error);
+
+  /* The canvas's own surfaces, so a legend in the interface matches what is drawn. */
+  --color-grid-background: var(--grid-background);
+  --color-grid-line: var(--grid-line);
+  --color-node-fill: var(--node-fill);
+  --color-node-stroke: var(--node-stroke);
+  --color-node-selected: var(--node-selected);
+  --color-knob-body: var(--knob-body);
+  --color-knob-pointer: var(--knob-pointer);
+  --color-knob-label: var(--knob-label);
+  --color-tile-fill: var(--tile-fill);
+  --color-tile-stroke: var(--tile-stroke);
+  --color-marquee: var(--marquee);
+  --color-playhead: var(--playhead);
+
+  /* The engine's signal roles. */
+  --color-signal-any: var(--signal-any);
+  --color-signal-audio: var(--signal-audio);
+  --color-signal-cv: var(--signal-cv);
+  --color-signal-gate: var(--signal-gate);
+  --color-signal-pitch: var(--signal-pitch);
+  --color-signal-phase: var(--signal-phase);
+  --color-signal-note: var(--signal-note);
+}
+
+:root {
+  --radius: 0.5rem;
+}
+
+/*
+  The ground, for the frame before the script runs.
+
+  The generated stylesheet is injected by JavaScript, and between the browser applying this file and
+  that happening there is one frame in which `var(--background)` resolves to nothing and the window
+  paints as whatever the platform's default is. These two are the only colours that show in that
+  frame, so they are the only ones duplicated -- and `theme-parity.test.ts` checks them against the
+  default theme, so they cannot drift.
+
+  Everything else deliberately has no fallback: a colour missing from the generated sheet should be
+  visibly missing, not quietly some other theme's value.
+*/
+:root {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+}
